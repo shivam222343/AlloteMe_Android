@@ -1,34 +1,41 @@
 {
     "project_info": {
-        "project_number": "123456789012",
-        "project_id": "mavericks-club-management",
-        "storage_bucket": "mavericks-club-management.appspot.com"
+        "project_number": "440104788015",
+        "project_id": "myauth-91ca5",
+        "storage_bucket": "myauth-91ca5.appspot.com"
     },
     "client": [
         {
             "client_info": {
-                "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+                "mobilesdk_app_id": "1:440104788015:android:fb4374fd81b81fac5766da",
                 "android_client_info": {
-                    "package_name": "com.mavericks.clubmanagement"
+                    "package_name": "com.mycompany.myauth"
                 }
             },
             "oauth_client": [
                 {
-                    "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com",
+                    "client_id": "440104788015-47p2oqv4ab736ktbbsosp562klvjcpl1.apps.googleusercontent.com",
                     "client_type": 3
                 }
             ],
             "api_key": [
                 {
-                    "current_key": "AIzaSyDummmyKeyForBuildPurposesOnly_ReplaceMe"
+                    "current_key": "AIzaSyAG2HyHAu1Ic38e0oV83xtDEGEyOAH7gRw"
                 }
             ],
             "services": {
                 "appinvite_service": {
                     "other_platform_oauth_client": [
                         {
-                            "client_id": "123456789012-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com",
+                            "client_id": "440104788015-47p2oqv4ab736ktbbsosp562klvjcpl1.apps.googleusercontent.com",
                             "client_type": 3
+                        },
+                        {
+                            "client_id": "440104788015-r5s0g8ff39rdct2e8t7v92qh8dkdr4o2.apps.googleusercontent.com",
+                            "client_type": 2,
+                            "ios_info": {
+                                "bundle_id": "com.mycompany.myauth"
+                            }
                         }
                     ]
                 }
