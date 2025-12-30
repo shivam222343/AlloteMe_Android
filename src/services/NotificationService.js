@@ -11,6 +11,8 @@ import { authAPI } from './api';
 export const registerForPushNotificationsAsync = async (userId) => {
     try {
         // 1. Request Permission
+        if (Platform.OS === 'web') return null;
+
         const authStatus = await messaging().requestPermission();
         const enabled =
             authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -31,10 +33,12 @@ export const registerForPushNotificationsAsync = async (userId) => {
             await authAPI.updateFCMToken(token);
         }
 
-        // 3. Setup Android Channel (Optional if using default, but good for custom sounds)
-        // React Native Firebase creates a default channel automatically.
+        // 3. Setup Android Channel
+        // Since we are using React Native Firebase, the channel "default" 
+        // is created automatically based on the 'notification_channel_id' in AndroidManifest 
+        // or through the config plugin in app.json. 
+        // We added channelId: 'default' to the backend payload to match this.
 
-        return token;
     } catch (e) {
         console.error('Error registering for push:', e);
         return null;
@@ -74,6 +78,9 @@ export const handleNotificationResponse = async (remoteMessage, navigation) => {
 
 // Listeners helper to be called in App.js or similar
 export const setupNotificationListeners = (navigation) => {
+    // Firebase Messaging is natively only supported on iOS/Android in this setup
+    if (Platform.OS === 'web') return;
+
     // Background / Quit state handler
     messaging().onNotificationOpenedApp(remoteMessage => {
         console.log('Notification caused app to open from background state:', remoteMessage.notification);
