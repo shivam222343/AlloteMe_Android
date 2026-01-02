@@ -20,7 +20,7 @@ const MainLayout = ({ children, navigation, currentRoute, title }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
-    const { user, unreadCount } = useAuth();
+    const { user, unreadCount, unreadMessageCount } = useAuth();
 
     const handleProfilePress = () => {
         if (currentRoute !== 'Profile') {
@@ -43,12 +43,14 @@ const MainLayout = ({ children, navigation, currentRoute, title }) => {
             <View style={styles.mainContent}>
                 {/* Navbar with Menu Button */}
                 <Navbar
+                    navigation={navigation}
                     onMenuPress={() => setSidebarOpen(true)}
                     onNotificationsPress={() => setNotificationsOpen(true)}
                     onProfilePress={handleProfilePress}
                     title={title || currentRoute || 'Dashboard'}
                     showMenu={true}
                     unreadCount={unreadCount}
+                    unreadMessageCount={unreadMessageCount}
                 />
 
                 <NotificationsModal

@@ -11,11 +11,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAuth } from '../contexts/AuthContext';
+import { Image } from 'react-native';
+
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
 
-const Navbar = ({ onMenuPress, title = 'Dashboard', showMenu = true, onNotificationsPress, onProfilePress, unreadCount = 0 }) => {
+const Navbar = ({ onMenuPress, title = 'Dashboard', showMenu = true, onNotificationsPress, onProfilePress, unreadCount = 0, unreadMessageCount = 0, navigation }) => {
     const insets = useSafeAreaInsets();
+    const { user } = useAuth(); // Get user for profile pic
 
     return (
         <LinearGradient
@@ -37,11 +41,29 @@ const Navbar = ({ onMenuPress, title = 'Dashboard', showMenu = true, onNotificat
 
                 {/* Center: Title */}
                 <View style={styles.titleContainer}>
-                    <Text style={styles.title}>{title}</Text>
+                    <Text
+                        style={styles.title}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {title}
+                    </Text>
                 </View>
 
-                {/* Right: Notification & Profile */}
+                {/* Right: Message, Notification & Profile */}
                 <View style={styles.rightSection}>
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={() => navigation?.navigate('Messages')}
+                    >
+                        <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFFFFF" />
+                        {unreadMessageCount > 0 && (
+                            <View style={styles.badge}>
+                                <Text style={styles.badgeText}>{unreadMessageCount > 99 ? '99+' : unreadMessageCount}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+
                     <TouchableOpacity style={styles.iconButton} onPress={onNotificationsPress}>
                         <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
                         {unreadCount > 0 && (
@@ -52,9 +74,14 @@ const Navbar = ({ onMenuPress, title = 'Dashboard', showMenu = true, onNotificat
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.profileButton} onPress={onProfilePress}>
-                        <View style={styles.avatar}>
-                            <Ionicons name="person" size={20} color="#0A66C2" />
-                        </View>
+                        <Image
+                            source={{
+                                uri: user?.profilePicture?.url
+                                    ? user.profilePicture.url
+                                    : `https://api.dicebear.com/9.x/notionists/png?seed=${user?._id || 'random'}&backgroundColor=b6e3f4,c0aede,d1d4f9`
+                            }}
+                            style={styles.avatarImage}
+                        />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -84,7 +111,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     title: {
-        fontSize: 24,
+        fontSize: 18,
         fontWeight: '700',
         color: '#FFFFFF',
     },
@@ -116,15 +143,14 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     profileButton: {
-        padding: 4,
+        marginLeft: 4,
     },
-    avatar: {
+    avatarImage: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: '#FFFFFF',
-        justifyContent: 'center',
-        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
     },
 });
 

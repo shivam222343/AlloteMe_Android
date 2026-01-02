@@ -19,7 +19,7 @@ const isWeb = Platform.OS === 'web';
 const isMobile = width < 768;
 
 const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => {
-    const { user, logout } = useAuth();
+    const { user, logout, unreadMessageCount } = useAuth();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const menuItems = [
@@ -89,6 +89,7 @@ const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => 
         }
 
         const isActive = currentRoute === item.route;
+        const showBadge = item.id === 'messages' && unreadMessageCount > 0;
 
         return (
             <TouchableOpacity
@@ -96,14 +97,23 @@ const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => 
                 onPress={() => item.action ? item.action() : handleNavigation(item.route)}
                 style={[styles.menuItem, isActive && styles.menuItemActive]}
             >
-                <Ionicons
-                    name={item.icon}
-                    size={22}
-                    color={isActive ? '#0A66C2' : '#6B7280'}
-                />
+                <View style={{ position: 'relative' }}>
+                    <Ionicons
+                        name={item.icon}
+                        size={22}
+                        color={isActive ? '#0A66C2' : '#6B7280'}
+                    />
+                </View>
                 <Text style={[styles.menuText, isActive && styles.menuTextActive]}>
                     {item.label}
                 </Text>
+                {showBadge && (
+                    <View style={styles.countBadge}>
+                        <Text style={styles.countText}>
+                            {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                        </Text>
+                    </View>
+                )}
                 {isActive && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
         );
@@ -112,29 +122,67 @@ const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => 
     const sidebarContent = (
         <View style={styles.sidebarContent}>
             {/* Header */}
-            <LinearGradient
-                colors={['#0A66C2', '#0E76A8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.header}
-            >
-                <View style={styles.headerContent}>
-                    <View style={styles.logoContainer}>
-                        <Image
-                            source={require('../../assets/AS.png')}
-                            style={styles.logoImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.logoText}>Mavericks</Text>
+            {/* Header */}
+            {user?.preferences?.sidebarBanner ? (
+                <View style={styles.header}>
+                    <Image
+                        source={
+                            user.preferences.sidebarBanner.startsWith('http')
+                                ? { uri: user.preferences.sidebarBanner }
+                                : (
+                                    user.preferences.sidebarBanner === 'local-banner-1' ? require('../../assets/banners/blue_geometric.png') :
+                                        user.preferences.sidebarBanner === 'local-banner-2' ? require('../../assets/banners/blue_abstract.png') :
+                                            user.preferences.sidebarBanner === 'local-banner-3' ? require('../../assets/banners/blue_shapes.png') :
+                                                user.preferences.sidebarBanner === 'local-banner-4' ? require('../../assets/banners/blue_cloud.png') :
+                                                    { uri: user.preferences.sidebarBanner }
+                                )
+                        }
+                        style={StyleSheet.absoluteFillObject}
+                        resizeMode="cover"
+                    />
+                    <View style={styles.headerOverlay} />
+                    <View style={styles.headerContent}>
+                        <View style={styles.logoContainer}>
+                            <Image
+                                source={require('../../assets/AS.png')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
+                            <Text style={styles.logoText}>Mavericks</Text>
+                        </View>
+                        {isMobile && (
+                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                                <Ionicons name="close" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+                        )}
                     </View>
-                    {isMobile && (
-                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={24} color="#FFFFFF" />
-                        </TouchableOpacity>
-                    )}
+                    <Text style={styles.tagline}>Club Management</Text>
                 </View>
-                <Text style={styles.tagline}>Club Management</Text>
-            </LinearGradient>
+            ) : (
+                <LinearGradient
+                    colors={['#0A66C2', '#0E76A8']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.header}
+                >
+                    <View style={styles.headerContent}>
+                        <View style={styles.logoContainer}>
+                            <Image
+                                source={require('../../assets/AS.png')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
+                            <Text style={styles.logoText}>Mavericks</Text>
+                        </View>
+                        {isMobile && (
+                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                                <Ionicons name="close" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <Text style={styles.tagline}>Club Management</Text>
+                </LinearGradient>
+            )}
 
             {/* Menu Items */}
             <ScrollView
@@ -258,12 +306,19 @@ const styles = StyleSheet.create({
         paddingTop: 60,
         paddingBottom: 24,
         paddingHorizontal: 20,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    headerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.6)', // Increased opacity for better text visibility
     },
     headerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 8,
+        zIndex: 10,
     },
     logoContainer: {
         flexDirection: 'row',
@@ -288,6 +343,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#D1E5FF',
         fontWeight: '500',
+        zIndex: 10,
     },
     menuContainer: {
         flex: 1,
@@ -333,6 +389,29 @@ const styles = StyleSheet.create({
         backgroundColor: '#0A66C2',
         borderTopRightRadius: 4,
         borderBottomRightRadius: 4,
+    },
+    badge: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#EF4444',
+        borderWidth: 1,
+        borderColor: '#FFF',
+    },
+    countBadge: {
+        marginLeft: 'auto',
+        backgroundColor: '#EF4444',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    countText: {
+        color: '#FFF',
+        fontSize: 10,
+        fontWeight: '700',
     },
 });
 

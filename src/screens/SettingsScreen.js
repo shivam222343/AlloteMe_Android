@@ -10,8 +10,10 @@ import {
     Modal,
     TextInput,
     ActivityIndicator,
+    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
@@ -21,10 +23,72 @@ const SettingsScreen = ({ navigation, route }) => {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [darkMode, setDarkMode] = useState(false);
     const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+    const [bannerModalVisible, setBannerModalVisible] = useState(false);
+    const [activeBannerTab, setActiveBannerTab] = useState('All');
+
+    const localBanners = [
+        { id: 'local-banner-1', source: require('../../assets/banners/blue_geometric.png') },
+        { id: 'local-banner-2', source: require('../../assets/banners/blue_abstract.png') },
+        { id: 'local-banner-3', source: require('../../assets/banners/blue_shapes.png') },
+        { id: 'local-banner-4', source: require('../../assets/banners/blue_cloud.png') },
+    ];
+    // Initialize with some banners properly to avoid empty state delay
+    const [generatedBanners, setGeneratedBanners] = useState([
+        'https://picsum.photos/seed/start1/400/200',
+        'https://picsum.photos/seed/start2/400/200',
+        'https://picsum.photos/seed/start3/400/200',
+        'https://picsum.photos/seed/start4/400/200',
+        'https://picsum.photos/seed/start5/400/200',
+        'https://picsum.photos/seed/start6/400/200',
+    ]);
+
+    // Refresh banners when modal opens
+    React.useEffect(() => {
+        if (bannerModalVisible) {
+            generateNewBanners();
+        }
+    }, [bannerModalVisible]);
+
+    const generateNewBanners = () => {
+        const newBanners = Array(6).fill(0).map((_, i) => {
+            const seed = Math.random().toString(36).substring(7);
+            return `https://picsum.photos/seed/${seed}/400/200`;
+        });
+        setGeneratedBanners(newBanners);
+    };
+
+    const updateSidebarBanner = async (url) => {
+        try {
+            const preferences = {
+                ...user.preferences,
+                sidebarBanner: url
+            };
+
+            // We need to call API to update user preferences
+            // Assuming authController.updateProfile handles preferences merging
+            const res = await authAPI.updateProfile({
+                preferences
+            });
+
+            if (res.success) {
+                // Update local user context if needed, or let refreshUser handle it
+                await refreshUser();
+                setBannerModalVisible(false);
+            } else {
+                Alert.alert('Error', 'Failed to update banner');
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Failed to update banner');
+        }
+    };
 
     React.useEffect(() => {
         if (route.params?.openChangePassword) {
             setChangePasswordVisible(true);
+        }
+        if (route.params?.openBannerModal) {
+            setBannerModalVisible(true);
         }
     }, [route.params]);
     const [passwordLoading, setPasswordLoading] = useState(false);
@@ -108,13 +172,46 @@ const SettingsScreen = ({ navigation, route }) => {
                         value={notificationsEnabled}
                         onValueChange={setNotificationsEnabled}
                     />
-                    <View style={styles.divider} />
-                    <SettingItem
-                        icon="moon-outline"
-                        title="Dark Mode"
-                        value={darkMode}
-                        onValueChange={setDarkMode}
-                    />
+                </View>
+
+                {/* Sidebar Banner Customization */}
+                <Text style={styles.sectionHeader}>Appearance</Text>
+                <View style={styles.section}>
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => setBannerModalVisible(true)}
+                    >
+                        <View style={styles.settingLeft}>
+                            <View style={[styles.iconBox, { backgroundColor: '#F0F9FF', overflow: 'hidden' }]}>
+                                {user?.preferences?.sidebarBanner ? (
+                                    <Image
+                                        source={
+                                            user.preferences.sidebarBanner.startsWith('http')
+                                                ? { uri: user.preferences.sidebarBanner }
+                                                : (
+                                                    user.preferences.sidebarBanner === 'local-banner-1' ? require('../../assets/banners/blue_geometric.png') :
+                                                        user.preferences.sidebarBanner === 'local-banner-2' ? require('../../assets/banners/blue_abstract.png') :
+                                                            user.preferences.sidebarBanner === 'local-banner-3' ? require('../../assets/banners/blue_shapes.png') :
+                                                                user.preferences.sidebarBanner === 'local-banner-4' ? require('../../assets/banners/blue_cloud.png') :
+                                                                    { uri: user.preferences.sidebarBanner }
+                                                )
+                                        }
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Ionicons name="color-palette-outline" size={22} color="#0284C7" />
+                                )}
+                            </View>
+                            <Text style={styles.settingTitle}>Sidebar Banner</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={{ color: '#64748B', marginRight: 8, fontSize: 13 }}>
+                                {user?.preferences?.sidebarBanner ? 'Custom' : 'Default'}
+                            </Text>
+                            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+                        </View>
+                    </TouchableOpacity>
                 </View>
 
                 <Text style={styles.sectionHeader}>Security</Text>
@@ -214,8 +311,147 @@ const SettingsScreen = ({ navigation, route }) => {
                     </View>
                 </Modal>
 
+                {/* Banner Selection Modal */}
+                <Modal
+                    visible={bannerModalVisible}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setBannerModalVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <View>
+                                    <Text style={styles.modalTitle}>Customize Banner</Text>
+                                    <Text style={styles.modalSubtitle}>Select a theme for your sidebar</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setBannerModalVisible(false)}>
+                                    <Ionicons name="close" size={24} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Banner Tabs */}
+                            <View style={{ flexDirection: 'row', marginBottom: 20, gap: 10 }}>
+                                {['All', 'Premium', 'AI Generated'].map(tab => (
+                                    <TouchableOpacity
+                                        key={tab}
+                                        style={{
+                                            paddingVertical: 6,
+                                            paddingHorizontal: 12,
+                                            borderRadius: 20,
+                                            backgroundColor: activeBannerTab === tab ? '#0A66C2' : '#F1F5F9'
+                                        }}
+                                        onPress={() => setActiveBannerTab(tab)}
+                                    >
+                                        <Text style={{
+                                            color: activeBannerTab === tab ? '#FFF' : '#64748B',
+                                            fontWeight: '600',
+                                            fontSize: 13
+                                        }}>{tab}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
+                                <Text style={[styles.inputLabel, { marginBottom: 10 }]}>Default</Text>
+                                <TouchableOpacity
+                                    style={[styles.bannerOption, !user?.preferences?.sidebarBanner && styles.bannerOptionActive]}
+                                    onPress={() => updateSidebarBanner(null)}
+                                >
+                                    <LinearGradient
+                                        colors={['#0A66C2', '#0E76A8']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.bannerImage}
+                                    >
+                                        <View style={styles.defaultBannerContent}>
+                                            <Image
+                                                source={require('../../assets/AS.png')}
+                                                style={{ width: 30, height: 30, marginRight: 10, tintColor: '#FFFFFF', opacity: 0.9 }}
+                                                resizeMode="contain"
+                                            />
+                                            <Text style={{ color: '#FFF', fontWeight: '600' }}>Classic Blue</Text>
+                                        </View>
+                                    </LinearGradient>
+                                    {!user?.preferences?.sidebarBanner && (
+                                        <View style={styles.checkBadge}>
+                                            <Ionicons name="checkmark" size={14} color="#FFF" />
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+
+                                {(activeBannerTab === 'All' || activeBannerTab === 'Premium') && (
+                                    <>
+                                        <Text style={[styles.inputLabel, { marginBottom: 10, marginTop: 10 }]}>Premium Themes</Text>
+                                        <View style={styles.bannerGrid}>
+                                            {localBanners.map((banner, index) => (
+                                                <TouchableOpacity
+                                                    key={`local-${index}`}
+                                                    style={[
+                                                        styles.bannerGridItem,
+                                                        user?.preferences?.sidebarBanner === banner.id && styles.bannerOptionActive
+                                                    ]}
+                                                    onPress={() => updateSidebarBanner(banner.id)}
+                                                >
+                                                    <Image
+                                                        source={banner.source}
+                                                        style={styles.bannerGridImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                    {user?.preferences?.sidebarBanner === banner.id && (
+                                                        <View style={styles.checkBadge}>
+                                                            <Ionicons name="checkmark" size={14} color="#FFF" />
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </>
+                                )}
+
+                                {(activeBannerTab === 'All' || activeBannerTab === 'AI Generated') && (
+                                    <>
+                                        <Text style={[styles.inputLabel, { marginBottom: 10, marginTop: 10 }]}>AI Generated Themes</Text>
+                                        <View style={styles.bannerGrid}>
+                                            {generatedBanners.map((url, index) => (
+                                                <TouchableOpacity
+                                                    key={`ai-${index}`}
+                                                    style={[
+                                                        styles.bannerGridItem,
+                                                        user?.preferences?.sidebarBanner === url && styles.bannerOptionActive
+                                                    ]}
+                                                    onPress={() => updateSidebarBanner(url)}
+                                                >
+                                                    <Image
+                                                        source={{ uri: url }}
+                                                        style={styles.bannerGridImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                    {user?.preferences?.sidebarBanner === url && (
+                                                        <View style={styles.checkBadge}>
+                                                            <Ionicons name="checkmark" size={14} color="#FFF" />
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={[styles.generateBtn, { marginTop: 20, marginBottom: 40 }]}
+                                            onPress={generateNewBanners}
+                                        >
+                                            <Ionicons name="sparkles" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                                            <Text style={styles.submitBtnText}>Generate New Themes</Text>
+                                        </TouchableOpacity>
+                                    </>
+                                )}
+                            </ScrollView>
+                        </View>
+                    </View>
+                </Modal>
+
             </ScrollView>
-        </MainLayout>
+        </MainLayout >
     );
 };
 
@@ -300,6 +536,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 24,
         padding: 24,
         paddingBottom: 40,
+        maxHeight: '90%', // Prevent modal from going off screen
     },
     modalHeader: {
         flexDirection: 'row',
@@ -311,6 +548,11 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         color: '#1E293B',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#64748B',
+        marginBottom: 16,
     },
     modalBody: {
         gap: 16,
@@ -344,6 +586,82 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '700',
+    },
+    // Banner Styles
+    bannerOption: {
+        width: '100%',
+        height: 80,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 16,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    bannerOptionActive: {
+        borderColor: '#0A66C2',
+    },
+    bannerImage: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    defaultBannerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    bannerGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginTop: 10,
+    },
+    bannerGridItem: {
+        width: '48%',
+        height: 80,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 12,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        backgroundColor: '#E2E8F0', // Placeholder color
+    },
+    bannerGridImage: {
+        width: '100%',
+        height: '100%',
+    },
+    headerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    checkBadge: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: '#0A66C2',
+        borderRadius: 10,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#FFF',
+    },
+    generateBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#7C3AED',
+        padding: 16,
+        borderRadius: 12,
+        marginTop: 10,
+        marginBottom: 20,
+    },
+    generateBtnText: {
+        color: '#FFF',
+        fontWeight: '600',
+        marginLeft: 8,
+        fontSize: 16,
     }
 });
 

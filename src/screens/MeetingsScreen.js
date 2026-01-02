@@ -470,7 +470,9 @@ const MeetingsScreen = ({ navigation }) => {
                                     const isPresent = managingMeeting.attendees.some(a => (a.userId?._id || a.userId) === member._id && a.status === 'present');
                                     return (
                                         <View key={member._id} style={styles.memberRow}>
-                                            <Text style={styles.memberName}>{member.displayName} ({member.maverickId})</Text>
+                                            <Text style={styles.memberName} numberOfLines={1} ellipsizeMode="tail">
+                                                {member.displayName} ({member.maverickId})
+                                            </Text>
                                             <TouchableOpacity
                                                 style={[styles.statusBtn, isPresent ? styles.presentBtn : styles.absentBtn]}
                                                 onPress={() => toggleManualAttendance(member._id, isPresent ? 'present' : 'absent')}
@@ -582,7 +584,7 @@ const styles = StyleSheet.create({
     smButtonText: { color: '#0A66C2', fontWeight: '600', fontSize: 12 },
     activeText: { color: '#22C55E', fontWeight: '600', fontSize: 12 },
     memberRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFF', paddingHorizontal: 16 },
-    memberName: { fontSize: 14, color: '#374151' },
+    memberName: { fontSize: 14, color: '#374151', flex: 1, marginRight: 10 },
     statusBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
     presentBtn: { backgroundColor: '#DCFCE7' },
     absentBtn: { backgroundColor: '#F3F4F6' },

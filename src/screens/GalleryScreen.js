@@ -44,6 +44,7 @@ const GalleryScreen = ({ navigation }) => {
     const [uploadModalVisible, setUploadModalVisible] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0); // Added state for progress
     const [uploadData, setUploadData] = useState({
         title: '',
         description: '',
@@ -63,7 +64,7 @@ const GalleryScreen = ({ navigation }) => {
     const [editData, setEditData] = useState({ title: '', description: '', category: '' });
 
     const categories = ['all', 'event', 'meeting', 'workshop', 'social', 'achievement', 'other'];
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
+    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB limit
 
     const fetchData = useCallback(async () => {
         try {
@@ -155,7 +156,7 @@ const GalleryScreen = ({ navigation }) => {
 
             // Initial size check for Mobile (often available in assets)
             if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
-                setFileSizeError('This image is too large (over 5MB). Please pick a smaller one.');
+                setFileSizeError('This image is too large (over 20MB). Please pick a smaller one.');
             } else {
                 setFileSizeError(null);
             }
@@ -176,9 +177,9 @@ const GalleryScreen = ({ navigation }) => {
 
                 // Final size check for Web
                 if (blob.size > MAX_FILE_SIZE) {
-                    setFileSizeError('This image is too large (over 5MB).');
+                    setFileSizeError('This image is too large (over 20MB).');
                     setUploading(false);
-                    return Alert.alert('Error', 'File size exceeds 5MB limit.');
+                    return Alert.alert('Error', 'File size exceeds 20MB limit.');
                 }
 
                 formData.append('image', blob, selectedImage.fileName || 'gallery_img.jpg');
@@ -201,12 +202,15 @@ const GalleryScreen = ({ navigation }) => {
             }
 
             console.log('Uploading Gallery Image to:', API_CONFIG.BASE_URL);
-            const res = await galleryAPI.upload(formData);
+            const res = await galleryAPI.upload(formData, (progress) => {
+                setUploadProgress(progress);
+            });
             if (res.success) {
                 setUploadModalVisible(false);
                 setSelectedImage(null);
                 setUploadData({ title: '', description: '', category: 'other', clubId: '' });
-                Alert.alert('Success', 'Image uploaded! Waiting for admin approval.');
+                Alert.alert('Success', 'Image uploaded successfully! Waiting for admin approval.');
+                // fetchData(); // Don't refresh list yet as it's pending
             }
         } catch (error) {
             console.error('Gallery Upload Error:', error);
@@ -545,7 +549,9 @@ const GalleryScreen = ({ navigation }) => {
                                         disabled={uploading}
                                     >
                                         {uploading ? (
-                                            <ActivityIndicator color="#FFF" />
+                                            <View style={{ width: '100%', alignItems: 'center' }}>
+                                                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>Uploading... {uploadProgress}%</Text>
+                                            </View>
                                         ) : (
                                             <Text style={styles.btnText}>Post to Gallery</Text>
                                         )}

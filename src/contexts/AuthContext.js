@@ -19,9 +19,10 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [unreadCount, setUnreadCount] = useState(0);
     const [socket, setSocket] = useState(null);
     const [selectedClubId, setSelectedClubId] = useState('all');
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [unreadMessageCount, setUnreadMessageCount] = useState(0);
     const lastUnreadFetch = React.useRef(0);
 
     // Load selected club from storage
@@ -51,7 +52,11 @@ export const AuthProvider = ({ children }) => {
         let interval;
         if (isAuthenticated && user) {
             fetchUnreadCount();
-            interval = setInterval(fetchUnreadCount, 30000);
+            fetchUnreadMessageCount();
+            interval = setInterval(() => {
+                fetchUnreadCount();
+                fetchUnreadMessageCount();
+            }, 30000);
 
             // Register for Push Notifications
             registerForPushNotificationsAsync(user._id);
@@ -81,6 +86,10 @@ export const AuthProvider = ({ children }) => {
                 fetchUnreadCount();
             });
 
+            newSocket.on('message:receive', () => {
+                fetchUnreadMessageCount();
+            });
+
             setSocket(newSocket);
 
             return () => {
@@ -107,10 +116,7 @@ export const AuthProvider = ({ children }) => {
 
     const fetchUnreadCount = async () => {
         // Debounce frequent calls from screen remounts
-        const now = Date.now();
-        if (now - lastUnreadFetch.current < 5000) return;
-        lastUnreadFetch.current = now;
-
+        // We remove global debounce for simplicity if called from different effects
         try {
             const { notificationsAPI } = require('../services/api');
             const res = await notificationsAPI.getAll();
@@ -120,6 +126,27 @@ export const AuthProvider = ({ children }) => {
             }
         } catch (error) {
             console.log('Unread count fetch skipped or failed');
+        }
+    };
+
+    const fetchUnreadMessageCount = async () => {
+        try {
+            const { messagesAPI, groupChatAPI } = require('../services/api');
+            const [msgRes, groupRes] = await Promise.all([
+                messagesAPI.getConversations(),
+                groupChatAPI.getTotalUnread()
+            ]);
+
+            let totalUnread = 0;
+            if (msgRes.success && Array.isArray(msgRes.data)) {
+                totalUnread += msgRes.data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+            }
+            if (groupRes.success) {
+                totalUnread += (groupRes.totalUnread || 0);
+            }
+            setUnreadMessageCount(totalUnread);
+        } catch (error) {
+            console.log('Unread message fetch failed', error);
         }
     };
 
@@ -265,6 +292,8 @@ export const AuthProvider = ({ children }) => {
         refreshUser: checkAuth,
         unreadCount,
         refreshUnreadCount: fetchUnreadCount,
+        unreadMessageCount,
+        refreshUnreadMessageCount: fetchUnreadMessageCount,
         socket,
         selectedClubId,
         updateSelectedClub,

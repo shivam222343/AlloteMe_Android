@@ -21,6 +21,7 @@
     "axios": "^1.13.2",
     "babel-preset-expo": "^54.0.9",
     "expo": "~54.0.30",
+    "expo-av": "~16.0.8",
     "expo-build-properties": "^1.0.10",
     "expo-camera": "~17.0.10",
     "expo-clipboard": "^8.0.8",

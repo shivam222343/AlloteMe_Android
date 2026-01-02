@@ -169,38 +169,53 @@ const MembersScreen = ({ navigation }) => {
         m.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const renderMemberCard = ({ item }) => (
-        <TouchableOpacity
-            style={styles.memberCard}
-            onPress={() => {
-                setSelectedMember(item);
-                setShowProfileModal(true);
-            }}
-        >
-            <View style={styles.avatarContainer}>
-                {item.profilePicture?.url ? (
-                    <Image source={{ uri: item.profilePicture.url }} style={styles.avatar} />
-                ) : (
-                    <View style={[styles.avatar, styles.placeholderAvatar]}>
-                        <Text style={styles.avatarText}>{item.displayName[0]}</Text>
+    const isMemberBirthday = (birthDate) => {
+        if (!birthDate) return false;
+        const bday = new Date(birthDate);
+        const today = new Date();
+        return bday.getDate() === today.getDate() && bday.getMonth() === today.getMonth();
+    };
+
+    const renderMemberCard = ({ item }) => {
+        const isBday = isMemberBirthday(item.birthDate);
+        return (
+            <TouchableOpacity
+                style={styles.memberCard}
+                onPress={() => {
+                    setSelectedMember(item);
+                    setShowProfileModal(true);
+                }}
+            >
+                <View style={styles.avatarContainer}>
+                    {item.profilePicture?.url ? (
+                        <Image source={{ uri: item.profilePicture.url }} style={styles.avatar} />
+                    ) : (
+                        <View style={[styles.avatar, styles.placeholderAvatar]}>
+                            <Text style={styles.avatarText}>{item.displayName[0]}</Text>
+                        </View>
+                    )}
+                    <View style={[styles.statusIndicator, { backgroundColor: item.isOnline ? '#10B981' : '#9CA3AF' }]} />
+                </View>
+                <View style={styles.memberInfo}>
+                    <View style={styles.memberHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.memberName}>{item.displayName}</Text>
+                            {isBday && (
+                                <Ionicons name="gift" size={16} color="#EC4899" style={{ marginLeft: 6 }} />
+                            )}
+                        </View>
+                        <Text style={styles.lastSeen}>
+                            {item.isOnline ? 'Online' : `Last seen ${new Date(item.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                        </Text>
                     </View>
-                )}
-                <View style={[styles.statusIndicator, { backgroundColor: item.isOnline ? '#10B981' : '#9CA3AF' }]} />
-            </View>
-            <View style={styles.memberInfo}>
-                <View style={styles.memberHeader}>
-                    <Text style={styles.memberName}>{item.displayName}</Text>
-                    <Text style={styles.lastSeen}>
-                        {item.isOnline ? 'Online' : `Last seen ${new Date(item.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                    <Text style={styles.memberStatus} numberOfLines={1}>
+                        {item.clubStats?.attendanceRate?.toFixed(0)}% attendance • {item.email}
                     </Text>
                 </View>
-                <Text style={styles.memberStatus} numberOfLines={1}>
-                    {item.clubStats?.attendanceRate?.toFixed(0)}% attendance • {item.email}
-                </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
-        </TouchableOpacity>
-    );
+                <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
+            </TouchableOpacity>
+        );
+    };
 
     const AttendanceGraph = ({ rate }) => {
         const radius = 35;
@@ -357,7 +372,12 @@ const MembersScreen = ({ navigation }) => {
                                                 )}
                                                 <View style={[styles.modalStatusIndicator, { backgroundColor: selectedMember.isOnline ? '#10B981' : '#9CA3AF' }]} />
                                             </View>
-                                            <Text style={styles.modalName}>{selectedMember.displayName}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={styles.modalName}>{selectedMember.displayName}</Text>
+                                                {isMemberBirthday(selectedMember.birthDate) && (
+                                                    <Ionicons name="gift" size={20} color="#EC4899" style={{ marginLeft: 8 }} />
+                                                )}
+                                            </View>
                                             <Text style={styles.modalEmail}>{selectedMember.email}</Text>
                                             <View style={styles.badge}>
                                                 <Text style={styles.badgeText}>Member</Text>

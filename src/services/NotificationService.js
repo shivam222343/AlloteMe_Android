@@ -1,4 +1,4 @@
-import messaging from '@react-native-firebase/messaging';
+// import messaging from '@react-native-firebase/messaging';
 import { Platform, Alert } from 'react-native';
 import { authAPI } from './api';
 
@@ -13,31 +13,27 @@ export const registerForPushNotificationsAsync = async (userId) => {
         // 1. Request Permission
         if (Platform.OS === 'web') return null;
 
-        const authStatus = await messaging().requestPermission();
-        const enabled =
-            authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-            authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        // const authStatus = await messaging().requestPermission();
+        // const enabled =
+        //     authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        //     authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-        if (!enabled) {
-            console.log('Authorization status:', authStatus);
-            return null;
-        }
+        // if (!enabled) {
+        //     console.log('Authorization status:', authStatus);
+        //     return null;
+        // }
 
         // 2. Get FCM Token
-        const token = await messaging().getToken();
-        console.log('Mobile FCM Token:', token);
+        // const token = await messaging().getToken();
+        // console.log('Mobile FCM Token:', token);
 
-        if (userId && token) {
-            // Update token in backend
-            // Ensure your backend authAPI.updateFCMToken accepts this token
-            await authAPI.updateFCMToken(token);
-        }
+        // if (userId && token) {
+        //     // Update token in backend
+        //     // Ensure your backend authAPI.updateFCMToken accepts this token
+        //     await authAPI.updateFCMToken(token);
+        // }
 
-        // 3. Setup Android Channel
-        // Since we are using React Native Firebase, the channel "default" 
-        // is created automatically based on the 'notification_channel_id' in AndroidManifest 
-        // or through the config plugin in app.json. 
-        // We added channelId: 'default' to the backend payload to match this.
+        return null;
 
     } catch (e) {
         console.error('Error registering for push:', e);
@@ -82,6 +78,7 @@ export const setupNotificationListeners = (navigation) => {
     if (Platform.OS === 'web') return;
 
     // Background / Quit state handler
+    /*
     messaging().onNotificationOpenedApp(remoteMessage => {
         console.log('Notification caused app to open from background state:', remoteMessage.notification);
         handleNotificationResponse(remoteMessage, navigation);
@@ -111,4 +108,6 @@ export const setupNotificationListeners = (navigation) => {
     });
 
     return unsubscribe;
+    */
+    return () => { };
 };

@@ -29,6 +29,13 @@ const CalendarScreen = ({ navigation }) => {
     const [selectedDate, setSelectedDate] = useState(null);
     const [dayEvents, setDayEvents] = useState({ meetings: [], holiday: null });
     const [modalVisible, setModalVisible] = useState(false);
+    const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+
+    const handleTodayView = () => {
+        const today = new Date().toISOString().split('T')[0];
+        setCurrentDate(today);
+        handleDayPress({ dateString: today });
+    };
 
     const fetchAllMeetings = async () => {
         try {
@@ -255,12 +262,22 @@ const CalendarScreen = ({ navigation }) => {
                     </ScrollView>
                 ) : (
                     <ScrollView showsVerticalScrollIndicator={false}>
+                        <View style={styles.headerControls}>
+                            <Text style={styles.calendarTitle}>Events & Festivals</Text>
+                            <TouchableOpacity onPress={handleTodayView} style={styles.todayButton}>
+                                <Text style={styles.todayButtonText}>Go to Today</Text>
+                                <Ionicons name="calendar-outline" size={16} color={Colors.primary[500]} style={{ marginLeft: 6 }} />
+                            </TouchableOpacity>
+                        </View>
+
                         <View style={styles.calendarCard}>
                             <Calendar
-                                current={new Date().toISOString().split('T')[0]}
+                                current={currentDate}
+                                onMonthChange={(month) => setCurrentDate(month.dateString)}
                                 onDayPress={handleDayPress}
                                 markedDates={markedDates}
                                 markingType={'multi-dot'}
+                                enableSwipeMonths={true}
                                 theme={{
                                     backgroundColor: '#ffffff',
                                     calendarBackground: '#ffffff',
@@ -613,6 +630,34 @@ const styles = StyleSheet.create({
         color: Colors.secondary[400],
         textAlign: 'center',
         fontSize: 14,
+    },
+    headerControls: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginHorizontal: Spacing.md,
+        marginTop: Spacing.md,
+        marginBottom: Spacing.xs,
+    },
+    calendarTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: Colors.secondary[900],
+    },
+    todayButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.primary[500],
+    },
+    todayButtonText: {
+        color: Colors.primary[500],
+        fontSize: 12,
+        fontWeight: 'bold',
     },
 });
 

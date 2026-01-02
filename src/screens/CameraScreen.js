@@ -14,8 +14,11 @@ import {
     ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
+import { Video } from 'expo-av'; // For video preview
+import * as ImagePicker from 'expo-image-picker';
 import { snapsAPI, clubsAPI, membersAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -23,10 +26,15 @@ const CameraScreen = ({ navigation, route }) => {
     const { user } = useAuth();
     const { type, clubId: initialClubId } = route.params || {};
     const [permission, requestPermission] = useCameraPermissions();
+    const [micPermission, requestMicPermission] = useMicrophonePermissions();
     const [cameraType, setCameraType] = useState('back');
+    const [mode, setMode] = useState('picture');
     const [previewVisible, setPreviewVisible] = useState(false);
-    const [capturedImage, setCapturedImage] = useState(null);
+    const [capturedMedia, setCapturedMedia] = useState(null); // Renamed from capturedImage
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [isRecording, setIsRecording] = useState(false);
+    const [duration, setDuration] = useState(0);
     const [clubs, setClubs] = useState([]);
     const [selectedClubId, setSelectedClubId] = useState(initialClubId);
 
@@ -38,8 +46,13 @@ const CameraScreen = ({ navigation, route }) => {
 
     const cameraRef = useRef();
 
+    const recordingTimer = useRef(null);
+
     useEffect(() => {
         fetchClubs();
+        if (!micPermission?.granted) {
+            requestMicPermission();
+        }
     }, []);
 
     useEffect(() => {
@@ -76,26 +89,113 @@ const CameraScreen = ({ navigation, route }) => {
         }
     };
 
-    if (!permission) {
-        return <View style={styles.container}><ActivityIndicator /></View>;
-    }
+    const pickMedia = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow Images and Videos
+                allowsEditing: true,
+                quality: 0.8,
+            });
 
-    if (!permission.granted) {
-        return (
-            <View style={styles.container}>
-                <Text style={styles.permissionText}>We need your permission to show the camera</Text>
-                <TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
-                    <Text style={styles.permissionButtonText}>Grant Permission</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
+            if (!result.canceled) {
+                const asset = result.assets[0];
+                setCapturedMedia({
+                    uri: asset.uri,
+                    type: asset.type,
+                    width: asset.width,
+                    height: asset.height
+                });
+                setPreviewVisible(true);
+            }
+        } catch (error) {
+            console.error('Error picking media:', error);
+            Alert.alert('Error', 'Failed to pick media from gallery');
+        }
+    };
+
+    const handleShutterPress = () => {
+        if (mode === 'picture') {
+            takePicture();
+        } else {
+            // Video Mode
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+    };
 
     const takePicture = async () => {
         if (cameraRef.current) {
-            const photo = await cameraRef.current.takePictureAsync();
-            setCapturedImage(photo);
-            setPreviewVisible(true);
+            try {
+                const photo = await cameraRef.current.takePictureAsync();
+                setCapturedMedia({ ...photo, type: 'image' });
+                setPreviewVisible(true);
+            } catch (error) {
+                console.error("Failed to take picture", error);
+            }
+        }
+    };
+
+    const startRecording = async () => {
+        if (cameraRef.current) {
+            try {
+                // Determine mode if needed, but 'picture' mode often fails to record.
+                // Switching mode is async, so we might need to handle this.
+                // For now, we assume CameraView might be in 'video' mode or we switch.
+                // Since switching is slow, we might just try to record.
+                // If it fails, we know we need to switch mode.
+
+                // However, let's try setting mode to 'video' based on a state wrapper
+                setMode('video');
+                // Give a tiny delay for mode switch?
+                await new Promise(r => setTimeout(r, 200));
+
+                setIsRecording(true);
+                const videoData = await cameraRef.current.recordAsync({ maxDuration: 30 });
+                // recordAsync returns promise that resolves when recording stops
+                setCapturedMedia({ uri: videoData.uri, type: 'video' });
+                setPreviewVisible(true);
+
+                // Cleanup after recording
+                setMode('picture');
+                setIsRecording(false);
+                setDuration(0);
+                clearInterval(recordingTimer.current);
+            } catch (error) {
+                console.error("Failed to record video", error);
+                setIsRecording(false); // Reset on error
+                setMode('picture');
+            }
+        }
+    };
+
+    const stopRecording = () => {
+        if (cameraRef.current && isRecording) {
+            cameraRef.current.stopRecording();
+            // isRecording will be set false in startRecording's await continuation
+        }
+    };
+
+    const handleLongPress = () => {
+        // Start recording
+        startRecording();
+
+        // Timer for max duration (30s)
+        let startTime = Date.now();
+        recordingTimer.current = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            setDuration(elapsed);
+            if (elapsed >= 30) {
+                stopRecording();
+            }
+        }, 100);
+    };
+
+    const handlePressOut = () => {
+        if (isRecording) {
+            stopRecording();
         }
     };
 
@@ -111,26 +211,32 @@ const CameraScreen = ({ navigation, route }) => {
 
             // Handle web vs mobile file upload
             if (Platform.OS === 'web') {
-                // For web, fetch the blob and convert to File
-                const response = await fetch(capturedImage.uri);
+                const response = await fetch(capturedMedia.uri);
                 const blob = await response.blob();
-                const file = new File([blob], 'snap.jpg', { type: 'image/jpeg' });
-                formData.append('image', file);
+                const fileType = capturedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg';
+                const fileName = capturedMedia.type === 'video' ? 'snap.mp4' : 'snap.jpg';
+                const file = new File([blob], fileName, { type: fileType });
+                formData.append('image', file); // keeping key as 'image' for backend compat, or change to 'file'? Backend expects 'image' or file field.
             } else {
                 // For mobile
+                const fileType = capturedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg';
+                const fileName = capturedMedia.type === 'video' ? `snap_${Date.now()}.mp4` : `snap_${Date.now()}.jpg`;
+
                 formData.append('image', {
-                    uri: capturedImage.uri,
-                    type: capturedImage.type || 'image/jpeg', // Use capturedImage.type if available, otherwise fallback
-                    name: capturedImage.name || `snap_${Date.now()}.jpg`, // Use capturedImage.name if available, otherwise fallback
+                    uri: capturedMedia.uri,
+                    type: fileType,
+                    name: fileName,
                 });
             }
 
             formData.append('clubId', selectedClubId);
-            formData.append('type', 'image');
+            formData.append('type', capturedMedia.type); // 'image' or 'video'
             formData.append('caption', snapCaption);
             formData.append('recipients', JSON.stringify(selectedRecipients));
 
-            const res = await snapsAPI.upload(formData);
+            const res = await snapsAPI.upload(formData, (progress) => {
+                setUploadProgress(progress);
+            });
             if (res.success) {
                 navigation.goBack();
             } else {
@@ -159,10 +265,20 @@ const CameraScreen = ({ navigation, route }) => {
         }
     };
 
-    if (previewVisible && capturedImage) {
+    if (previewVisible && capturedMedia) {
         return (
             <SafeAreaView style={styles.container}>
-                <Image source={{ uri: capturedImage.uri }} style={styles.preview} />
+                {capturedMedia.type === 'video' ? (
+                    <Video
+                        source={{ uri: capturedMedia.uri }}
+                        style={styles.preview}
+                        resizeMode="cover"
+                        shouldPlay
+                        isLooping
+                    />
+                ) : (
+                    <Image source={{ uri: capturedMedia.uri }} style={styles.preview} />
+                )}
                 <View style={styles.topControls}>
                     <TouchableOpacity onPress={() => setPreviewVisible(false)} style={styles.closeButton}>
                         <Ionicons name="close" size={30} color="#FFF" />
@@ -213,7 +329,9 @@ const CameraScreen = ({ navigation, route }) => {
                         disabled={uploading}
                     >
                         {uploading ? (
-                            <ActivityIndicator color="#FFF" />
+                            <View style={{ width: '100%', alignItems: 'center' }}>
+                                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>Uploading... {uploadProgress}%</Text>
+                            </View>
                         ) : (
                             <>
                                 <Text style={styles.uploadButtonText}>Post Snap</Text>
@@ -290,28 +408,74 @@ const CameraScreen = ({ navigation, route }) => {
                 ref={cameraRef}
                 style={styles.camera}
                 facing={cameraType}
+                mode={mode}
             />
             <View style={styles.cameraOverlay}>
                 <View style={styles.topControls}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeButton}>
                         <Ionicons name="close" size={30} color="#FFF" />
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.flipButton}
-                        onPress={() => setCameraType(prev => prev === 'back' ? 'front' : 'back')}
-                    >
-                        <Ionicons name="camera-reverse" size={30} color="#FFF" />
-                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.cameraBottom}>
-                    <View style={styles.shootButtonContainer}>
-                        <TouchableOpacity style={styles.shootButton} onPress={takePicture} />
+                    {/* Mode Switcher */}
+                    <View style={styles.modeSwitcher}>
+                        <TouchableOpacity onPress={() => setMode('picture')}>
+                            <Text style={[styles.modeText, mode === 'picture' && styles.modeTextActive]}>PHOTO</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setMode('video')}>
+                            <Text style={[styles.modeText, mode === 'video' && styles.modeTextActive]}>VIDEO</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.controlsRow}>
+                        {/* Gallery Button */}
+                        <TouchableOpacity style={styles.iconButton} onPress={pickMedia}>
+                            <Ionicons name="images" size={28} color="#FFF" />
+                        </TouchableOpacity>
+
+                        {/* Shutter Button */}
+                        <View style={styles.shootButtonContainer}>
+                            <Svg height="88" width="88" viewBox="0 0 100 100" style={styles.progressRing}>
+                                <Circle
+                                    cx="50"
+                                    cy="50"
+                                    r="45"
+                                    stroke={mode === 'video' || isRecording ? "#FF0000" : "#0A66C2"}
+                                    strokeWidth="5"
+                                    fill="transparent"
+                                    strokeDasharray={2 * Math.PI * 45}
+                                    strokeDashoffset={2 * Math.PI * 45 * (1 - duration / 30)}
+                                    // strokeLinecap="round"
+                                    rotation="-90"
+                                    origin="50, 50"
+                                />
+                            </Svg>
+                            <TouchableOpacity
+                                style={[
+                                    styles.shootButton,
+                                    mode === 'video' && styles.videoButton,
+                                    isRecording && styles.recordingButton
+                                ]}
+                                onPress={handleShutterPress}
+                                onLongPress={mode === 'picture' ? handleLongPress : undefined}
+                                onPressOut={mode === 'picture' ? handlePressOut : undefined}
+                                delayLongPress={300}
+                            />
+                        </View>
+
+                        {/* Flip Button (Moved here for balance) */}
+                        <TouchableOpacity
+                            style={styles.iconButton}
+                            onPress={() => setCameraType(prev => prev === 'back' ? 'front' : 'back')}
+                        >
+                            <Ionicons name="camera-reverse" size={28} color="#FFF" />
+                        </TouchableOpacity>
                     </View>
                 </View>
             </View>
         </View>
+
     );
 };
 
@@ -344,19 +508,31 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     shootButtonContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 88,
+        height: 88,
+        borderRadius: 44,
         borderWidth: 4,
-        borderColor: '#FFF',
+        borderColor: 'rgba(255,255,255,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
+        position: 'relative',
+    },
+    progressRing: {
+        position: 'absolute',
+        top: -4,
+        left: -4,
     },
     shootButton: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 70,
+        height: 70,
+        borderRadius: 35,
         backgroundColor: '#FFF',
+    },
+    recordingButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 10,
+        backgroundColor: '#F00', // Red square when recording
     },
     preview: {
         ...StyleSheet.absoluteFillObject,
@@ -528,6 +704,49 @@ const styles = StyleSheet.create({
         ...Platform.select({
             web: { outlineWidth: 0 }
         }),
+    },
+    controlsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        width: '100%',
+        paddingHorizontal: 30,
+        marginBottom: 20,
+    },
+    iconButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modeSwitcher: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginBottom: 25,
+        gap: 30,
+    },
+    modeText: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 14,
+        fontWeight: '800',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        letterSpacing: 1,
+    },
+    modeTextActive: {
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        color: '#F4B400',
+        textShadowColor: 'rgba(244, 180, 0, 0.8)',
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
+    },
+    videoButton: {
+        backgroundColor: '#FF0000',
+        transform: [{ scale: 0.9 }],
     },
 });
 

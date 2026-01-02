@@ -62,8 +62,23 @@ api.interceptors.response.use(
                 await AsyncStorage.removeItem('backendToken');
             }
 
-            // Return the server's error data directly
-            return Promise.reject(data);
+            if (status === 413) {
+                return Promise.reject({
+                    success: false,
+                    message: "File is too large. Please upload a smaller file (Max 200MB for video, 20MB for images)."
+                });
+            }
+
+            // Handle non-JSON responses (HTML often sent by Nginx/proxies on error)
+            if (typeof data === 'string' && data.startsWith('<')) {
+                return Promise.reject({
+                    success: false,
+                    message: `Server Error (${status}). Please try again later.`
+                });
+            }
+
+            // Return the server's error data or message
+            return Promise.reject(data || { success: false, message: 'Unknown server error' });
         } else if (error.request) {
             // Request made but no response
             let message = 'Network error. Please check your connection.';
@@ -179,7 +194,14 @@ export const messagesAPI = {
 
 // Snaps API
 export const snapsAPI = {
-    upload: (formData) => api.post('/snaps', formData),
+    upload: (formData, onProgress) => api.post('/snaps', formData, {
+        onUploadProgress: (progressEvent) => {
+            if (onProgress) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
+    }),
     getClubSnaps: (clubId) => api.get(`/snaps/club/${clubId}`),
     getMySnaps: () => api.get('/snaps/my-clubs'),
     view: (snapId) => api.post(`/snaps/${snapId}/view`),
@@ -191,7 +213,14 @@ export const snapsAPI = {
 // Gallery API
 export const galleryAPI = {
     getImages: (params) => api.get('/gallery', { params }),
-    upload: (formData) => api.post('/gallery', formData),
+    upload: (formData, onProgress) => api.post('/gallery', formData, {
+        onUploadProgress: (progressEvent) => {
+            if (onProgress) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
+    }),
     updateStatus: (id, status) => api.put(`/gallery/${id}/status`, { status }),
     toggleLike: (id) => api.post(`/gallery/${id}/like`),
     addComment: (id, text) => api.post(`/gallery/${id}/comment`, { text }),
@@ -208,6 +237,24 @@ export const adminAPI = {
     generateReports: (params) => api.get('/admin/reports', { params }),
     getClubAttendanceReport: (clubId, months) => api.get(`/admin/attendance-report/${clubId}`, { params: { months } }),
     sendNotification: (data) => api.post('/admin/send-notification', data),
+};
+
+// Group Chat API
+export const groupChatAPI = {
+    getGroupChat: (clubId) => api.get(`/group-chat/${clubId}`),
+    sendMessage: (clubId, formData, onProgress) => api.post(`/group-chat/${clubId}/messages`, formData, {
+        onUploadProgress: (progressEvent) => {
+            if (onProgress) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
+    }),
+    markAsRead: (clubId) => api.put(`/group-chat/${clubId}/read`),
+    deleteMessage: (clubId, messageId) => api.delete(`/group-chat/${clubId}/messages/${messageId}`),
+    updateSettings: (clubId, formData) => api.put(`/group-chat/${clubId}/settings`, formData),
+    addReaction: (clubId, messageId, emoji) => api.post(`/group-chat/${clubId}/messages/${messageId}/reaction`, { emoji }),
+    getTotalUnread: () => api.get('/group-chat/unread/total'),
 };
 
 export default api;

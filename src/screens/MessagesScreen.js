@@ -14,12 +14,13 @@ import {
     Platform,
     Alert,
     TouchableWithoutFeedback,
+    ActivityIndicator, // Added ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
 import { useAuth } from '../contexts/AuthContext';
-import { messagesAPI, clubsAPI, membersAPI, snapsAPI } from '../services/api';
+import { messagesAPI, clubsAPI, membersAPI, snapsAPI, groupChatAPI } from '../services/api';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
@@ -28,6 +29,7 @@ const MessagesScreen = ({ navigation }) => {
     const { user, socket, selectedClubId, updateSelectedClub } = useAuth();
     const [conversations, setConversations] = useState([]);
     const [clubs, setClubs] = useState([]);
+    const [groupChat, setGroupChat] = useState(null);
     // Initialize with global state to prevent flickering
     const [selectedClub, setSelectedClub] = useState(selectedClubId || null);
     const [clubMembers, setClubMembers] = useState([]);
@@ -42,23 +44,65 @@ const MessagesScreen = ({ navigation }) => {
     const [editCaptionModalVisible, setEditCaptionModalVisible] = useState(false);
     const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
     const [snapToDelete, setSnapToDelete] = useState(null);
+
+    // Listen for new snaps
+    useEffect(() => {
+        if (socket) {
+            socket.on('snap:new', () => {
+                fetchData(); // Refresh to show new snap
+            });
+            socket.on('group:message', (data) => {
+                if (data.clubId === selectedClub) {
+                    setGroupChat(prev => {
+                        if (!prev) return prev;
+                        return {
+                            ...prev,
+                            lastMessage: data.message,
+                            unreadCount: prev.unreadCount + (data.message.senderId?._id === user._id ? 0 : 1)
+                        };
+                    });
+                }
+            });
+            socket.on('group:settings_update', (data) => {
+                if (data.clubId === selectedClub) {
+                    setGroupChat(prev => prev ? { ...prev, ...data } : data);
+                }
+            });
+            socket.on('message:receive', (msg) => {
+                // Refresh conversations list
+                fetchData();
+            });
+            return () => {
+                socket.off('snap:new');
+                socket.off('group:message');
+                socket.off('group:settings_update');
+                socket.off('message:receive');
+            };
+        }
+    }, [socket]);
     const [replyText, setReplyText] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
     const [newCaption, setNewCaption] = useState('');
     const [editingSnapId, setEditingSnapId] = useState(null);
     const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
 
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchData();
+        }, [])
+    );
+
     const fetchData = async () => {
         try {
             setLoading(true);
 
             // Fetch conversations and clubs
-            const [convRes, clubsRes] = await Promise.all([
+            const [conversationsRes, clubsRes] = await Promise.all([
                 messagesAPI.getConversations(),
-                clubsAPI.getAll()
+                clubsAPI.getAll() // Fetch user's clubs
             ]);
 
-            if (convRes.success) setConversations(convRes.data);
+            if (conversationsRes.success) setConversations(conversationsRes.data);
             if (clubsRes.success) {
                 // Filter clubs to only show those the user has joined
                 const userClubIds = user.clubsJoined.map(c =>
@@ -85,6 +129,21 @@ const MessagesScreen = ({ navigation }) => {
                         updateSelectedClub(joinedClubs[0]._id);
                     }
                 }
+            }
+
+            // Fetch group chat for selected club
+            if (selectedClub && selectedClub !== 'all') {
+                try {
+                    const groupChatRes = await groupChatAPI.getGroupChat(selectedClub);
+                    if (groupChatRes.success) {
+                        setGroupChat(groupChatRes.data);
+                    }
+                } catch (groupError) {
+                    console.error('Error fetching group chat:', groupError);
+                    setGroupChat(null);
+                }
+            } else {
+                setGroupChat(null);
             }
 
             // Fetch snaps for the selected club
@@ -493,6 +552,58 @@ const MessagesScreen = ({ navigation }) => {
                             <View style={[styles.sectionHeader, { marginTop: 10 }]}>
                                 <Text style={styles.sectionTitle}>Recent Chats</Text>
                             </View>
+
+                            {/* Group Chat Card - Always on Top if club selected */}
+                            {groupChat && (
+                                <TouchableOpacity
+                                    style={styles.groupCard}
+                                    onPress={() => navigation.navigate('GroupChat', {
+                                        clubId: groupChat.clubId,
+                                        clubName: groupChat.name
+                                    })}
+                                >
+                                    <View style={styles.convAvatarContainer}>
+                                        {groupChat.groupIcon?.url ? (
+                                            <Image source={{ uri: groupChat.groupIcon.url }} style={styles.convAvatar} />
+                                        ) : (
+                                            <View style={[styles.convPlaceholder, { backgroundColor: '#7C3AED' }]}>
+                                                <Ionicons name="people" size={24} color="#FFF" />
+                                            </View>
+                                        )}
+                                        {/* Optional: Online indicator for groups or icon for settings if admin */}
+                                    </View>
+
+                                    <View style={styles.convContent}>
+                                        <View style={styles.convHeader}>
+                                            <Text style={styles.convName}>{groupChat.name}</Text>
+                                            {groupChat.lastMessage && (
+                                                <Text style={styles.convTime}>
+                                                    {new Date(groupChat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <View style={styles.convFooter}>
+                                            <Text style={[styles.convLastMsg, { fontWeight: groupChat.unreadCount > 0 ? '700' : '400' }]} numberOfLines={1}>
+                                                {groupChat.lastMessage ? (
+                                                    `${(groupChat.lastMessage.senderId?.displayName || 'Someone').split(' ')[0]}: ${groupChat.lastMessage.content}`
+                                                ) : 'No messages yet'}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                {/* Group tag */}
+                                                <View style={styles.groupBadge}>
+                                                    <Text style={styles.groupBadgeText}>Group</Text>
+                                                </View>
+                                                {groupChat.unreadCount > 0 && (
+                                                    <View style={[styles.unreadBadge, { marginLeft: 5 }]}>
+                                                        <Text style={styles.unreadText}>{groupChat.unreadCount}</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+
                             <FlatList
                                 data={filteredConversations}
                                 renderItem={renderConversationItem}
@@ -798,6 +909,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        paddingVertical: 15,
+        paddingHorizontal: 15,
+        marginHorizontal: -15, // Extend to edges
     },
     snapUserInfo: {
         flexDirection: 'row',
@@ -1074,6 +1189,27 @@ const styles = StyleSheet.create({
         flex: 1,
         marginRight: 10,
     },
+    groupCard: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        backgroundColor: '#F8FAFC', // Slightly different background for group
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        marginBottom: 5,
+    },
+    groupBadge: {
+        backgroundColor: '#EBF5FF',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginLeft: 5,
+    },
+    groupBadgeText: {
+        color: '#0A66C2',
+        fontSize: 10,
+        fontWeight: '700',
+    },
     unreadBadge: {
         backgroundColor: '#0A66C2',
         width: 20,
@@ -1181,7 +1317,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         textAlign: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.6)', // Increased opacity for better visibility
         paddingHorizontal: 15,
         paddingVertical: 8,
         borderRadius: 20,
@@ -1192,9 +1328,16 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '700',
         marginTop: 5,
-        textShadowColor: 'rgba(0,0,0,0.5)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 1,
+        ...Platform.select({
+            web: {
+                textShadow: '0px 1px 1px rgba(0,0,0,0.5)',
+            },
+            default: {
+                textShadowColor: 'rgba(0,0,0,0.5)',
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 1,
+            },
+        }),
     },
     snapReplyContainer: {
         flexDirection: 'row',

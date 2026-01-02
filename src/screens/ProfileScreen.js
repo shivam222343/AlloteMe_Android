@@ -10,6 +10,7 @@ import {
     Share,
     Clipboard,
     Platform,
+    Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +22,98 @@ import EditProfileModal from '../components/EditProfileModal';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProfileScreen = ({ navigation }) => {
-    const { user, logout, uploadProfilePicture, loading } = useAuth();
+    const { user, logout, uploadProfilePicture, updateProfile, loading } = useAuth();
     const [uploading, setUploading] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showImageModal, setShowImageModal] = useState(false);
+    const [showAvatarModal, setShowAvatarModal] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState(null);
+    const [generatedAvatars, setGeneratedAvatars] = useState([]);
+
+    const [selectedStyle, setSelectedStyle] = useState('mixed');
+
+    const AVATAR_STYLES = [
+        { id: 'mixed', label: 'Mixed' },
+        { id: 'notionists', label: 'Sketch' },
+        { id: 'adventurer', label: 'Adventurer' },
+        { id: 'bottts', label: 'Robots' },
+        { id: 'avataaars', label: 'Toon' },
+        { id: 'lorelei', label: 'Artistic' },
+        { id: 'fun-emoji', label: 'Emoji' },
+        { id: 'micah', label: 'Minimalist' },
+        { id: 'miniavs', label: 'Mini' },
+        { id: 'open-peeps', label: 'Peeps' },
+        { id: 'personas', label: 'Persona' }
+    ];
+
+    useEffect(() => {
+        if (showAvatarModal) {
+            generateAvatars(selectedStyle);
+        }
+    }, [showAvatarModal, selectedStyle]);
+
+    // Stable styles for Mixed mode to ensure fast loading and no errors
+    const SAFE_STYLES = ['notionists', 'adventurer', 'bottts', 'avataaars', 'lorelei', 'micah', 'open-peeps', 'personas'];
+
+    const generateAvatars = (style) => {
+        const newAvatars = Array(12).fill(0).map((_, i) => {
+            const seed = Math.random().toString(36).substring(7);
+            let currentStyle = style;
+
+            if (style === 'mixed') {
+                currentStyle = SAFE_STYLES[Math.floor(Math.random() * SAFE_STYLES.length)];
+            }
+
+            return `https://api.dicebear.com/9.x/${currentStyle}/png?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf`;
+        });
+        setGeneratedAvatars(newAvatars);
+    };
+
+    const handleAvatarSelect = async (url) => {
+        try {
+            setUploading(true);
+            setShowAvatarModal(false);
+
+            // For now, we save the URL directly. The backend's updateProfile supports profile fields update 
+            // but for profilePicture structure we might need a direct call or update the backend.
+            // The existing `uploadProfilePicture` expects a FILE.
+            // We can either:
+            // 1. Download the image and upload it as a file (Heavy)
+            // 2. Just update the user document with this URL directly (Simpler & Faster)
+
+            // Let's assume we can pass a URL to a new endpoint OR assume `uploadProfilePicture` can handle a URL string
+            // Actually, `uploadProfilePicture` in `useAuth` calls `/upload-profile-picture` which expects multipart.
+            // We should use `updateProfile` in `authController` but it only updates text fields.
+
+            // WORKAROUND: We will download the image -> Blob -> File -> Upload.
+            // This ensures it's saved in our Cloudinary/storage consistently and doesn't rely on external API availability forever.
+
+            const response = await fetch(url);
+            const blob = await response.blob();
+            // Convert blob to file-like object for upload
+            const localUri = URL.createObjectURL(blob);
+            // Wait, React Native fetch returns blob. `formData.append` needs specific format.
+
+            // Simpler approach for React Native without heavy blob polyfills:
+            // Just update the user profile URL directly in the database.
+            // We need a route for "setProfilePictureUrl". 
+            // Or we just abuse `updateProfile`? It updates `displayName` etc.
+            // Let's modify `updateProfile` in backend to accept `profilePictureUrl` if we want to be clean.
+            // OR, just send it as a "display name" update? No.
+
+            // Let's try downloading and uploading as a file:
+            // On mobile, `fetch(url)` works.
+            // But honestly, for "AI Generated", storing the URL string is efficient.
+            // I'll update the backend `updateProfile` to accept `profilePictureUrl`.
+
+            // Wait, I can't easily change backend right now without breaking flow. 
+            // Let's assume we implement `handleAvatarSelect` by calling a new prompt to the backend? 
+            // Better: I will use `updateProfile` and send `avatarUrl`.
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     const pickImage = async () => {
         // Request permissions
@@ -51,6 +138,30 @@ const ProfileScreen = ({ navigation }) => {
         }
     };
 
+    const confirmAvatarSelection = async (url) => {
+        try {
+            setUploading(true);
+            setShowAvatarModal(false);
+
+            // Call updateProfile with the new URL
+            const result = await updateProfile({
+                profilePictureUrl: url
+            });
+
+            if (result.success) {
+                // Success - UI will update via context
+            } else {
+                alert(result.message || 'Failed to update avatar');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Failed to update avatar');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // ... existing handleImageUpload ...
     const handleImageUpload = async (asset) => {
         try {
             setUploading(true);
@@ -97,6 +208,13 @@ const ProfileScreen = ({ navigation }) => {
         }
     };
 
+    const isBirthday = React.useMemo(() => {
+        if (!user?.birthDate) return false;
+        const bday = new Date(user.birthDate);
+        const today = new Date();
+        return bday.getDate() === today.getDate() && bday.getMonth() === today.getMonth();
+    }, [user?.birthDate]);
+
     if (loading) {
         return (
             <MainLayout navigation={navigation} title="Profile">
@@ -111,20 +229,55 @@ const ProfileScreen = ({ navigation }) => {
         <MainLayout navigation={navigation} currentRoute="Profile" title="Profile">
             <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
                 {/* Header Section */}
-                <LinearGradient
-                    colors={['#0A66C2', '#0E76A8']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.header}
-                >
+                {/* Header Section */}
+                <View style={styles.header}>
+                    {user?.preferences?.sidebarBanner ? (
+                        <>
+                            <Image
+                                source={
+                                    user.preferences.sidebarBanner.startsWith('http')
+                                        ? { uri: user.preferences.sidebarBanner }
+                                        : (
+                                            user.preferences.sidebarBanner === 'local-banner-1' ? require('../../assets/banners/blue_geometric.png') :
+                                                user.preferences.sidebarBanner === 'local-banner-2' ? require('../../assets/banners/blue_abstract.png') :
+                                                    user.preferences.sidebarBanner === 'local-banner-3' ? require('../../assets/banners/blue_shapes.png') :
+                                                        user.preferences.sidebarBanner === 'local-banner-4' ? require('../../assets/banners/blue_cloud.png') :
+                                                            { uri: user.preferences.sidebarBanner }
+                                        )
+                                }
+                                style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]}
+                                resizeMode="cover"
+                            />
+                            <View style={styles.headerOverlay} />
+                        </>
+                    ) : (
+                        <LinearGradient
+                            colors={['#0A66C2', '#0E76A8']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
+
                     <View style={styles.profileImageContainer}>
-                        {user?.profilePicture?.url ? (
-                            <Image source={{ uri: user.profilePicture.url }} style={styles.profileImage} />
-                        ) : (
-                            <View style={[styles.profileImage, styles.placeholderImage]}>
-                                <Ionicons name="person" size={40} color="#9CA3AF" />
-                            </View>
-                        )}
+                        <Image
+                            source={{
+                                uri: user?.profilePicture?.url
+                                    ? user.profilePicture.url
+                                    : `https://api.dicebear.com/9.x/notionists/png?seed=${user?._id || 'random'}&backgroundColor=b6e3f4,c0aede,d1d4f9`
+                            }}
+                            style={styles.profileImage}
+                        />
+                        {/* Magic AI Avatar Button - Positioned Left */}
+                        <TouchableOpacity
+                            style={[styles.cameraButton, { right: undefined, left: 0 }]}
+                            onPress={() => setShowAvatarModal(true)}
+                            disabled={uploading}
+                        >
+                            <Ionicons name="color-wand" size={20} color="#7C3AED" />
+                        </TouchableOpacity>
+
+                        {/* Gallery Upload Button - Positioned Right */}
                         <TouchableOpacity
                             style={styles.cameraButton}
                             onPress={pickImage}
@@ -138,7 +291,12 @@ const ProfileScreen = ({ navigation }) => {
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
+                        {isBirthday && (
+                            <Ionicons name="gift" size={20} color="#EC4899" style={{ marginLeft: 8 }} />
+                        )}
+                    </View>
                     <Text style={styles.userEmail}>{user?.email || 'email@example.com'}</Text>
 
                     {user?.maverickId && (
@@ -147,7 +305,16 @@ const ProfileScreen = ({ navigation }) => {
                             <Text style={styles.idText}>{user.maverickId}</Text>
                         </View>
                     )}
-                </LinearGradient>
+
+                    {/* Banner Edit Button */} // Positioned relative to header
+                    <TouchableOpacity
+                        style={styles.bannerEditButton}
+                        onPress={() => navigation.navigate('Settings', { openBannerModal: true })}
+                    >
+                        <Ionicons name="image-outline" size={20} color="#FFFFFF" />
+                        <Text style={styles.bannerEditText}>Edit Banner</Text>
+                    </TouchableOpacity>
+                </View>
 
                 <View style={styles.body}>
                     {/* Personal Info Card */}
@@ -331,8 +498,89 @@ const ProfileScreen = ({ navigation }) => {
                     cancelText="Cancel"
                     type="info"
                 />
+
+                {/* Avatar Selection Modal */}
+                <Modal
+                    visible={showAvatarModal}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowAvatarModal(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Choose AI Avatar</Text>
+                                <TouchableOpacity onPress={() => setShowAvatarModal(false)}>
+                                    <Ionicons name="close" size={24} color="#374151" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.modalSubtitle}>Pick a style to generate your unique avatar!</Text>
+
+                            {/* Style Filters */}
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.filterScroll}
+                                contentContainerStyle={styles.filterContainer}
+                            >
+                                {AVATAR_STYLES.map((style) => (
+                                    <TouchableOpacity
+                                        key={style.id}
+                                        style={[styles.filterChip, selectedStyle === style.id && styles.filterChipActive]}
+                                        onPress={() => setSelectedStyle(style.id)}
+                                    >
+                                        <Text style={[styles.filterChipText, selectedStyle === style.id && styles.filterChipTextActive]}>
+                                            {style.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            <ScrollView style={styles.avatarScroll} showsVerticalScrollIndicator={false}>
+                                <View style={styles.avatarGrid}>
+                                    {generatedAvatars.map((url, index) => (
+                                        <TouchableOpacity
+                                            key={index}
+                                            style={styles.avatarItem}
+                                            onPress={() => confirmAvatarSelection(url)}
+                                        >
+                                            <Image source={{ uri: url }} style={styles.avatarImage} />
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </ScrollView>
+
+                            <TouchableOpacity
+                                style={styles.refreshButton}
+                                onPress={() => generateAvatars(selectedStyle)}
+                            >
+                                <Ionicons name="refresh" size={20} color="#FFF" />
+                                <Text style={styles.refreshButtonText}>Generate New</Text>
+                            </TouchableOpacity>
+
+                            {/* Past Avatars Section */}
+                            {user?.profilePictureHistory && user.profilePictureHistory.length > 0 && (
+                                <View style={styles.historySection}>
+                                    <Text style={[styles.modalSubtitle, { marginTop: 20 }]}>Recently Used</Text>
+                                    <View style={styles.avatarGrid}>
+                                        {user.profilePictureHistory.slice(0, 3).map((historyItem, index) => (
+                                            <TouchableOpacity
+                                                key={`hist-${index}`}
+                                                style={styles.avatarItem}
+                                                onPress={() => confirmAvatarSelection(historyItem.url)}
+                                            >
+                                                <Image source={{ uri: historyItem.url }} style={styles.avatarImage} />
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </Modal>
             </ScrollView>
-        </MainLayout>
+        </MainLayout >
     );
 };
 
@@ -355,6 +603,11 @@ const styles = StyleSheet.create({
         paddingBottom: 60,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
+        overflow: 'hidden', // Ensure background image respects border radius
+    },
+    headerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(10, 102, 194, 0.5)', // Transparent blue overlay matching app theme
     },
     profileImageContainer: {
         position: 'relative',
@@ -377,8 +630,11 @@ const styles = StyleSheet.create({
         bottom: 0,
         right: 0,
         backgroundColor: '#FFFFFF',
-        padding: 8,
+        width: 40,
+        height: 40,
         borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
@@ -411,6 +667,25 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 14,
         letterSpacing: 0.5,
+    },
+    bannerEditButton: {
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.4)',
+    },
+    bannerEditText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 6,
     },
     body: {
         paddingHorizontal: 20,
@@ -529,6 +804,105 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#EF4444',
         marginLeft: 8,
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        padding: 20,
+        elevation: 5,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1F2937',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginBottom: 20,
+    },
+    avatarGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    avatarItem: {
+        width: '30%',
+        aspectRatio: 1,
+        marginBottom: 15,
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    refreshButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#7C3AED',
+        padding: 12,
+        borderRadius: 12,
+    },
+    refreshButtonText: {
+        color: '#FFF',
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    // Filter Styles
+    filterScroll: {
+        maxHeight: 50,
+        marginBottom: 16,
+    },
+    filterContainer: {
+        paddingHorizontal: 4,
+        gap: 8,
+    },
+    filterChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#F3F4F6',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        marginRight: 8,
+    },
+    filterChipActive: {
+        backgroundColor: '#0A66C2',
+        borderColor: '#0A66C2',
+    },
+    filterChipText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4B5563',
+    },
+    filterChipTextActive: {
+        color: '#FFF',
+    },
+    avatarScroll: {
+        maxHeight: 300, // Limit height to allow scrolling within modal
+    },
+    historySection: {
+        marginTop: 10,
+        marginBottom: 10,
+        width: '100%',
     },
 });
 

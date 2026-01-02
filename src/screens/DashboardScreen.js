@@ -10,6 +10,7 @@ import {
     useWindowDimensions,
     Image,
     Animated,
+    Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,18 +44,56 @@ const DashboardScreen = ({ navigation }) => {
     const scrollX = React.useRef(new Animated.Value(0)).current;
     const sliderRef = React.useRef(null);
     const [greeting, setGreeting] = React.useState('');
+    const [profilePromptVisible, setProfilePromptVisible] = React.useState(false);
+    const [bannerPromptVisible, setBannerPromptVisible] = React.useState(false);
+
+    // Check for first-time prompts (Profile & Banner)
+    React.useEffect(() => {
+        const checkPrompts = async () => {
+            try {
+                // 1. Profile Picture Prompt
+                const hasPromptedProfile = await AsyncStorage.getItem(`hasPromptedProfile_${user?._id}`);
+                const hasProfilePic = user?.profilePicture?.url && !user.profilePicture.url.includes('dicebear');
+
+                if (!hasPromptedProfile && !hasProfilePic) {
+                    setProfilePromptVisible(true);
+                    await AsyncStorage.setItem(`hasPromptedProfile_${user?._id}`, 'true');
+                    return; // Show only one prompt at a time
+                }
+
+                // 2. Banner Change Prompt (only if profile prompt didn't fire)
+                const hasPromptedBanner = await AsyncStorage.getItem(`hasPromptedBanner_${user?._id}`);
+                // Assuming 'null' or undefined means default blue banner
+                const hasCustomBanner = user?.preferences?.sidebarBanner;
+
+                if (!hasPromptedBanner && !hasCustomBanner) {
+                    // We can reuse the same modal mechanism or create a new state
+                    // For now, let's navigate to settings directly or use a simple Alert? 
+                    // User requested a "random popup". I'll add a 'bannerPromptVisible' state.
+                    setBannerPromptVisible(true);
+                    await AsyncStorage.setItem(`hasPromptedBanner_${user?._id}`, 'true');
+                }
+            } catch (e) {
+                console.log('Error checking prompts', e);
+            }
+        };
+
+        if (user) {
+            checkPrompts();
+        }
+    }, [user]);
 
     const fetchDashboardData = React.useCallback(async () => {
         try {
             const [dashRes, galleryRes] = await Promise.all([
                 authAPI.getDashboard(),
-                galleryAPI.getImages({ limit: 10, status: 'approved' })
+                galleryAPI.getImages({ limit: 5, status: 'approved' })
             ]);
             if (dashRes.success) {
                 setDashboardData(dashRes.data);
             }
             if (galleryRes.success) {
-                setRecentImages(galleryRes.data.slice(0, 6));
+                setRecentImages(galleryRes.data.slice(0, 5));
             }
         } catch (error) {
             console.error('Fetch dashboard data error:', error);
@@ -153,10 +192,11 @@ const DashboardScreen = ({ navigation }) => {
     );
 
     // Sync with global club selection when it changes from other screens
+    // Sync with global club selection
     React.useEffect(() => {
-        // No need to sync in Dashboard since we're using selectedClubId directly
-        // This screen doesn't have a local selectedClub state
-    }, [selectedClubId]);
+        setLoading(true);
+        fetchDashboardData();
+    }, [selectedClubId, fetchDashboardData]);
 
     React.useEffect(() => {
         if (!socket) return;
@@ -299,27 +339,29 @@ const DashboardScreen = ({ navigation }) => {
                 )}
 
                 {/* 2. Other Members Birthdays */}
-                {dashboardData.birthdays && dashboardData.birthdays.map((bdayUser) => (
-                    <View key={bdayUser._id} style={styles.bdayCard}>
-                        <LinearGradient
-                            colors={['#EC4899', '#F472B6']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 0, y: 1 }}
-                            style={styles.bdayBorder}
-                        />
-                        <View style={styles.bdayContent}>
-                            <View style={[styles.bdayIconBox, { backgroundColor: '#FDF2F8' }]}>
-                                <Ionicons name="gift-outline" size={24} color="#DB2777" />
-                            </View>
-                            <View style={styles.bdayTextBox}>
-                                <Text style={styles.bdayTitle}>Happy Birthday, {bdayUser.displayName}! 🎈</Text>
-                                <Text style={styles.bdayText}>
-                                    Wishing them a fantastic year ahead!
-                                </Text>
+                {dashboardData.birthdays && dashboardData.birthdays
+                    .filter(bdayUser => bdayUser._id.toString() !== user?._id?.toString())
+                    .map((bdayUser) => (
+                        <View key={bdayUser._id} style={styles.bdayCard}>
+                            <LinearGradient
+                                colors={['#EC4899', '#F472B6']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                                style={styles.bdayBorder}
+                            />
+                            <View style={styles.bdayContent}>
+                                <View style={[styles.bdayIconBox, { backgroundColor: '#FDF2F8' }]}>
+                                    <Ionicons name="gift-outline" size={24} color="#DB2777" />
+                                </View>
+                                <View style={styles.bdayTextBox}>
+                                    <Text style={styles.bdayTitle}>Happy Birthday, {bdayUser.displayName}! 🎈</Text>
+                                    <Text style={styles.bdayText}>
+                                        Wishing them a fantastic year ahead!
+                                    </Text>
+                                </View>
                             </View>
                         </View>
-                    </View>
-                ))}
+                    ))}
 
                 {/* Gallery Carousel */}
                 {recentImages.length > 0 && (
@@ -530,6 +572,93 @@ const DashboardScreen = ({ navigation }) => {
                     visible={scanModalVisible}
                     onClose={() => setScanModalVisible(false)}
                 />
+
+                {/* First Time Profile Prompt Modal */}
+                <Modal
+                    visible={profilePromptVisible}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setProfilePromptVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Welcome, {user?.displayName}!</Text>
+                            </View>
+
+                            <Text style={styles.modalSubtitle}>
+                                We've assigned you a random avatar. Do you want to keep this look or choose your own?
+                            </Text>
+
+                            <View style={styles.promptAvatarContainer}>
+                                <Image
+                                    source={{
+                                        uri: user?.profilePicture?.url || `https://api.dicebear.com/9.x/notionists/png?seed=${user?._id}&backgroundColor=b6e3f4,c0aede,d1d4f9`
+                                    }}
+                                    style={styles.promptAvatar}
+                                />
+                            </View>
+
+                            <View style={styles.promptButtonRow}>
+                                <TouchableOpacity
+                                    style={styles.promptButtonSecondary}
+                                    onPress={() => setProfilePromptVisible(false)}
+                                >
+                                    <Text style={styles.promptButtonTextSecondary}>It looks cool!</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.promptButtonPrimary}
+                                    onPress={() => {
+                                        setProfilePromptVisible(false);
+                                        navigation.navigate('Settings', { openBannerModal: true });
+                                    }}
+                                >
+                                    <Text style={styles.promptButtonTextPrimary}>Customize</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Banner Customization Prompt Modal */}
+                <Modal
+                    visible={bannerPromptVisible}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setBannerPromptVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Customize Your Experience!</Text>
+                            </View>
+
+                            <Text style={styles.modalSubtitle}>
+                                Did you know you can personalize your sidebar with premium banners? Make the app truly yours!
+                            </Text>
+
+                            <View style={styles.promptButtonRow}>
+                                <TouchableOpacity
+                                    style={styles.promptButtonSecondary}
+                                    onPress={() => setBannerPromptVisible(false)}
+                                >
+                                    <Text style={styles.promptButtonTextSecondary}>Maybe Later</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.promptButtonPrimary}
+                                    onPress={() => {
+                                        setBannerPromptVisible(false);
+                                        navigation.navigate('Settings', { openBannerModal: true });
+                                    }}
+                                >
+                                    <Text style={styles.promptButtonTextPrimary}>Customize Now</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </ScrollView>
         </MainLayout>
     );
@@ -642,8 +771,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         padding: 16,
-        background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        backgroundColor: 'rgba(0,0,0,0.4)', // Simplified overlay
     },
     carouselImageTitle: {
         fontSize: 16,
@@ -731,6 +859,83 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
         fontWeight: '500',
         marginTop: 2,
+    },
+
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    modalContent: {
+        backgroundColor: '#FFF',
+        borderRadius: 24,
+        padding: 24,
+        alignItems: 'center',
+    },
+    modalHeader: {
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#1E293B',
+        textAlign: 'center',
+    },
+    modalSubtitle: {
+        fontSize: 15,
+        color: '#64748B',
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    promptAvatarContainer: {
+        marginBottom: 32,
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+    },
+    promptAvatar: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        borderWidth: 4,
+        borderColor: '#FFF',
+    },
+    promptButtonRow: {
+        flexDirection: 'row',
+        gap: 12,
+        width: '100%',
+    },
+    promptButtonPrimary: {
+        flex: 1,
+        backgroundColor: '#0A66C2',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    promptButtonSecondary: {
+        flex: 1,
+        backgroundColor: '#F1F5F9',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    promptButtonTextPrimary: {
+        color: '#FFF',
+        fontWeight: '600',
+        fontSize: 16,
+    },
+    promptButtonTextSecondary: {
+        color: '#475569',
+        fontWeight: '600',
+        fontSize: 16,
     },
     section: {
         marginBottom: 32,

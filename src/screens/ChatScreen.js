@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -28,12 +28,41 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import { snapsAPI } from '../services/api';
+import { formatRelativeTime } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
+const DateSeparator = ({ date }) => {
+    const d = new Date(date);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    let dateText = "";
+    if (d.toDateString() === today.toDateString()) {
+        dateText = "Today";
+    } else if (d.toDateString() === yesterday.toDateString()) {
+        dateText = "Yesterday";
+    } else {
+        dateText = d.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    return (
+        <View style={styles.dateSeparatorContainer}>
+            <View style={styles.dateBadge}>
+                <Text style={styles.dateText}>{dateText}</Text>
+            </View>
+        </View>
+    );
+};
+
 const MessageItem = React.memo(({ item, index, user, otherUser, messages, setReplyingTo, setShowOptionsId, isSelected, toggleSelection, isSelectionMode }) => {
     // Filter out malformed messages (e.g. error objects)
-    if (!item || typeof item.content !== 'string') return null;
+    if (!item) return null;
+    if (item.type === 'date_separator') {
+        return <DateSeparator date={item.date} />;
+    }
+    if (typeof item.content !== 'string') return null;
 
     const isAI = item.senderId === 'AI' || item.senderId?._id === 'AI' || item.senderId === '000000000000000000000000' || item.senderId?._id === '000000000000000000000000' || item.isAI;
     const isMine = !isAI && (item.senderId === user._id || (item.senderId?._id === user._id));
@@ -73,6 +102,8 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
             <Animated.View style={[
                 styles.messageRow,
                 isMine ? styles.myRow : isAI ? styles.aiRow : styles.otherRow,
+                // Add extra margin if previous message has reactions
+                prevMessage && prevMessage.reactions && prevMessage.reactions.length > 0 && { marginTop: 12 },
                 {
                     transform: [{
                         translateX: itemSwipeX.interpolate({
@@ -179,6 +210,14 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                                     <Text style={styles.replyContent} numberOfLines={1}>{item.replyTo.content}</Text>
                                 </View>
                             )}
+
+                            {item.fileUrl && !item.deleted && (
+                                <Image
+                                    source={{ uri: item.fileUrl }}
+                                    style={styles.messageImage}
+                                    resizeMode="cover"
+                                />
+                            )}
                             <Text style={[styles.messageText, isMine ? styles.myText : isAI ? styles.aiText : styles.otherText, item.deleted && styles.deletedText]}>
                                 {item.content}
                             </Text>
@@ -216,7 +255,7 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
 const ChatScreen = ({ route, navigation }) => {
     const insets = useSafeAreaInsets();
     const { otherUser } = route.params;
-    const { user, socket } = useAuth();
+    const { user, socket, refreshUnreadMessageCount } = useAuth();
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(true);
@@ -238,6 +277,26 @@ const ChatScreen = ({ route, navigation }) => {
     const [forwardLoading, setForwardLoading] = useState(false);
 
     const isSelectionMode = selectedMessages.length > 0;
+
+    const formattedMessages = useMemo(() => {
+        const sorted = [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        const formatted = [];
+        let lastDate = null;
+
+        sorted.forEach((msg) => {
+            const dateStr = new Date(msg.createdAt).toDateString();
+            if (dateStr !== lastDate) {
+                formatted.push({
+                    type: 'date_separator',
+                    date: dateStr,
+                    _id: `date-${dateStr}`
+                });
+                lastDate = dateStr;
+            }
+            formatted.push(msg);
+        });
+        return formatted;
+    }, [messages]);
 
     const flatListRef = useRef();
     const inputRef = useRef();
@@ -298,6 +357,7 @@ const ChatScreen = ({ route, navigation }) => {
     const markRead = async () => {
         try {
             await messagesAPI.markAsRead(otherUser._id);
+            refreshUnreadMessageCount(); // Update badge in sidebar
         } catch (error) {
             console.log('Error marking read');
         }
@@ -453,51 +513,35 @@ const ChatScreen = ({ route, navigation }) => {
     };
 
     const uploadAttachment = async (uri, type) => {
-        // Since we don't have a direct "upload file for chat" endpoint in the provided API snippet, 
-        // we'll try to use the snapsAPI (which handles multipart) OR send via message text for now.
-        // Ideally, we'd have a separate endpoint. For now, assuming snapsAPI or similar can return a URL, 
-        // OR we send it as a 'snap' that appears in chat.
-
-        // However, standard implementation usually POSTs to /upload. 
-        // Based on available APIs, `snapsAPI.upload` is the best candidate for file upload.
-        // We will repurpose it slightly or just use it to get the file to server.
-
-        // NOTE: If backend supports messages with file attachments directly, use that.
-        // But the previous messagesAPI.send took separate `content` and `type`.
-
         try {
+            setLoading(true); // Show some loading state
             const formData = new FormData();
 
-            if (Platform.OS === 'web') {
-                const response = await fetch(uri);
-                const blob = await response.blob();
-                const file = new File([blob], 'attachment.jpg', { type: type === 'image' ? 'image/jpeg' : 'application/pdf' });
-                formData.append('image', file);
-            } else {
-                formData.append('image', {
-                    uri,
-                    type: type === 'image' ? 'image/jpeg' : 'application/pdf',
-                    name: 'attachment.' + (type === 'image' ? 'jpg' : 'pdf')
-                });
+            const filename = uri.split('/').pop();
+            const match = /\.(\w+)$/.exec(filename);
+            const ext = match ? match[1] : (type === 'image' ? 'jpg' : 'pdf');
+
+            formData.append('file', {
+                uri,
+                type: type === 'image' ? `image/${ext}` : `application/${ext}`,
+                name: filename
+            });
+            formData.append('receiverId', otherUser._id);
+            formData.append('type', type);
+            formData.append('content', type === 'image' ? '📷 Photo' : '📎 Attachment');
+
+            const res = await messagesAPI.send(formData);
+            if (res.success) {
+                setMessages(prev => [...prev, res.data]);
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
             }
-
-            formData.append('type', 'image'); // Snaps expects 'image' or 'video'
-            formData.append('clubId', 'direct_message'); // Hack? Or maybe valid.
-            // If the backend is strict about clubId, this might fail.
-            // Let's assume we can send a message with 'image' type and the content is the URI if we can't upload.
-            // But real uploads need backend support.
-
-            // FALLBACK TO SENDING TEXT MSG since we can't verify backend upload for chat right now without risky guesses.
-            // We will instruct the user or just alert "Not fully implemented" if upload fails.
-
-            // Actually, let's try to just send the message with type='image' and see if backend handles base64?
-            // No, that's heavy.
-
-            // Let's use the snapsAPI.upload as a proxy if possible, or just log.
-            alert("File selection successful. Uploading is not fully configured in this demo version.");
-
         } catch (error) {
             console.error('Error uploading:', error);
+            alert("Failed to upload file. Please try again.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -610,14 +654,14 @@ const ChatScreen = ({ route, navigation }) => {
             index={index}
             user={user}
             otherUser={otherUser}
-            messages={messages}
+            messages={formattedMessages}
             setReplyingTo={setReplyingTo}
             setShowOptionsId={setShowOptionsId}
             isSelected={selectedMessages.includes(item._id)}
             toggleSelection={toggleSelection}
             isSelectionMode={isSelectionMode}
         />
-    ), [user._id, otherUser._id, messages.length, selectedMessages, isSelectionMode, toggleSelection]);
+    ), [user._id, otherUser._id, formattedMessages.length, selectedMessages, isSelectionMode, toggleSelection]);
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -655,9 +699,9 @@ const ChatScreen = ({ route, navigation }) => {
                                     style={styles.headerAvatar}
                                 />
                                 <View>
-                                    <Text style={styles.headerName}>{otherUser.displayName}</Text>
+                                    <Text style={[styles.headerName, { flex: 1 }]} numberOfLines={1}>{otherUser.displayName}</Text>
                                     <Text style={styles.headerStatus}>
-                                        {isTyping ? 'typing...' : (otherUser.isOnline ? 'online' : 'last seen recently')}
+                                        {isTyping ? 'typing...' : (otherUser.isOnline ? 'online' : `last seen ${formatRelativeTime(otherUser.lastSeen)}`)}
                                     </Text>
                                 </View>
                             </TouchableOpacity>
@@ -1226,6 +1270,12 @@ const styles = StyleSheet.create({
     aiText: {
         color: '#1F2937',
     },
+    messageImage: {
+        width: 200,
+        height: 150,
+        borderRadius: 10,
+        marginBottom: 8,
+    },
     avatarSpace: {
         width: 35,
         marginRight: 5,
@@ -1453,6 +1503,27 @@ const styles = StyleSheet.create({
         backgroundColor: '#0A66C2',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    dateSeparatorContainer: {
+        alignItems: 'center',
+        marginVertical: 15,
+    },
+    dateBadge: {
+        backgroundColor: '#FFF',
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 12,
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+    },
+    dateText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#6B7280',
+        textTransform: 'uppercase',
     },
     micButton: {
         padding: 5,
