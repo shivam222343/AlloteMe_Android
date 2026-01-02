@@ -29,6 +29,7 @@ import { API_CONFIG } from '../constants/theme';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { TapGestureHandler, State } from 'react-native-gesture-handler';
+import { prepareFile } from '../services/cloudinaryService';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 45) / 2;
@@ -145,7 +146,7 @@ const GalleryScreen = ({ navigation }) => {
 
     const handlePickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             quality: 0.8,
         });
@@ -171,26 +172,9 @@ const GalleryScreen = ({ navigation }) => {
             setUploading(true);
             const formData = new FormData();
 
-            if (Platform.OS === 'web') {
-                const response = await fetch(selectedImage.uri);
-                const blob = await response.blob();
-
-                // Final size check for Web
-                if (blob.size > MAX_FILE_SIZE) {
-                    setFileSizeError('This image is too large (over 20MB).');
-                    setUploading(false);
-                    return Alert.alert('Error', 'File size exceeds 20MB limit.');
-                }
-
-                formData.append('image', blob, selectedImage.fileName || 'gallery_img.jpg');
-            } else {
-                // For Mobile
-                formData.append('image', {
-                    uri: selectedImage.uri,
-                    type: selectedImage.mimeType || selectedImage.type || 'image/jpeg',
-                    name: selectedImage.fileName || 'gallery_img.jpg',
-                });
-            }
+            // Prepare file using centralized service
+            const file = await prepareFile(selectedImage.uri);
+            formData.append('image', file);
 
             formData.append('title', uploadData.title || '');
             formData.append('description', uploadData.description || '');

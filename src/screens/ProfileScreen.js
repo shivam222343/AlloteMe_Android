@@ -20,6 +20,7 @@ import MainLayout from '../components/MainLayout';
 import ConfirmModal from '../components/ConfirmModal';
 import EditProfileModal from '../components/EditProfileModal';
 import { useAuth } from '../contexts/AuthContext';
+import { prepareFile } from '../services/cloudinaryService';
 
 const ProfileScreen = ({ navigation }) => {
     const { user, logout, uploadProfilePicture, updateProfile, loading } = useAuth();
@@ -169,21 +170,11 @@ const ProfileScreen = ({ navigation }) => {
             // Create form data
             const formData = new FormData();
 
-            if (Platform.OS === 'web') {
-                // For web, we need to fetch the uri and convert to blob
-                const response = await fetch(asset.uri);
-                const blob = await response.blob();
-                // Create a File object from the blob to ensure correct mimetype and filename
-                const file = new File([blob], 'profile-image.jpg', { type: blob.type || 'image/jpeg' });
-                formData.append('image', file);
-            } else {
-                // For mobile
-                formData.append('image', {
-                    uri: asset.uri,
-                    type: asset.mimeType || 'image/jpeg',
-                    name: asset.fileName || `profile_${Date.now()}.jpg`,
-                });
-            }
+            // Prepare file using centralized service
+
+            // Prepare file using centralized service
+            const file = await prepareFile(asset.uri);
+            formData.append('image', file);
 
             // Upload via useAuth hook
             const result = await uploadProfilePicture(formData);

@@ -8,9 +8,20 @@ import {
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { handleNotificationResponse, setupNotificationListeners } from './src/services/NotificationService';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ProfileCompletionModal from './src/components/ProfileCompletionModal';
 import { authAPI } from './src/services/api';
+
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -28,7 +39,6 @@ import CameraScreen from './src/screens/CameraScreen';
 import GalleryScreen from './src/screens/GalleryScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import TasksScreen from './src/screens/TasksScreen';
-import GroupChatScreen from './src/screens/GroupChatScreen';
 
 const Stack = createStackNavigator();
 
@@ -79,6 +89,16 @@ const AppContent = () => {
       }
     }
   }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    // Setup FCM listeners
+    if (navigationRef.current) {
+      const unsubscribe = setupNotificationListeners(navigationRef.current);
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    }
+  }, [navigationRef.current]);
 
   const handleProfileComplete = async (profileData) => {
     try {
@@ -144,7 +164,6 @@ const AppContent = () => {
               <Stack.Screen name="Gallery" component={GalleryScreen} />
               <Stack.Screen name="Analytics" component={AnalyticsScreen} />
               <Stack.Screen name="Tasks" component={TasksScreen} />
-              <Stack.Screen name="GroupChat" component={GroupChatScreen} />
             </>
           )}
         </Stack.Navigator>

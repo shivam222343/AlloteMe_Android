@@ -21,6 +21,7 @@ import { Video } from 'expo-av'; // For video preview
 import * as ImagePicker from 'expo-image-picker';
 import { snapsAPI, clubsAPI, membersAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { prepareFile } from '../services/cloudinaryService';
 
 const CameraScreen = ({ navigation, route }) => {
     const { user } = useAuth();
@@ -92,7 +93,7 @@ const CameraScreen = ({ navigation, route }) => {
     const pickMedia = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow Images and Videos
+                mediaTypes: ['images', 'videos'], // Updated from MediaTypeOptions
                 allowsEditing: true,
                 quality: 0.8,
             });
@@ -209,25 +210,9 @@ const CameraScreen = ({ navigation, route }) => {
             setUploading(true);
             const formData = new FormData();
 
-            // Handle web vs mobile file upload
-            if (Platform.OS === 'web') {
-                const response = await fetch(capturedMedia.uri);
-                const blob = await response.blob();
-                const fileType = capturedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg';
-                const fileName = capturedMedia.type === 'video' ? 'snap.mp4' : 'snap.jpg';
-                const file = new File([blob], fileName, { type: fileType });
-                formData.append('image', file); // keeping key as 'image' for backend compat, or change to 'file'? Backend expects 'image' or file field.
-            } else {
-                // For mobile
-                const fileType = capturedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg';
-                const fileName = capturedMedia.type === 'video' ? `snap_${Date.now()}.mp4` : `snap_${Date.now()}.jpg`;
-
-                formData.append('image', {
-                    uri: capturedMedia.uri,
-                    type: fileType,
-                    name: fileName,
-                });
-            }
+            // Prepare file using centralized service
+            const file = await prepareFile(capturedMedia.uri);
+            formData.append('image', file);
 
             formData.append('clubId', selectedClubId);
             formData.append('type', capturedMedia.type); // 'image' or 'video'
@@ -448,7 +433,7 @@ const CameraScreen = ({ navigation, route }) => {
                                     strokeDashoffset={2 * Math.PI * 45 * (1 - duration / 30)}
                                     // strokeLinecap="round"
                                     rotation="-90"
-                                    origin="50, 50"
+                                    {...(Platform.OS !== 'web' ? { origin: "50, 50" } : {})}
                                 />
                             </Svg>
                             <TouchableOpacity

@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
         width: 180,
         height: 60,
         marginBottom: 12,
-        borderRadius: 30,
+        borderRadius: 16, // Rounded corners
     },
     tagline: {
         fontSize: 14,

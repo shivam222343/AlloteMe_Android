@@ -186,22 +186,39 @@ export const notificationsAPI = {
 export const messagesAPI = {
     getConversations: () => api.get('/messages/conversations/list'),
     getMessages: (userId) => api.get(`/messages/${userId}`),
-    send: (data) => api.post('/messages', data),
+    send: (data, file) => {
+        if (file) {
+            const formData = new FormData();
+            formData.append('receiverId', data.receiverId);
+            formData.append('content', data.content || '');
+            formData.append('type', data.type || 'text');
+            if (data.replyTo) formData.append('replyTo', data.replyTo);
+            if (data.mentionAI) formData.append('mentionAI', 'true');
+            if (data.isForwarded) formData.append('isForwarded', 'true');
+            formData.append('file', file);
+            return api.post('/messages', formData);
+        }
+        return api.post('/messages', data);
+    },
     markAsRead: (userId) => api.put(`/messages/${userId}/read`),
     addReaction: (messageId, data) => api.post(`/messages/${messageId}/reaction`, data),
-    deleteMessage: (messageId, type) => api.delete(`/messages/${messageId}`, { params: { type } }),
+    deleteMessage: (messageId, type) => api.delete(`/messages/${messageId}`, { data: { type } }),
 };
 
 // Snaps API
 export const snapsAPI = {
-    upload: (formData, onProgress) => api.post('/snaps', formData, {
-        onUploadProgress: (progressEvent) => {
-            if (onProgress) {
-                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                onProgress(percentCompleted);
+    upload: (formData, onProgress) => {
+        // Log keys to verify field name from the screen
+        // console.log('[API] Snap upload keys:', Array.from(formData.keys()));
+        return api.post('/snaps', formData, {
+            onUploadProgress: (progressEvent) => {
+                if (onProgress) {
+                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                    onProgress(percentCompleted);
+                }
             }
-        }
-    }),
+        });
+    },
     getClubSnaps: (clubId) => api.get(`/snaps/club/${clubId}`),
     getMySnaps: () => api.get('/snaps/my-clubs'),
     view: (snapId) => api.post(`/snaps/${snapId}/view`),
@@ -242,19 +259,26 @@ export const adminAPI = {
 // Group Chat API
 export const groupChatAPI = {
     getGroupChat: (clubId) => api.get(`/group-chat/${clubId}`),
-    sendMessage: (clubId, formData, onProgress) => api.post(`/group-chat/${clubId}/messages`, formData, {
-        onUploadProgress: (progressEvent) => {
-            if (onProgress) {
-                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                onProgress(percentCompleted);
-            }
+    sendMessage: (clubId, data, file) => {
+        if (file) {
+            const formData = new FormData();
+            formData.append('content', data.content || '');
+
+            // Validate type before sending
+            const validTypes = ['text', 'image', 'video', 'document', 'media', 'file'];
+            const type = (data.type && validTypes.includes(data.type)) ? data.type : 'media';
+            formData.append('type', type);
+
+            if (data.replyTo) formData.append('replyTo', data.replyTo);
+            formData.append('file', file);
+            return api.post(`/group-chat/${clubId}/messages`, formData);
         }
-    }),
+        return api.post(`/group-chat/${clubId}/messages`, data);
+    },
     markAsRead: (clubId) => api.put(`/group-chat/${clubId}/read`),
-    deleteMessage: (clubId, messageId) => api.delete(`/group-chat/${clubId}/messages/${messageId}`),
-    updateSettings: (clubId, formData) => api.put(`/group-chat/${clubId}/settings`, formData),
-    addReaction: (clubId, messageId, emoji) => api.post(`/group-chat/${clubId}/messages/${messageId}/reaction`, { emoji }),
-    getTotalUnread: () => api.get('/group-chat/unread/total'),
+    deleteMessage: (clubId, messageId, type) => api.delete(`/group-chat/${clubId}/messages/${messageId}`, { params: { type } }),
+    addReaction: (clubId, messageId, data) => api.post(`/group-chat/${clubId}/messages/${messageId}/reaction`, data),
+    getUnreadCount: (clubId) => api.get(`/group-chat/${clubId}/unread-count`),
 };
 
 export default api;

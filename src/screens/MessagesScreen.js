@@ -19,6 +19,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
+import GroupChatCard from '../components/GroupChatCard';
 import { useAuth } from '../contexts/AuthContext';
 import { messagesAPI, clubsAPI, membersAPI, snapsAPI, groupChatAPI } from '../services/api';
 import { useFocusEffect } from '@react-navigation/native';
@@ -29,7 +30,7 @@ const MessagesScreen = ({ navigation }) => {
     const { user, socket, selectedClubId, updateSelectedClub } = useAuth();
     const [conversations, setConversations] = useState([]);
     const [clubs, setClubs] = useState([]);
-    const [groupChat, setGroupChat] = useState(null);
+    const [groupChats, setGroupChats] = useState([]); // Group chat state
     // Initialize with global state to prevent flickering
     const [selectedClub, setSelectedClub] = useState(selectedClubId || null);
     const [clubMembers, setClubMembers] = useState([]);
@@ -51,32 +52,8 @@ const MessagesScreen = ({ navigation }) => {
             socket.on('snap:new', () => {
                 fetchData(); // Refresh to show new snap
             });
-            socket.on('group:message', (data) => {
-                if (data.clubId === selectedClub) {
-                    setGroupChat(prev => {
-                        if (!prev) return prev;
-                        return {
-                            ...prev,
-                            lastMessage: data.message,
-                            unreadCount: prev.unreadCount + (data.message.senderId?._id === user._id ? 0 : 1)
-                        };
-                    });
-                }
-            });
-            socket.on('group:settings_update', (data) => {
-                if (data.clubId === selectedClub) {
-                    setGroupChat(prev => prev ? { ...prev, ...data } : data);
-                }
-            });
-            socket.on('message:receive', (msg) => {
-                // Refresh conversations list
-                fetchData();
-            });
             return () => {
                 socket.off('snap:new');
-                socket.off('group:message');
-                socket.off('group:settings_update');
-                socket.off('message:receive');
             };
         }
     }, [socket]);
@@ -113,11 +90,36 @@ const MessagesScreen = ({ navigation }) => {
                 );
                 setClubs(joinedClubs);
 
+                // Fetch group chats for all joined clubs
+                const groupChatPromises = joinedClubs.map(async (club) => {
+                    try {
+                        const clubId = club._id?.toString() || club._id;
+                        const res = await groupChatAPI.getGroupChat(clubId);
+                        if (res && res.success) {
+                            return {
+                                ...res.data,
+                                club: club
+                            };
+                        }
+                        return null;
+                    } catch (err) {
+                        console.log(`Error fetching group chat for ${club.name}:`, err);
+                        return null;
+                    }
+                });
+
+                const groupChatResults = await Promise.all(groupChatPromises);
+                const validGroupChats = groupChatResults.filter(chat => chat !== null);
+
+                console.log('Group chats loaded:', validGroupChats.length);
+                setGroupChats(validGroupChats);
+
                 // Only set initial club if not already set (prevents flickering on refresh)
                 if (!selectedClub && joinedClubs.length > 0) {
                     // Sync with global club selection
                     if (selectedClubId && selectedClubId !== 'all') {
-                        const globalClub = joinedClubs.find(c => c._id === selectedClubId);
+                        const sId = selectedClubId?._id || selectedClubId;
+                        const globalClub = joinedClubs.find(c => (c._id?.toString() || c._id) === sId.toString());
                         if (globalClub) {
                             setSelectedClub(globalClub._id);
                         } else {
@@ -129,21 +131,6 @@ const MessagesScreen = ({ navigation }) => {
                         updateSelectedClub(joinedClubs[0]._id);
                     }
                 }
-            }
-
-            // Fetch group chat for selected club
-            if (selectedClub && selectedClub !== 'all') {
-                try {
-                    const groupChatRes = await groupChatAPI.getGroupChat(selectedClub);
-                    if (groupChatRes.success) {
-                        setGroupChat(groupChatRes.data);
-                    }
-                } catch (groupError) {
-                    console.error('Error fetching group chat:', groupError);
-                    setGroupChat(null);
-                }
-            } else {
-                setGroupChat(null);
             }
 
             // Fetch snaps for the selected club
@@ -330,6 +317,8 @@ const MessagesScreen = ({ navigation }) => {
 
         socket.on('message:receive', handleNewMessage);
         socket.on('message:delete', handleNewMessage);
+        socket.on('group:message', handleNewMessage); // Added: Refresh list on group message
+        socket.on('group:message:delete', handleNewMessage); // Added: Refresh list on group message delete
         socket.on('snap:new', (snap) => {
             if (!selectedClub || snap.clubId === selectedClub) {
                 fetchData();
@@ -343,6 +332,8 @@ const MessagesScreen = ({ navigation }) => {
         return () => {
             socket.off('message:receive', handleNewMessage);
             socket.off('message:delete', handleNewMessage);
+            socket.off('group:message', handleNewMessage);
+            socket.off('group:message:delete', handleNewMessage);
             socket.off('snap:new');
             socket.off('snap:delete');
         };
@@ -382,7 +373,7 @@ const MessagesScreen = ({ navigation }) => {
                         )}
                     </View>
                 </LinearGradient>
-                <Text style={styles.snapName} numberOfLines={1}>{item.user.displayName.split(' ')[0]}</Text>
+                <Text style={styles.snapName} numberOfLines={1}>{(item.user?.displayName || 'User').split(' ')[0]}</Text>
             </TouchableOpacity>
         );
     };
@@ -411,16 +402,16 @@ const MessagesScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('Chat', { otherUser: item })}
         >
             <View style={styles.memberAvatarContainer}>
-                {item.profilePicture?.url ? (
+                {item?.profilePicture?.url ? (
                     <Image source={{ uri: item.profilePicture.url }} style={styles.memberAvatar} />
                 ) : (
                     <View style={styles.memberPlaceholder}>
-                        <Text style={styles.placeholderText}>{item.displayName.charAt(0)}</Text>
+                        <Text style={styles.placeholderText}>{item?.displayName?.charAt(0) || '?'}</Text>
                     </View>
                 )}
-                {item.isOnline && <View style={styles.onlineIndicator} />}
+                {item?.isOnline && <View style={styles.onlineIndicator} />}
             </View>
-            <Text style={styles.memberName} numberOfLines={1}>{item.displayName}</Text>
+            <Text style={styles.memberName} numberOfLines={1}>{item?.displayName || 'Member'}</Text>
         </TouchableOpacity>
     );
 
@@ -434,19 +425,19 @@ const MessagesScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('Chat', { otherUser: otherUser })}
             >
                 <View style={styles.convAvatarContainer}>
-                    {otherUser.profilePicture?.url ? (
+                    {otherUser?.profilePicture?.url ? (
                         <Image source={{ uri: otherUser.profilePicture.url }} style={styles.convAvatar} />
                     ) : (
                         <View style={styles.convPlaceholder}>
-                            <Text style={styles.placeholderText}>{otherUser.displayName.charAt(0)}</Text>
+                            <Text style={styles.placeholderText}>{otherUser?.displayName?.charAt(0) || '?'}</Text>
                         </View>
                     )}
-                    {otherUser.isOnline && <View style={styles.onlineIndicator} />}
+                    {otherUser?.isOnline && <View style={styles.onlineIndicator} />}
                 </View>
 
                 <View style={styles.convContent}>
                     <View style={styles.convHeader}>
-                        <Text style={styles.convName}>{otherUser.displayName}</Text>
+                        <Text style={styles.convName}>{otherUser?.displayName || 'Chat'}</Text>
                         <Text style={styles.convTime}>{time}</Text>
                     </View>
                     <View style={styles.convFooter}>
@@ -548,66 +539,55 @@ const MessagesScreen = ({ navigation }) => {
                                 )}
                             />
 
+                            {/* Group Chats Section */}
+                            {groupChats.filter(gc => {
+                                const gcClubId = gc.clubId?._id || gc.clubId;
+                                return !selectedClub || selectedClub === 'all' || gcClubId.toString() === selectedClub.toString();
+                            }).length > 0 && (
+                                    <>
+                                        <View style={[styles.sectionHeader, { marginTop: 10 }]}>
+                                            <Text style={styles.sectionTitle}>Group Chats</Text>
+                                        </View>
+                                        {groupChats
+                                            .filter(gc => {
+                                                const gcClubId = gc.clubId?._id || gc.clubId;
+                                                return !selectedClub || selectedClub === 'all' || gcClubId.toString() === selectedClub.toString();
+                                            })
+                                            .map(groupChat => {
+                                                const unreadCount = groupChat.messages?.filter(msg =>
+                                                    !msg.deleted &&
+                                                    msg.senderId?._id !== user._id && // Exclude my own messages
+                                                    msg.senderId !== user._id &&
+                                                    !msg.readBy?.some(r => r.userId?.toString() === user._id.toString())
+                                                ).length || 0;
+                                                const lastMessage = groupChat.messages?.[groupChat.messages.length - 1];
+
+                                                return (
+                                                    <GroupChatCard
+                                                        key={groupChat.clubId}
+                                                        club={groupChat.club}
+                                                        unreadCount={unreadCount}
+                                                        lastMessage={lastMessage}
+                                                        onPress={() => navigation.navigate('Chat', {
+                                                            isGroupChat: true,
+                                                            clubId: groupChat.clubId,
+                                                            clubName: groupChat.club.name,
+                                                            groupChatData: groupChat
+                                                        })}
+                                                    />
+                                                );
+                                            })}
+                                    </>
+                                )}
+
                             {/* Conversations List */}
                             <View style={[styles.sectionHeader, { marginTop: 10 }]}>
                                 <Text style={styles.sectionTitle}>Recent Chats</Text>
                             </View>
-
-                            {/* Group Chat Card - Always on Top if club selected */}
-                            {groupChat && (
-                                <TouchableOpacity
-                                    style={styles.groupCard}
-                                    onPress={() => navigation.navigate('GroupChat', {
-                                        clubId: groupChat.clubId,
-                                        clubName: groupChat.name
-                                    })}
-                                >
-                                    <View style={styles.convAvatarContainer}>
-                                        {groupChat.groupIcon?.url ? (
-                                            <Image source={{ uri: groupChat.groupIcon.url }} style={styles.convAvatar} />
-                                        ) : (
-                                            <View style={[styles.convPlaceholder, { backgroundColor: '#7C3AED' }]}>
-                                                <Ionicons name="people" size={24} color="#FFF" />
-                                            </View>
-                                        )}
-                                        {/* Optional: Online indicator for groups or icon for settings if admin */}
-                                    </View>
-
-                                    <View style={styles.convContent}>
-                                        <View style={styles.convHeader}>
-                                            <Text style={styles.convName}>{groupChat.name}</Text>
-                                            {groupChat.lastMessage && (
-                                                <Text style={styles.convTime}>
-                                                    {new Date(groupChat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </Text>
-                                            )}
-                                        </View>
-                                        <View style={styles.convFooter}>
-                                            <Text style={[styles.convLastMsg, { fontWeight: groupChat.unreadCount > 0 ? '700' : '400' }]} numberOfLines={1}>
-                                                {groupChat.lastMessage ? (
-                                                    `${(groupChat.lastMessage.senderId?.displayName || 'Someone').split(' ')[0]}: ${groupChat.lastMessage.content}`
-                                                ) : 'No messages yet'}
-                                            </Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                {/* Group tag */}
-                                                <View style={styles.groupBadge}>
-                                                    <Text style={styles.groupBadgeText}>Group</Text>
-                                                </View>
-                                                {groupChat.unreadCount > 0 && (
-                                                    <View style={[styles.unreadBadge, { marginLeft: 5 }]}>
-                                                        <Text style={styles.unreadText}>{groupChat.unreadCount}</Text>
-                                                    </View>
-                                                )}
-                                            </View>
-                                        </View>
-                                    </View>
-                                </TouchableOpacity>
-                            )}
-
                             <FlatList
                                 data={filteredConversations}
                                 renderItem={renderConversationItem}
-                                keyExtractor={item => `conv-${item.otherUser._id}`}
+                                keyExtractor={item => `conv-${item.otherUser?._id || Math.random()}`}
                                 scrollEnabled={false}
                                 contentContainerStyle={styles.convList}
                                 ListEmptyComponent={() => (
@@ -1188,27 +1168,6 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         flex: 1,
         marginRight: 10,
-    },
-    groupCard: {
-        flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        backgroundColor: '#F8FAFC', // Slightly different background for group
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
-        marginBottom: 5,
-    },
-    groupBadge: {
-        backgroundColor: '#EBF5FF',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-        marginLeft: 5,
-    },
-    groupBadgeText: {
-        color: '#0A66C2',
-        fontSize: 10,
-        fontWeight: '700',
     },
     unreadBadge: {
         backgroundColor: '#0A66C2',

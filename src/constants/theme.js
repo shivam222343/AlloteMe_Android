@@ -281,7 +281,7 @@ export const NotificationTypes = {
 export const API_CONFIG = {
     BASE_URL: 'https://mavericks-android-backend-1.onrender.com/api',
     SOCKET_URL: 'https://mavericks-android-backend-1.onrender.com',
-    TIMEOUT: 120000,
+    TIMEOUT: 300000, // 5 minutes for large media uploads
 };
 
 export default {

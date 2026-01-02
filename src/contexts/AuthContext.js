@@ -90,6 +90,10 @@ export const AuthProvider = ({ children }) => {
                 fetchUnreadMessageCount();
             });
 
+            newSocket.on('group:message', () => {
+                fetchUnreadMessageCount();
+            });
+
             setSocket(newSocket);
 
             return () => {
@@ -132,18 +136,30 @@ export const AuthProvider = ({ children }) => {
     const fetchUnreadMessageCount = async () => {
         try {
             const { messagesAPI, groupChatAPI } = require('../services/api');
-            const [msgRes, groupRes] = await Promise.all([
-                messagesAPI.getConversations(),
-                groupChatAPI.getTotalUnread()
-            ]);
 
+            // Fetch individual unread
+            const messagesRes = await messagesAPI.getConversations();
             let totalUnread = 0;
-            if (msgRes.success && Array.isArray(msgRes.data)) {
-                totalUnread += msgRes.data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
+            if (messagesRes.success && Array.isArray(messagesRes.data)) {
+                totalUnread += messagesRes.data.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
             }
-            if (groupRes.success) {
-                totalUnread += (groupRes.totalUnread || 0);
+
+            // Fetch group unread for all joined clubs
+            if (user && user.clubsJoined) {
+                const groupChatPromises = user.clubsJoined.map(async (c) => {
+                    try {
+                        const clubId = c.clubId?._id || c.clubId;
+                        if (!clubId) return 0;
+                        const res = await groupChatAPI.getUnreadCount(clubId.toString());
+                        return res.success ? (res.data.unreadCount || 0) : 0;
+                    } catch (err) {
+                        return 0;
+                    }
+                });
+                const groupUnreadCounts = await Promise.all(groupChatPromises);
+                totalUnread += groupUnreadCounts.reduce((sum, count) => sum + count, 0);
             }
+
             setUnreadMessageCount(totalUnread);
         } catch (error) {
             console.log('Unread message fetch failed', error);

@@ -1,6 +1,8 @@
-// import messaging from '@react-native-firebase/messaging';
+import messaging from '@react-native-firebase/messaging';
+import * as Notifications from 'expo-notifications';
 import { Platform, Alert } from 'react-native';
-import { authAPI } from './api';
+import { authAPI, messagesAPI, groupChatAPI } from './api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // No need for Notifications.setNotificationHandler with strict RNFirebase unless using local notifications
 // For foreground messages, we use messaging().onMessage()
@@ -10,30 +12,41 @@ import { authAPI } from './api';
  */
 export const registerForPushNotificationsAsync = async (userId) => {
     try {
-        // 1. Request Permission
         if (Platform.OS === 'web') return null;
 
-        // const authStatus = await messaging().requestPermission();
-        // const enabled =
-        //     authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        //     authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        // 1. Request Permission
+        const authStatus = await messaging().requestPermission();
+        const enabled =
+            authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+            authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-        // if (!enabled) {
-        //     console.log('Authorization status:', authStatus);
-        //     return null;
-        // }
+        if (!enabled) {
+            console.log('FCM Authorization status:', authStatus);
+            return null;
+        }
+
+        // Expo Notifications Permission (needed for local display of actions)
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+        }
+
+        if (finalStatus !== 'granted') {
+            console.log('Expo Notifications permission not granted');
+        }
 
         // 2. Get FCM Token
-        // const token = await messaging().getToken();
-        // console.log('Mobile FCM Token:', token);
+        const token = await messaging().getToken();
+        console.log('Mobile FCM Token:', token);
 
-        // if (userId && token) {
-        //     // Update token in backend
-        //     // Ensure your backend authAPI.updateFCMToken accepts this token
-        //     await authAPI.updateFCMToken(token);
-        // }
+        if (userId && token) {
+            await authAPI.updateFCMToken(token);
+        }
 
-        return null;
+        // 3. Setup Categories (for Quick Reply)
+        await initNotificationCategories();
 
     } catch (e) {
         console.error('Error registering for push:', e);
@@ -42,72 +55,144 @@ export const registerForPushNotificationsAsync = async (userId) => {
 };
 
 /**
- * Handle notification clicks (Navigate to relevant screen)
- * This is usually called from a useEffect in a top-level component
+ * Initialize notification categories for Quick Reply
  */
-export const handleNotificationResponse = async (remoteMessage, navigation) => {
-    if (!remoteMessage) return;
+export const initNotificationCategories = async () => {
+    if (Platform.OS === 'web') return;
 
-    const data = remoteMessage.data;
-    const notification = remoteMessage.notification;
+    await Notifications.setNotificationCategoryAsync('chat-reply', [
+        {
+            identifier: 'reply',
+            buttonTitle: 'Reply',
+            options: {
+                opensAppToForeground: false,
+            },
+            textInput: {
+                placeholder: 'Type your reply...',
+                submitButtonTitle: 'Send',
+            },
+        },
+    ]);
+    console.log('✅ Notification Category "chat-reply" initialized');
+};
 
-    console.log('Notification Response:', remoteMessage);
+/**
+ * Handle notification clicks (Navigate to relevant screen)
+ */
+export const handleNotificationResponse = async (response, navigation) => {
+    if (!response) return;
 
-    // Handle Direct Reply Action (Custom logic required for purely background actions with FCM is complex, simplifing to open app)
-    // If you need background reply, you often need Headless JS or Notifee
+    // Response can be from messaging() (remoteMessage) or expo-notifications (notificationResponse)
+    const remoteMessage = response.notification ? response : (response.notification ? response.notification : null);
+    const notificationResponse = response.actionIdentifier ? response : null;
 
-    // Generic navigation
+    console.log('Notification Response Received:', response);
+
+    // 1. Handle Quick Reply (Action)
+    if (notificationResponse && notificationResponse.actionIdentifier === 'reply') {
+        const replyText = notificationResponse.userText;
+        const data = notificationResponse.notification.request.content.data;
+
+        if (replyText && data) {
+            await handleBackgroundReply(data, replyText);
+            return;
+        }
+    }
+
+    // 2. Handle Navigation
+    const data = notificationResponse
+        ? notificationResponse.notification.request.content.data
+        : (remoteMessage?.data || {});
+
     if (data?.screen) {
-        navigation.navigate(data.screen, data.params ? JSON.parse(data.params) : {});
+        try {
+            const params = typeof data.params === 'string' ? JSON.parse(data.params) : data.params;
+            navigation.navigate(data.screen, params || {});
+        } catch (e) {
+            console.error('Error parsing notification params:', e);
+            navigation.navigate(data.screen);
+        }
         return;
     }
 
-    // Legacy logic
-    if (data?.type === 'meeting_created' || data?.type === 'meeting_cancelled') {
-        navigation.navigate('Meetings', { selectedMeetingId: data.meetingId });
-    } else if (data?.type === 'new_message') {
+    if (data?.type === 'new_message' || data?.senderId) {
         navigation.navigate('Chat', { otherUser: { _id: data.senderId, displayName: data.senderName } });
+    } else if (data?.clubId) {
+        navigation.navigate('Chat', { isGroupChat: true, clubId: data.clubId, clubName: data.clubName });
     } else {
         navigation.navigate('Dashboard');
     }
 };
 
-// Listeners helper to be called in App.js or similar
+/**
+ * Handle background reply without opening the app fully
+ */
+export const handleBackgroundReply = async (data, text) => {
+    try {
+        console.log('Processing background reply:', text);
+        if (data.clubId) {
+            // Group Chat Reply
+            await groupChatAPI.sendMessage(data.clubId, { content: text, type: 'text' });
+        } else if (data.senderId) {
+            // Individual Chat Reply
+            await messagesAPI.send({ receiverId: data.senderId, content: text, type: 'text' });
+        }
+        console.log('✅ Background reply sent successfully');
+
+        // Show success local notification summary if needed
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: 'Reply Sent',
+                body: `Your message to ${data.senderName || 'the group'} has been delivered.`,
+            },
+            trigger: null,
+        });
+    } catch (error) {
+        console.error('Failed to send background reply:', error);
+    }
+};
+
+/**
+ * Setup notification listeners
+ */
 export const setupNotificationListeners = (navigation) => {
-    // Firebase Messaging is natively only supported on iOS/Android in this setup
     if (Platform.OS === 'web') return;
 
-    // Background / Quit state handler
-    /*
-    messaging().onNotificationOpenedApp(remoteMessage => {
-        console.log('Notification caused app to open from background state:', remoteMessage.notification);
+    // 1. FCM Background / Quit state handler (Opening App)
+    const unsubscribeFCMOpened = messaging().onNotificationOpenedApp(remoteMessage => {
         handleNotificationResponse(remoteMessage, navigation);
     });
 
-    // Initial notification (if app was closed)
     messaging().getInitialNotification().then(remoteMessage => {
         if (remoteMessage) {
-            console.log('Notification caused app to open from quit state:', remoteMessage.notification);
             handleNotificationResponse(remoteMessage, navigation);
         }
     });
 
-    // Foreground handler
-    const unsubscribe = messaging().onMessage(async remoteMessage => {
-        console.log('A new FCM message arrived!', remoteMessage);
-
-        // Show an alert/toast or local notification here because FCM doesn't show foreground notifications by default on iOS/Android
-        Alert.alert(
-            remoteMessage.notification?.title || 'New Notification',
-            remoteMessage.notification?.body || '',
-            [
-                { text: 'View', onPress: () => handleNotificationResponse(remoteMessage, navigation) },
-                { text: 'Cancel', style: 'cancel' }
-            ]
-        );
+    // 2. Expo Notifications Response Listener (Handles Actions like Reply)
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+        handleNotificationResponse(response, navigation);
     });
 
-    return unsubscribe;
-    */
-    return () => { };
+    // 3. Foreground handler
+    const unsubscribeFCMForeground = messaging().onMessage(async remoteMessage => {
+        console.log('Foreground FCM:', remoteMessage);
+
+        // Display local notification in foreground to ensure high visibility and consistency
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: remoteMessage.notification?.title || 'New Message',
+                body: remoteMessage.notification?.body || '',
+                data: remoteMessage.data,
+                categoryIdentifier: 'chat-reply',
+            },
+            trigger: null,
+        });
+    });
+
+    return () => {
+        unsubscribeFCMOpened();
+        unsubscribeFCMForeground();
+        responseSubscription.remove();
+    };
 };
