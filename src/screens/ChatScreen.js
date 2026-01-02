@@ -392,12 +392,184 @@ const ChatScreen = ({ route, navigation }) => {
 
     const isSelectionMode = selectedMessages.length > 0;
 
-    const [attachment, setAttachment] = useState(null);
+    const [attachments, setAttachments] = useState([]);
     const [showMediaViewer, setShowMediaViewer] = useState(false);
     const [mediaViewerData, setMediaViewerData] = useState(null);
 
     const flatListRef = useRef();
     const inputRef = useRef();
+
+    useEffect(() => {
+        if (replyingTo && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [replyingTo]);
+
+    // ... (keep useEffects for socket and fetching same)
+
+    const sendMessage = async () => {
+        if (!inputText.trim() && attachments.length === 0) return;
+
+        const tempText = inputText;
+        const tempAttachments = [...attachments];
+        const tempReply = replyingTo;
+
+        // Clear local state immediately
+        setInputText('');
+        setAttachments([]);
+        setReplyingTo(null);
+        setMentionEta(false);
+
+        try {
+            const sendSingle = async (text, attachmentItem) => {
+                let file = null;
+                if (attachmentItem) {
+                    file = await prepareFile(attachmentItem.uri);
+                }
+
+                const messageData = {
+                    content: text,
+                    type: attachmentItem ? 'media' : 'text',
+                    replyTo: tempReply?._id
+                };
+
+                if (!messageData.content && attachmentItem) {
+                    messageData.content = ''; // No default text for secondary attachments
+                }
+
+                if (isGroupChat) {
+                    await groupChatAPI.sendMessage(clubId, messageData, file);
+                } else {
+                    messageData.receiverId = otherUser._id;
+                    if (text && /@Eta/i.test(text)) {
+                        messageData.mentionAI = true;
+                        setAiProcessing(true);
+                    }
+                    await messagesAPI.send(messageData, file);
+                }
+            };
+
+            if (tempAttachments.length > 0) {
+                // Send first attachment with the text caption
+                await sendSingle(tempText, tempAttachments[0]);
+
+                // Send remaining attachments as separate messages
+                for (let i = 1; i < tempAttachments.length; i++) {
+                    await sendSingle('', tempAttachments[i]);
+                }
+            } else {
+                // Just text
+                await sendSingle(tempText, null);
+            }
+
+            // Refresh/Scroll
+            setTimeout(() => {
+                fetchMessages(); // specific fetch to ensure sync
+                flatListRef.current?.scrollToEnd({ animated: true });
+            }, 500);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            setAiProcessing(false);
+            alert('Failed to send message');
+            // Optionally restore attachments
+        }
+    };
+
+    // ... (rest of simple functions)
+
+    const handlePickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.All,
+                quality: 0.8,
+                allowsMultipleSelection: true,
+                selectionLimit: 5
+            });
+
+            if (!result.canceled) {
+                const newAttachments = result.assets.map(asset => ({
+                    uri: asset.uri,
+                    type: asset.type === 'video' ? 'video' : 'image',
+                    name: asset.fileName || 'Media'
+                }));
+                setAttachments(prev => [...prev, ...newAttachments]);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+        }
+        setShowAttachMenu(false);
+    };
+
+    const handlePickCamera = async () => {
+        // ... (keep camera logic, but append to attachments)
+        try {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+                alert('Permission needed to access camera');
+                return;
+            }
+            const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+            if (!result.canceled) {
+                setAttachments(prev => [...prev, {
+                    uri: result.assets[0].uri,
+                    type: 'image',
+                    name: 'CameraCapture.jpg'
+                }]);
+            }
+        } catch (err) { console.log(err); }
+        setShowAttachMenu(false);
+    };
+
+    const handlePickDocument = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: '*/*',
+                copyToCacheDirectory: true,
+                multiple: true
+            });
+
+            if (result.assets) {
+                const newAttachments = result.assets.map(asset => ({
+                    uri: asset.uri,
+                    type: 'document',
+                    name: asset.name
+                }));
+                setAttachments(prev => [...prev, ...newAttachments]);
+            }
+        } catch (err) { console.log(err); }
+        setShowAttachMenu(false);
+    };
+
+    const handlePickAudio = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'audio/*',
+                copyToCacheDirectory: true,
+                multiple: true
+            });
+            if (result.assets) {
+                const newAttachments = result.assets.map(asset => ({
+                    uri: asset.uri,
+                    type: 'document', // Backend handles as file
+                    name: asset.name
+                }));
+                setAttachments(prev => [...prev, ...newAttachments]);
+            }
+        } catch (err) { console.log(err); }
+        setShowAttachMenu(false);
+    }
+
+    // ... handleUpdateGroupIcon (unchanged)
+
+    // ... renderMedia (unchanged)
+
+    // ... Helper to remove attachment
+    const removeAttachment = (index) => {
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // ... UI render updates (next step)
 
     useEffect(() => {
         if (replyingTo && inputRef.current) {
@@ -539,143 +711,6 @@ const ChatScreen = ({ route, navigation }) => {
         ));
     };
 
-    const sendMessage = async () => {
-        if (!inputText.trim() && !attachment) return;
-
-        const tempText = inputText;
-        const tempAttachment = attachment;
-        const tempReply = replyingTo;
-
-        // Clear local state immediately for optimistic feel
-        setInputText('');
-        setAttachment(null);
-        setReplyingTo(null);
-        setMentionEta(false);
-
-        try {
-            let file = null;
-            if (tempAttachment) {
-                file = await prepareFile(tempAttachment.uri);
-            }
-
-            const messageData = {
-                content: tempText,
-                type: tempAttachment ? 'media' : 'text',
-                replyTo: tempReply?._id
-            };
-
-            // If only attachment and no text, content can be default msg or empty
-            if (!messageData.content && tempAttachment) {
-                messageData.content = 'Sent an attachment';
-            }
-
-            let res;
-            if (isGroupChat) {
-                res = await groupChatAPI.sendMessage(clubId, messageData, file);
-            } else {
-                messageData.receiverId = otherUser._id;
-                const mentionsEta = /@Eta/i.test(tempText);
-                if (mentionsEta) {
-                    messageData.mentionAI = true;
-                    setAiProcessing(true);
-                }
-                res = await messagesAPI.send(messageData, file);
-            }
-
-            if (res && res.success) {
-                setMessages(prev => {
-                    if (prev.some(m => m._id === res.data._id)) return prev;
-                    return [...prev, res.data];
-                });
-                setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-            } else {
-                setAiProcessing(false);
-                if (tempAttachment) setAttachment(tempAttachment); // Restore if failed
-            }
-        } catch (error) {
-            console.error('Error sending message:', error);
-            setAiProcessing(false);
-            alert('Failed to send message');
-            if (tempAttachment) setAttachment(tempAttachment); // Restore if failed
-        }
-    };
-
-    useEffect(() => {
-        if (messages.length > 0) {
-            setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-            }, 100);
-        }
-    }, [messages.length]);
-
-    const handlePickImage = async () => {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Orders, // Allow both images and videos
-                quality: 0.8,
-            });
-
-            if (!result.canceled) {
-                setAttachment({
-                    uri: result.assets[0].uri,
-                    type: result.assets[0].type, // 'image' or 'video'
-                    name: result.assets[0].fileName || 'Media'
-                });
-            }
-        } catch (error) {
-            console.error('Error picking image:', error);
-        }
-        setShowAttachMenu(false);
-    };
-
-    const handlePickCamera = async () => {
-        try {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-                alert('Permission needed to access camera');
-                return;
-            }
-
-            const result = await ImagePicker.launchCameraAsync({
-                quality: 0.8,
-            });
-
-            if (!result.canceled) {
-                setAttachment({
-                    uri: result.assets[0].uri,
-                    type: 'image',
-                    name: 'CameraCapture.jpg'
-                });
-            }
-        } catch (error) {
-            console.error('Error launching camera:', error);
-        }
-        setShowAttachMenu(false);
-    };
-
-    const handlePickDocument = async () => {
-        try {
-            const result = await DocumentPicker.getDocumentAsync({
-                type: '*/*',
-                copyToCacheDirectory: true
-            });
-
-            if (result.assets && result.assets.length > 0) {
-                setAttachment({
-                    uri: result.assets[0].uri,
-                    type: 'document',
-                    name: result.assets[0].name
-                });
-            }
-        } catch (error) {
-            console.error('Error picking document:', error);
-        }
-        setShowAttachMenu(false);
-    };
-
-    // Removed direct uploadAttachment, now handled in sendMessage
 
     const handleUpdateGroupIcon = async () => {
         try {
@@ -947,6 +982,26 @@ const ChatScreen = ({ route, navigation }) => {
 
                         {/* Input Area - Now part of flex flow */}
                         <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+                            {attachment && (
+                                <View style={{ padding: 10, backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                                    <View style={{ width: 50, height: 50, borderRadius: 8, overflow: 'hidden', marginRight: 10 }}>
+                                        {attachment.type === 'image' ? (
+                                            <Image source={{ uri: attachment.uri }} style={{ width: '100%', height: '100%' }} />
+                                        ) : (
+                                            <View style={{ flex: 1, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }}>
+                                                <Ionicons name="document-text" size={24} color="#6B7280" />
+                                            </View>
+                                        )}
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600' }}>{attachment.name}</Text>
+                                        <Text style={{ fontSize: 10, color: '#6B7280' }}>Ready to send</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setAttachment(null)} style={{ padding: 5 }}>
+                                        <Ionicons name="close-circle" size={20} color="#6B7280" />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
                             {replyingTo && (
                                 <View style={styles.inputReplyBar}>
                                     <View style={styles.replyBarIndicator} />
@@ -996,7 +1051,7 @@ const ChatScreen = ({ route, navigation }) => {
                                         <View style={styles.attachOptionContainer}>
                                             <TouchableOpacity
                                                 style={[styles.attachOption, { backgroundColor: '#00A884' }]}
-                                                onPress={() => { }} // Audio placeholder
+                                                onPress={handlePickAudio}
                                             >
                                                 <Ionicons name="headset" size={26} color="#FFF" />
                                             </TouchableOpacity>
@@ -1005,7 +1060,7 @@ const ChatScreen = ({ route, navigation }) => {
                                         <View style={styles.attachOptionContainer}>
                                             <TouchableOpacity
                                                 style={[styles.attachOption, { backgroundColor: '#2196F3' }]}
-                                                onPress={() => { }} // Location placeholder
+                                                onPress={() => alert('Location sharing coming soon!')}
                                             >
                                                 <Ionicons name="location" size={26} color="#FFF" />
                                             </TouchableOpacity>
@@ -1039,6 +1094,31 @@ const ChatScreen = ({ route, navigation }) => {
                                             >
                                                 <Text style={styles.emojiText}>{emoji}</Text>
                                             </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+
+                            {attachments.length > 0 && (
+                                <View style={{ padding: 10, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                        {attachments.map((att, index) => (
+                                            <View key={index} style={{ marginRight: 10, width: 70, position: 'relative' }}>
+                                                <View style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }}>
+                                                    {att.type === 'image' || att.type === 'video' ? (
+                                                        <Image source={{ uri: att.uri }} style={{ width: '100%', height: '100%' }} />
+                                                    ) : (
+                                                        <Ionicons name={att.type === 'document' ? "document-text" : "musical-note"} size={28} color="#6B7280" />
+                                                    )}
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => removeAttachment(index)}
+                                                    style={{ position: 'absolute', top: -5, right: 0, backgroundColor: '#FFF', borderRadius: 10 }}
+                                                >
+                                                    <Ionicons name="close-circle" size={22} color="#EF4444" />
+                                                </TouchableOpacity>
+                                                <Text numberOfLines={1} style={{ fontSize: 10, marginTop: 4, textAlign: 'center' }}>{att.name}</Text>
+                                            </View>
                                         ))}
                                     </ScrollView>
                                 </View>
@@ -1097,8 +1177,8 @@ const ChatScreen = ({ route, navigation }) => {
                                     </View>
                                 </View>
 
-                                {inputText.length > 0 ? (
-                                    <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+                                {inputText.length > 0 || attachments.length > 0 ? (
+                                    <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
                                         <Ionicons name="send" size={20} color="#FFF" />
                                     </TouchableOpacity>
                                 ) : (
@@ -1447,6 +1527,30 @@ const ChatScreen = ({ route, navigation }) => {
                     </TouchableOpacity>
                 </Modal>
             </View>
+            {/* Media Viewer Modal */}
+            <Modal
+                visible={showMediaViewer}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowMediaViewer(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+                    <TouchableOpacity
+                        style={{ position: 'absolute', top: 40, right: 20, zIndex: 10, padding: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20 }}
+                        onPress={() => setShowMediaViewer(false)}
+                    >
+                        <Ionicons name="close" size={30} color="#FFF" />
+                    </TouchableOpacity>
+
+                    {mediaViewerData?.type === 'image' && (
+                        <Image
+                            source={{ uri: mediaViewerData.uri }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="contain"
+                        />
+                    )}
+                </View>
+            </Modal>
         </GestureHandlerRootView>
     );
 };
