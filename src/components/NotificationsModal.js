@@ -5,13 +5,15 @@ import {
     StyleSheet,
     Modal,
     TouchableOpacity,
-    ScrollView,
     ActivityIndicator,
     Dimensions,
+    FlatList,
+    Animated as RNAnimated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { notificationsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -47,6 +49,18 @@ const NotificationsModal = ({ visible, onClose }) => {
             refreshUnreadCount();
         } catch (error) {
             console.error('Mark as read error:', error);
+        }
+    };
+
+    const deleteNotification = async (id) => {
+        try {
+            // Optimistic update
+            setNotifications(prev => prev.filter(n => n._id !== id));
+            await notificationsAPI.delete(id);
+            refreshUnreadCount();
+        } catch (error) {
+            console.error('Delete notification error:', error);
+            fetchNotifications(); // Revert on error
         }
     };
 
@@ -92,6 +106,59 @@ const NotificationsModal = ({ visible, onClose }) => {
         return '#6B7280';
     };
 
+    const renderRightActions = (progress, dragX, item) => {
+        const scale = dragX.interpolate({
+            inputRange: [-80, 0],
+            outputRange: [1, 0],
+            extrapolate: 'clamp',
+        });
+        return (
+            <TouchableOpacity onPress={() => deleteNotification(item._id)} style={styles.deleteAction}>
+                <RNAnimated.View style={[styles.deleteIcon, { transform: [{ scale }] }]}>
+                    <Ionicons name="trash-outline" size={24} color="#FFF" />
+                </RNAnimated.View>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderLeftActions = (progress, dragX, item) => {
+        const scale = dragX.interpolate({
+            inputRange: [0, 80],
+            outputRange: [0, 1],
+            extrapolate: 'clamp',
+        });
+        return (
+            <TouchableOpacity onPress={() => deleteNotification(item._id)} style={styles.deleteActionLeft}>
+                <RNAnimated.View style={[styles.deleteIcon, { transform: [{ scale }] }]}>
+                    <Ionicons name="trash-outline" size={24} color="#FFF" />
+                </RNAnimated.View>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderItem = ({ item }) => (
+        <Swipeable
+            renderLeftActions={(progress, dragX) => renderLeftActions(progress, dragX, item)}
+            onSwipeableLeftOpen={() => deleteNotification(item._id)}
+        >
+            <TouchableOpacity
+                style={[styles.notificationItem, !item.read && styles.unreadItem]}
+                onPress={() => markAsRead(item._id)}
+                activeOpacity={0.7}
+            >
+                <View style={[styles.iconContainer, { backgroundColor: `${getIconColor(item.type)}15` }]}>
+                    <Ionicons name={getIcon(item.type)} size={20} color={getIconColor(item.type)} />
+                </View>
+                <View style={styles.itemContent}>
+                    <Text style={styles.itemTitle}>{item.title}</Text>
+                    <Text style={styles.itemMessage}>{item.message}</Text>
+                    <Text style={styles.itemTime}>{new Date(item.createdAt).toLocaleString()}</Text>
+                </View>
+                {!item.read && <View style={styles.unreadDot} />}
+            </TouchableOpacity>
+        </Swipeable>
+    );
+
     return (
         <Modal
             visible={visible}
@@ -126,26 +193,15 @@ const NotificationsModal = ({ visible, onClose }) => {
                             <ActivityIndicator size="large" color="#0A66C2" />
                         </View>
                     ) : notifications.length > 0 ? (
-                        <ScrollView style={styles.list}>
-                            {notifications.map((n) => (
-                                <TouchableOpacity
-                                    key={n._id}
-                                    style={[styles.notificationItem, !n.read && styles.unreadItem]}
-                                    onPress={() => markAsRead(n._id)}
-                                >
-                                    <View style={[styles.iconContainer, { backgroundColor: `${getIconColor(n.type)}15` }]}>
-                                        <Ionicons name={getIcon(n.type)} size={20} color={getIconColor(n.type)} />
-                                    </View>
-                                    <View style={styles.itemContent}>
-                                        <Text style={styles.itemTitle}>{n.title}</Text>
-                                        <Text style={styles.itemMessage}>{n.message}</Text>
-                                        <Text style={styles.itemTime}>{new Date(n.createdAt).toLocaleString()}</Text>
-                                    </View>
-                                    {!n.read && <View style={styles.unreadDot} />}
-                                </TouchableOpacity>
-                            ))}
-                            <View style={{ height: 40 }} />
-                        </ScrollView>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                            <FlatList
+                                data={notifications}
+                                keyExtractor={(item) => item._id}
+                                renderItem={renderItem}
+                                contentContainerStyle={{ paddingBottom: 40 }}
+                                showsVerticalScrollIndicator={false}
+                            />
+                        </GestureHandlerRootView>
                     ) : (
                         <View style={styles.center}>
                             <Ionicons name="notifications-off-outline" size={64} color="#D1D5DB" />
@@ -220,15 +276,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 40,
     },
-    list: {
-        flex: 1,
-    },
     notificationItem: {
         flexDirection: 'row',
         padding: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F4F6',
         alignItems: 'center',
+        backgroundColor: 'white' // Ensure background is white for swipe reveal
     },
     unreadItem: {
         backgroundColor: '#F0F7FF',
@@ -272,6 +326,21 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#9CA3AF',
     },
+    deleteAction: {
+        backgroundColor: '#EF4444',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 80,
+    },
+    deleteActionLeft: {
+        backgroundColor: '#EF4444',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 80,
+    },
+    deleteIcon: {
+        padding: 20,
+    }
 });
 
 export default NotificationsModal;

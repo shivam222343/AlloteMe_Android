@@ -412,14 +412,6 @@ const DashboardScreen = ({ navigation }) => {
                                         style={styles.carouselImage}
                                         resizeMode="cover"
                                     />
-                                    <View style={styles.carouselOverlay}>
-                                        <Text style={styles.carouselImageTitle} numberOfLines={1}>
-                                            {image.title || 'Untitled'}
-                                        </Text>
-                                        <Text style={styles.carouselImageAuthor} numberOfLines={1}>
-                                            {image.uploadedBy?.displayName}
-                                        </Text>
-                                    </View>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -764,24 +756,6 @@ const styles = StyleSheet.create({
     carouselImage: {
         width: '100%',
         height: '100%',
-    },
-    carouselOverlay: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 16,
-        backgroundColor: 'rgba(0,0,0,0.4)', // Simplified overlay
-    },
-    carouselImageTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#FFF',
-        marginBottom: 4,
-    },
-    carouselImageAuthor: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.8)',
     },
     pagination: {
         flexDirection: 'row',

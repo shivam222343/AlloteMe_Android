@@ -202,7 +202,7 @@ export const messagesAPI = {
     },
     markAsRead: (userId) => api.put(`/messages/${userId}/read`),
     addReaction: (messageId, data) => api.post(`/messages/${messageId}/reaction`, data),
-    deleteMessage: (messageId, type) => api.delete(`/messages/${messageId}`, { data: { type } }),
+    deleteMessage: (messageId, type) => api.delete(`/messages/${messageId}`, { params: { type } }),
 };
 
 // Snaps API

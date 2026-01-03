@@ -28,11 +28,13 @@ import { prepareFile } from '../services/cloudinaryService';
 import * as Animatable from 'react-native-animatable';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import * as Clipboard from 'expo-clipboard';
 
 const { width } = Dimensions.get('window');
 
-const MessageItem = React.memo(({ item, index, user, otherUser, messages, setReplyingTo, setShowOptionsId, isSelected, toggleSelection, isSelectionMode, isGroupChat }) => {
+const MessageItem = React.memo(({ item, index, user, otherUser, messages, setReplyingTo, setShowOptionsId, isSelected, toggleSelection, isSelectionMode, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails }) => {
     // Filter out malformed messages (e.g. error objects)
     if (!item) return null;
 
@@ -46,6 +48,8 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
     const prevSenderId = prevMessage?.senderId?._id || prevMessage?.senderId;
     const showAvatar = !isMine && !isAI && (!prevMessage || prevSenderId !== msgSenderId);
     const showSenderName = isGroupChat && !isMine && !isAI && (!prevMessage || prevSenderId !== msgSenderId);
+
+    const replyingToMsg = item.replyTo && (typeof item.replyTo === 'object' ? item.replyTo : messages.find(m => m._id === item.replyTo));
 
     const itemSwipeX = useRef(new Animated.Value(0)).current;
 
@@ -83,11 +87,15 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
         if (isImage) {
             return (
                 <TouchableOpacity
+                    activeOpacity={0.9}
                     onPress={() => {
+                        console.log('Opening Media Viewer for:', urlStr); // Debug log
                         setMediaViewerData({ uri: urlStr, type: 'image' });
                         setShowMediaViewer(true);
                     }}
-                    onLongPress={() => toggleSelection(item._id)}
+                    onLongPress={() => {
+                        setShowOptionsId(item._id);
+                    }}
                     delayLongPress={200}
                 >
                     <Image
@@ -122,239 +130,191 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
             activeOffsetX={isMine ? [-50, 0] : [0, 50]}
             failOffsetY={[-5, 5]}
         >
-            <Animated.View style={[
-                styles.messageRow,
-                isMine ? styles.myRow : isAI ? styles.aiRow : styles.otherRow,
-                {
-                    translateX: itemSwipeX.interpolate({
-                        inputRange: isMine ? [-100, 0] : [0, 100],
-                        outputRange: isMine ? [-40, 0] : [0, 40],
-                        extrapolate: 'clamp'
-                    })
-                }
-            ]}>
-                {!isMine && !isAI && (
-                    <View style={styles.avatarSpace}>
-                        {showAvatar && (
-                            <Image
-                                source={item.senderId?.profilePicture?.url
-                                    ? { uri: item.senderId.profilePicture.url }
-                                    : (otherUser?.profilePicture?.url && !isGroupChat)
-                                        ? { uri: otherUser.profilePicture.url }
-                                        : { uri: 'https://ui-avatars.com/api/?name=' + (item.senderId?.displayName || otherUser?.displayName || 'Member') }}
-                                style={styles.miniAvatar}
-                            />
-                        )}
-                    </View>
-                )}
-
-                {isAI && (
-                    <View style={styles.avatarSpace}>
-                        <View style={styles.aiAvatar}>
-                            <Ionicons name="sparkles" size={16} color="#FFF" />
-                        </View>
-                    </View>
-                )}
-
-                <View style={{ position: 'relative' }}>
-                    {renderMedia()}
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onLongPress={() => setShowOptionsId(item._id)}
-                        delayLongPress={200}
-                    >
-                        <View style={[
-                            styles.bubble,
-                            isMine ? styles.myBubble : (isAI ? styles.aiBubble : styles.otherBubble),
-                            item.deleted && styles.deletedBubble
-                        ]}>
-                            {item.deleted ? (
-                                <Text style={[styles.messageText, styles.deletedText]}>
-                                    This message was deleted
-                                </Text>
-                            ) : (
-                                <>
-                                    {isGroupChat && !isMine && (
-                                        <Text style={styles.senderName}>{item.senderId?.displayName || 'Unknown'}</Text>
-                                    )}
-
-                                    {replyingToMsg && (
-                                        <View style={styles.replyPreview}>
-                                            <Text style={styles.replyUser}>
-                                                {(replyingToMsg.senderId?._id || replyingToMsg.senderId) === user._id ? 'You' : (replyingToMsg.senderId?.displayName || 'Someone')}
-                                            </Text>
-                                            <Text style={styles.replyContent} numberOfLines={1}>
-                                                {replyingToMsg.content || 'Attachment'}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {/* Link content for AI */}
-                                    {isAI && item.citations && item.citations.length > 0 && (
-                                        <Text style={{ fontSize: 10, color: '#7C3AED', marginBottom: 2 }}>
-                                            Source: {item.citations[0]}
-                                        </Text>
-                                    )}
-
-                                    {item.content ? (
-                                        <Text style={[styles.messageText, isMine ? styles.myText : styles.otherText]}>
-                                            {item.content}
-                                        </Text>
-                                    ) : null}
-
-                                    <View style={styles.messageFooter}>
-                                        <Text style={styles.timeText}>
-                                            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </Text>
-                                        {isMine && (
-                                            <Ionicons
-                                                name={item.readBy?.length > 0 ? "checkmark-done" : "checkmark"}
-                                                size={16}
-                                                color={item.readBy?.length > 0 ? "#34B7F1" : "#9CA3AF"}
-                                                style={{ marginLeft: 5 }}
-                                            />
-                                        )}
-                                    </View>
-                                </>
+            <View>
+                <Animated.View style={[
+                    styles.messageRow,
+                    isMine ? styles.myRow : isAI ? styles.aiRow : styles.otherRow,
+                    {
+                        translateX: itemSwipeX.interpolate({
+                            inputRange: isMine ? [-100, 0] : [0, 100],
+                            outputRange: isMine ? [-40, 0] : [0, 40],
+                            extrapolate: 'clamp'
+                        })
+                    }
+                ]}>
+                    {!isMine && !isAI && (
+                        <View style={styles.avatarSpace}>
+                            {showAvatar && (
+                                <Image
+                                    source={item.senderId?.profilePicture?.url
+                                        ? { uri: item.senderId.profilePicture.url }
+                                        : (otherUser?.profilePicture?.url && !isGroupChat)
+                                            ? { uri: otherUser.profilePicture.url }
+                                            : { uri: 'https://ui-avatars.com/api/?name=' + (item.senderId?.displayName || otherUser?.displayName || 'Member') }}
+                                    style={styles.miniAvatar}
+                                />
                             )}
                         </View>
-                        {/* Reactions Rendering */}
-                        {item.reactions && Object.keys(item.reactions).length > 0 && (
-                            <View style={[styles.reactionsContainer, isMine ? styles.myReactions : styles.otherReactions]}>
-                                {Object.entries(item.reactions).map(([reaction, users]) => (
-                                    <Text key={reaction} style={styles.reactionEmoji}>
-                                        {reaction} <Text style={styles.reactionCount}>{users.length}</Text>
-                                    </Text>
-                                ))}
+                    )}
+
+                    {isAI && (
+                        <View style={styles.avatarSpace}>
+                            <View style={styles.aiAvatar}>
+                                <Ionicons name="sparkles" size={16} color="#FFF" />
                             </View>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </Animated.View>
+                        </View>
+                    )}
+
+                    <View style={{ position: 'relative' }}>
+                        {renderMedia()}
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onLongPress={() => toggleSelection(item._id)}
+                            onPress={() => {
+                                if (isSelectionMode) {
+                                    toggleSelection(item._id);
+                                } else {
+                                    setShowOptionsId(item._id);
+                                }
+                            }}
+                            delayLongPress={200}
+                        >
+                            <View style={[
+                                styles.bubble,
+                                isMine ? styles.myBubble : (isAI ? styles.aiBubble : styles.otherBubble),
+                                item.deleted && styles.deletedBubble
+                            ]}>
+                                {item.deleted ? (
+                                    <Text style={[styles.messageText, styles.deletedText]}>
+                                        This message was deleted
+                                    </Text>
+                                ) : (
+                                    <>
+                                        {isGroupChat && !isMine && (
+                                            <Text style={styles.senderName}>{item.senderId?.displayName || 'Unknown'}</Text>
+                                        )}
+
+                                        {replyingToMsg && (
+                                            <View style={styles.replyPreview}>
+                                                <Text style={styles.replyUser}>
+                                                    {(replyingToMsg.senderId?._id || replyingToMsg.senderId) === user._id ? 'You' : (replyingToMsg.senderId?.displayName || 'Someone')}
+                                                </Text>
+                                                <Text style={styles.replyContent} numberOfLines={1}>
+                                                    {replyingToMsg.content || 'Attachment'}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {/* Link content for AI */}
+                                        {isAI && item.citations && item.citations.length > 0 && (
+                                            <Text style={{ fontSize: 10, color: '#7C3AED', marginBottom: 2 }}>
+                                                Source: {item.citations[0]}
+                                            </Text>
+                                        )}
+
+                                        {item.content ? (
+                                            <Text style={[styles.messageText, isMine ? styles.myText : styles.otherText]}>
+                                                {item.content}
+                                            </Text>
+                                        ) : null}
+
+                                        <View style={styles.messageFooter}>
+                                            <Text style={styles.timeText}>
+                                                {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </Text>
+                                            {isMine && (
+                                                <Ionicons
+                                                    name={item.readBy?.length > 0 ? "checkmark-done" : "checkmark"}
+                                                    size={16}
+                                                    color={item.readBy?.length > 0 ? "#34B7F1" : "#9CA3AF"}
+                                                    style={{ marginLeft: 5 }}
+                                                />
+                                            )}
+                                        </View>
+                                    </>
+                                )}
+                            </View>
+                            {/* Reactions Rendering */}
+                            {item.reactions && item.reactions.length > 0 && (
+                                <View style={[styles.reactionsContainer, isMine ? { justifyContent: 'flex-end', marginLeft: 'auto', right: 0 } : { justifyContent: 'flex-start', left: 0 }]}>
+                                    <TouchableOpacity
+                                        style={{ flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#FFF', borderRadius: 15, padding: 2, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1 }}
+                                        activeOpacity={0.8}
+                                        onPress={() => {
+                                            setReactionDetailsData(item.reactions);
+                                            setShowReactionDetails(true);
+                                        }}
+                                    >
+                                        {(() => {
+                                            const reactionCounts = item.reactions.reduce((acc, curr) => {
+                                                acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
+                                                return acc;
+                                            }, {});
+                                            return Object.entries(reactionCounts).map(([emoji, count]) => (
+                                                <View key={emoji} style={styles.reactionChip}>
+                                                    <Text style={styles.reactionEmoji}>{emoji}</Text>
+                                                    <Text style={styles.reactionCount}>{count}</Text>
+                                                </View>
+                                            ));
+                                        })()}
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                    {/* Spacer for reactions to prevent overlap */}
+                    {item.reactions && item.reactions.length > 0 && <View style={{ height: 15 }} />}
+                </Animated.View>
+
+                {/* Reply Indicator (Behind the swipe) */}
+                <Animated.View style={[
+                    {
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        width: 50,
+                        left: 0,
+                        opacity: itemSwipeX.interpolate({
+                            inputRange: [0, 60],
+                            outputRange: [0, 1],
+                            extrapolate: 'clamp'
+                        }),
+                        transform: [{
+                            scale: itemSwipeX.interpolate({
+                                inputRange: [0, 60],
+                                outputRange: [0.5, 1],
+                                extrapolate: 'clamp'
+                            })
+                        }]
+                    },
+                    isMine ? { right: -50, left: undefined } : {}
+                ]}>
+                    <Ionicons name="arrow-undo-circle" size={30} color="#0A66C2" />
+                </Animated.View>
+            </View>
         </PanGestureHandler>
     );
 
-    // ... (rest of the file until return) ...
-    {
-        opacity: itemSwipeX.interpolate({
-            inputRange: isMine ? [-60, 0] : [0, 60],
-            outputRange: isMine ? [1, 0] : [0, 1],
-            extrapolate: 'clamp'
-        }),
-            transform: [{
-                scale: itemSwipeX.interpolate({
-                    inputRange: isMine ? [-60, 0] : [0, 60],
-                    outputRange: [1, 0.5],
-                    extrapolate: 'clamp'
-                })
-            }]
-    }
-                    ]}>
-    <Ionicons name="arrow-undo-circle" size={24} color="#0A66C2" />
-                    </Animated.View >
 
-    <TouchableOpacity
-        onLongPress={() => {
-            if (!isSelectionMode) {
-                Vibration.vibrate(50);
-                toggleSelection(item._id);
-            }
-        }}
-        onPress={() => {
-            if (isSelectionMode) {
-                toggleSelection(item._id);
-            } else if (!item.deleted && !isAI) {
-                setShowOptionsId(item._id);
-            } else if (item.deleted) {
-                // Allow options for deleted messages too (Delete for me)
-                setShowOptionsId(item._id);
-            }
-        }}
-        activeOpacity={0.8}
-    >
-        <Animatable.View
-            animation={isMine ? "slideInRight" : "slideInLeft"}
-            duration={300}
-            style={[
-                styles.bubble,
-                isMine ? styles.myBubble : isAI ? styles.aiBubble : styles.otherBubble,
-                item.deleted && styles.deletedBubble,
-                isSelected && styles.selectedBubble,
-                (item.reactions && item.reactions.length > 0) && { marginBottom: 15 }
-            ]}
-        >
-            {isSelected && (
-                <View style={styles.selectionOverlay}>
-                    <Ionicons name="checkmark-circle" size={20} color="#0A66C2" />
-                </View>
-            )}
 
-            {showSenderName && (
-                <Text style={styles.senderName}>
-                    {item.senderId?.displayName || 'Member'}
-                </Text>
-            )}
 
-            {isAI && (
-                <View style={styles.aiHeader}>
-                    <Ionicons name="sparkles" size={12} color="#7C3AED" />
-                    <Text style={styles.aiLabel}>Eta AI</Text>
-                </View>
-            )}
 
-            {(item.forwarded || item.isForwarded) && (
-                <View style={styles.forwardedBadge}>
-                    <Ionicons name="arrow-redo" size={10} color="#6B7280" />
-                    <Text style={styles.forwardedText}>Forwarded</Text>
-                </View>
-            )}
 
-            {item.replyTo && (
-                <View style={styles.replyPreview}>
-                    <Text style={styles.replyUser}>
-                        {(item.replyTo.senderId?._id || item.replyTo.senderId) === user._id ? 'You' : (item.replyTo.senderId?.displayName || 'Member')}
-                    </Text>
-                    <Text style={styles.replyContent} numberOfLines={1}>{item.replyTo.content}</Text>
-                </View>
-            )}
 
-            {renderMedia()}
 
-            {item.content && (item.content !== 'Sent an attachment' || item.type !== 'media') && (
-                <Text style={[styles.messageText, isMine ? styles.myText : isAI ? styles.aiText : styles.otherText, item.deleted && styles.deletedText]}>
-                    {item.content}
-                </Text>
-            )}
 
-            <View style={styles.messageFooter}>
-                <Text style={styles.timeText}>
-                    {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-                {isMine && !item.deleted && (
-                    <Ionicons
-                        name={item.read ? "checkmark-done" : "checkmark"}
-                        size={14}
-                        color={item.read ? "#34B7F1" : "#9CA3AF"}
-                        style={{ marginLeft: 4 }}
-                    />
-                )}
-            </View>
 
-            {/* Reactions Display */}
-            {item.reactions && item.reactions.length > 0 && (
-                <View style={[styles.reactionsContainer, isMine ? styles.myReactions : styles.otherReactions]}>
-                    {item.reactions.map((r, i) => (
-                        <Text key={i} style={styles.reactionEmoji}>{r.emoji}</Text>
-                    ))}
-                    <Text style={styles.reactionCount}>{item.reactions.length}</Text>
-                </View>
-            )}
-        </Animatable.View>
-    </TouchableOpacity>
-                </View >
-            </Animated.View >
-        </PanGestureHandler >
-    );
+
+
+
+
+
+
+
+
+
 });
 
 const ChatScreen = ({ route, navigation }) => {
@@ -395,6 +355,12 @@ const ChatScreen = ({ route, navigation }) => {
     const [attachments, setAttachments] = useState([]);
     const [showMediaViewer, setShowMediaViewer] = useState(false);
     const [mediaViewerData, setMediaViewerData] = useState(null);
+
+    // Reaction & Details State
+    const [showReactionPicker, setShowReactionPicker] = useState(false);
+    const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
+    const [showReactionDetails, setShowReactionDetails] = useState(false);
+    const [reactionDetailsData, setReactionDetailsData] = useState([]);
 
     const flatListRef = useRef();
     const inputRef = useRef();
@@ -864,8 +830,12 @@ const ChatScreen = ({ route, navigation }) => {
             toggleSelection={toggleSelection}
             isSelectionMode={isSelectionMode}
             isGroupChat={isGroupChat}
+            setMediaViewerData={setMediaViewerData}
+            setShowMediaViewer={setShowMediaViewer}
+            setReactionDetailsData={setReactionDetailsData}
+            setShowReactionDetails={setShowReactionDetails}
         />
-    ), [user?._id, otherUser?._id, messages.length, selectedMessages, isSelectionMode, toggleSelection, isGroupChat]);
+    ), [user?._id, otherUser?._id, messages.length, selectedMessages, isSelectionMode, toggleSelection, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails]);
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -982,26 +952,7 @@ const ChatScreen = ({ route, navigation }) => {
 
                         {/* Input Area - Now part of flex flow */}
                         <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-                            {attachment && (
-                                <View style={{ padding: 10, backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
-                                    <View style={{ width: 50, height: 50, borderRadius: 8, overflow: 'hidden', marginRight: 10 }}>
-                                        {attachment.type === 'image' ? (
-                                            <Image source={{ uri: attachment.uri }} style={{ width: '100%', height: '100%' }} />
-                                        ) : (
-                                            <View style={{ flex: 1, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }}>
-                                                <Ionicons name="document-text" size={24} color="#6B7280" />
-                                            </View>
-                                        )}
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600' }}>{attachment.name}</Text>
-                                        <Text style={{ fontSize: 10, color: '#6B7280' }}>Ready to send</Text>
-                                    </View>
-                                    <TouchableOpacity onPress={() => setAttachment(null)} style={{ padding: 5 }}>
-                                        <Ionicons name="close-circle" size={20} color="#6B7280" />
-                                    </TouchableOpacity>
-                                </View>
-                            )}
+
                             {replyingTo && (
                                 <View style={styles.inputReplyBar}>
                                     <View style={styles.replyBarIndicator} />
@@ -1099,93 +1050,100 @@ const ChatScreen = ({ route, navigation }) => {
                                 </View>
                             )}
 
-                            {attachments.length > 0 && (
-                                <View style={{ padding: 10, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                        {attachments.map((att, index) => (
-                                            <View key={index} style={{ marginRight: 10, width: 70, position: 'relative' }}>
-                                                <View style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }}>
-                                                    {att.type === 'image' || att.type === 'video' ? (
-                                                        <Image source={{ uri: att.uri }} style={{ width: '100%', height: '100%' }} />
-                                                    ) : (
-                                                        <Ionicons name={att.type === 'document' ? "document-text" : "musical-note"} size={28} color="#6B7280" />
-                                                    )}
+
+
+                            <View>
+                                {/* Moved Attachment Preview Here - Above Input Row completely */}
+                                {attachments.length > 0 && (
+                                    <View style={{ paddingHorizontal: 10, paddingBottom: 5 }}>
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 90 }}>
+                                            {attachments.map((att, i) => (
+                                                <View key={i} style={{ marginRight: 10, position: 'relative' }}>
+                                                    <View style={{ width: 70, height: 70, borderRadius: 10, overflow: 'hidden', backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                                                        {att.type === 'image' || att.type === 'video' ? (
+                                                            <Image source={{ uri: att.uri }} style={{ width: '100%', height: '100%' }} />
+                                                        ) : (
+                                                            <Ionicons name="document-text" size={30} color="#6B7280" />
+                                                        )}
+                                                    </View>
+                                                    <TouchableOpacity
+                                                        onPress={() => removeAttachment(i)}
+                                                        style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#FFF', borderRadius: 12, elevation: 2 }}
+                                                    >
+                                                        <Ionicons name="close-circle" size={24} color="#EF4444" />
+                                                    </TouchableOpacity>
                                                 </View>
-                                                <TouchableOpacity
-                                                    onPress={() => removeAttachment(index)}
-                                                    style={{ position: 'absolute', top: -5, right: 0, backgroundColor: '#FFF', borderRadius: 10 }}
-                                                >
-                                                    <Ionicons name="close-circle" size={22} color="#EF4444" />
-                                                </TouchableOpacity>
-                                                <Text numberOfLines={1} style={{ fontSize: 10, marginTop: 4, textAlign: 'center' }}>{att.name}</Text>
-                                            </View>
-                                        ))}
-                                    </ScrollView>
-                                </View>
-                            )}
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
 
-                            <View style={styles.inputContainer}>
-                                <TouchableOpacity
-                                    style={styles.attachButton}
-                                    onPress={() => {
-                                        Keyboard.dismiss();
-                                        setShowAttachMenu(!showAttachMenu);
-                                        setShowEmojiPicker(false);
-                                    }}
-                                >
-                                    <Ionicons name={showAttachMenu ? "close" : "add"} size={26} color="#0A66C2" />
-                                </TouchableOpacity>
-
-                                <View style={styles.inputFieldContainer}>
-                                    <TextInput
-                                        ref={inputRef}
-                                        style={styles.input}
-                                        placeholder="Message..."
-                                        value={inputText}
-                                        onChangeText={handleInputTyping}
-                                        onFocus={() => {
+                                <View style={styles.inputContainer}>
+                                    <TouchableOpacity
+                                        style={styles.attachButton}
+                                        onPress={() => {
+                                            Keyboard.dismiss();
+                                            setShowAttachMenu(!showAttachMenu);
                                             setShowEmojiPicker(false);
-                                            setShowAttachMenu(false);
                                         }}
-                                        multiline
-                                        placeholderTextColor="#9CA3AF"
-                                    />
+                                    >
+                                        <Ionicons name={showAttachMenu ? "close" : "add"} size={26} color="#0A66C2" />
+                                    </TouchableOpacity>
 
-                                    <View style={styles.inputActions}>
-                                        <TouchableOpacity
-                                            style={[styles.quickActionBtn, mentionEta && styles.quickActionActive]}
-                                            onPress={() => {
-                                                if (!inputText.includes('@Eta')) {
-                                                    setInputText('@Eta ' + inputText);
-                                                    setMentionEta(true);
-                                                }
-                                            }}
-                                        >
-                                            <Text style={[styles.etaText, mentionEta && { color: '#0A66C2' }]}>@Eta</Text>
-                                        </TouchableOpacity>
 
-                                        <TouchableOpacity
-                                            style={styles.quickActionBtn}
-                                            onPress={() => {
-                                                Keyboard.dismiss();
-                                                setShowEmojiPicker(!showEmojiPicker);
+
+                                    <View style={styles.inputFieldContainer}>
+
+                                        <TextInput
+                                            ref={inputRef}
+                                            style={styles.input}
+                                            placeholder="Message..."
+                                            value={inputText}
+                                            onChangeText={handleInputTyping}
+                                            onFocus={() => {
+                                                setShowEmojiPicker(false);
                                                 setShowAttachMenu(false);
                                             }}
-                                        >
-                                            <Ionicons name="happy-outline" size={22} color="#6B7280" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
+                                            multiline
+                                            placeholderTextColor="#9CA3AF"
+                                        />
 
-                                {inputText.length > 0 || attachments.length > 0 ? (
-                                    <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
-                                        <Ionicons name="send" size={20} color="#FFF" />
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity style={styles.micButton}>
-                                        <Ionicons name="mic" size={24} color="#0A66C2" />
-                                    </TouchableOpacity>
-                                )}
+                                        <View style={styles.inputActions}>
+                                            <TouchableOpacity
+                                                style={[styles.quickActionBtn, mentionEta && styles.quickActionActive]}
+                                                onPress={() => {
+                                                    if (!inputText.includes('@Eta')) {
+                                                        setInputText('@Eta ' + inputText);
+                                                        setMentionEta(true);
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={[styles.etaText, mentionEta && { color: '#0A66C2' }]}>@Eta</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                style={styles.quickActionBtn}
+                                                onPress={() => {
+                                                    Keyboard.dismiss();
+                                                    setShowEmojiPicker(!showEmojiPicker);
+                                                    setShowAttachMenu(false);
+                                                }}
+                                            >
+                                                <Ionicons name="happy-outline" size={22} color="#6B7280" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+
+                                    {inputText.length > 0 || attachments.length > 0 ? (
+                                        <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
+                                            <Ionicons name="send" size={20} color="#FFF" />
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <TouchableOpacity style={styles.micButton}>
+                                            <Ionicons name="mic" size={24} color="#0A66C2" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
                         </View>
                     </View>
@@ -1204,19 +1162,28 @@ const ChatScreen = ({ route, navigation }) => {
                         onPress={() => setShowOptionsId(null)}
                     >
                         <View style={styles.optionsPopup}>
-                            {!isGroupChat && (
-                                <View style={styles.reactionBar}>
-                                    {['❤️', '😂', '😮', '😢', '🙏', '👍'].map(emoji => (
-                                        <TouchableOpacity
-                                            key={emoji}
-                                            style={styles.reactionBtn}
-                                            onPress={() => toggleReaction(showOptionsId, emoji)}
-                                        >
-                                            <Text style={styles.reactionText}>{emoji}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            )}
+                            <View style={styles.reactionBar}>
+                                {['❤️', '😂', '😮', '😢', '🙏', '👍'].map(emoji => (
+                                    <TouchableOpacity
+                                        key={emoji}
+                                        style={styles.reactionBtn}
+                                        onPress={() => toggleReaction(showOptionsId, emoji)}
+                                    >
+                                        <Text style={styles.reactionText}>{emoji}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                                <TouchableOpacity
+                                    style={[styles.reactionBtn, { backgroundColor: '#E5E7EB' }]}
+                                    onPress={() => {
+                                        setReactionPickerMessageId(showOptionsId);
+                                        setShowOptionsId(null);
+                                        setShowReactionPicker(true);
+                                    }}
+                                >
+                                    <Ionicons name="add" size={20} color="#374151" />
+                                </TouchableOpacity>
+                            </View>
+
 
                             <View style={styles.menuList}>
                                 {(() => {
@@ -1527,6 +1494,40 @@ const ChatScreen = ({ route, navigation }) => {
                     </TouchableOpacity>
                 </Modal>
             </View>
+            {/* Reaction Picker Modal */}
+            <Modal
+                visible={showReactionPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowReactionPicker(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowReactionPicker(false)}
+                >
+                    <View style={[styles.optionsPopup, { height: '50%', paddingVertical: 20 }]}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 15, alignSelf: 'center', color: '#1F2937' }}>React</Text>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, paddingBottom: 20 }}>
+                                {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '🥲', '☺️', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '👍', '👎', '👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙'].map((emoji) => (
+                                    <TouchableOpacity
+                                        key={emoji}
+                                        style={{ padding: 8, borderRadius: 20, backgroundColor: '#F3F4F6' }}
+                                        onPress={() => {
+                                            toggleReaction(reactionPickerMessageId, emoji);
+                                            setShowReactionPicker(false);
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 28 }}>{emoji}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
             {/* Media Viewer Modal */}
             <Modal
                 visible={showMediaViewer}
@@ -1550,6 +1551,38 @@ const ChatScreen = ({ route, navigation }) => {
                         />
                     )}
                 </View>
+            </Modal>
+
+            {/* Reaction Details Modal */}
+            <Modal
+                visible={showReactionDetails}
+                borderTopLeftRadius={20}
+                borderTopRightRadius={20}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowReactionDetails(false)}
+            >
+                <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+                    activeOpacity={1}
+                    onPress={() => setShowReactionDetails(false)}
+                >
+                    <View style={{ backgroundColor: '#FFF', height: '50%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
+                        <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 15, alignSelf: 'center' }}>Reactions</Text>
+                        <FlatList
+                            data={reactionDetailsData}
+                            keyExtractor={(item, index) => index.toString()}
+                            renderItem={({ item }) => (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
+                                    <Text style={{ fontSize: 24, marginRight: 15 }}>{item.emoji}</Text>
+                                    <Text style={{ fontSize: 16, fontWeight: '600' }}>
+                                        {item.userId?.displayName || item.senderId?.displayName || item.user?.displayName || 'User'}
+                                    </Text>
+                                </View>
+                            )}
+                        />
+                    </View>
+                </TouchableOpacity>
             </Modal>
         </GestureHandlerRootView>
     );
@@ -2258,6 +2291,15 @@ const styles = StyleSheet.create({
         backgroundColor: '#10B981',
         borderWidth: 2,
         borderColor: '#FFF',
+    },
+    downloadBtn: {
+        position: 'absolute',
+        top: 40,
+        right: 20,
+        zIndex: 10,
+        padding: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 20
     },
 });
 

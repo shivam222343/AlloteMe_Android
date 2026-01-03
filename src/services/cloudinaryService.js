@@ -53,7 +53,12 @@ export const prepareFile = async (fileRef) => {
         }
 
         const fileName = uri.split('/').pop();
-        const extension = fileName.split('.').pop().toLowerCase();
+        let extension = fileName.split('.').pop().toLowerCase();
+
+        // If no extension found (file name matches extension), default to jpg
+        if (extension === fileName.toLowerCase()) {
+            extension = 'jpg';
+        }
 
         let type = 'image/jpeg'; // Default
         if (['mp4', 'mov', 'avi', 'mkv'].includes(extension)) type = 'video/mp4';
@@ -61,11 +66,16 @@ export const prepareFile = async (fileRef) => {
         else if (['jpg', 'jpeg'].includes(extension)) type = 'image/jpeg';
         else if (['png'].includes(extension)) type = 'image/png';
         else if (['gif'].includes(extension)) type = 'image/gif';
+        else if (['webp'].includes(extension)) type = 'image/webp';
+
+        const finalName = (fileName.toLowerCase().endsWith('.' + extension))
+            ? fileName
+            : `${fileName}.${extension}`;
 
         return {
             uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
             type,
-            name: fileName || `upload_${Date.now()}.${extension}`,
+            name: finalName,
         };
     } catch (error) {
         console.error('[CloudinaryService] Preparation error:', error);
