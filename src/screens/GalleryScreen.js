@@ -320,46 +320,41 @@ const GalleryScreen = ({ navigation }) => {
                 }}
                 activeOpacity={0.95}
             >
-                <TapGestureHandler
-                    onHandlerStateChange={handleDoubleTap}
-                    numberOfTaps={2}
-                >
-                    <View style={{ height: itemHeight }}>
-                        <Image source={{ uri: item.imageUrl }} style={[styles.cardImage, { height: itemHeight }]} />
+                <View style={{ height: itemHeight }}>
+                    <Image source={{ uri: item.imageUrl }} style={[styles.cardImage, { height: itemHeight }]} />
 
-                        <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.8)']}
-                            style={styles.cardOverlay}
-                        >
-                            <Text style={styles.cardTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
-                            <View style={styles.cardMeta}>
-                                <View style={styles.authorInfo}>
-                                    <Image
-                                        source={item.uploadedBy?.profilePicture?.url ? { uri: item.uploadedBy.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + item.uploadedBy?.displayName }}
-                                        style={styles.authorAvatar}
-                                    />
-                                    <Text style={styles.authorName} numberOfLines={1}>{item.uploadedBy?.displayName}</Text>
-                                </View>
-                                <View style={styles.likesCount}>
-                                    <Ionicons name="heart" size={12} color="#FFF" />
-                                    <Text style={styles.likesText}>{item.likes?.length || 0}</Text>
-                                </View>
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.8)']}
+                        style={styles.cardOverlay}
+                    >
+                        <Text style={styles.cardTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
+                        <View style={styles.cardMeta}>
+                            <View style={styles.authorInfo}>
+                                <Image
+                                    source={item.uploadedBy?.profilePicture?.url ? { uri: item.uploadedBy.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + item.uploadedBy?.displayName }}
+                                    style={styles.authorAvatar}
+                                />
+                                <Text style={styles.authorName} numberOfLines={1}>{item.uploadedBy?.displayName}</Text>
                             </View>
-                        </LinearGradient>
+                            <View style={styles.likesCount}>
+                                <Ionicons name="heart" size={12} color="#FFF" />
+                                <Text style={styles.likesText}>{item.likes?.length || 0}</Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
 
-                        <Animated.View style={[styles.largeHeart, {
-                            opacity: heartAnim,
-                            transform: [{
-                                scale: heartAnim.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [0.5, 1.5]
-                                })
-                            }]
-                        }]}>
-                            <Ionicons name="heart" size={60} color="#FFF" />
-                        </Animated.View>
-                    </View>
-                </TapGestureHandler>
+                    <Animated.View style={[styles.largeHeart, {
+                        opacity: heartAnim,
+                        transform: [{
+                            scale: heartAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0.5, 1.5]
+                            })
+                        }]
+                    }]}>
+                        <Ionicons name="heart" size={60} color="#FFF" />
+                    </Animated.View>
+                </View>
             </TouchableOpacity>
         );
     };
