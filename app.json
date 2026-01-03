@@ -45,6 +45,7 @@
       "favicon": "./assets/AS.png"
     },
     "plugins": [
+      "./withAndroidXFix",
       "@react-native-community/datetimepicker",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
@@ -57,7 +58,15 @@
           },
           "android": {
             "googleServicesFile": "./google-services.json",
-            "enableJetifier": true
+            "enableJetifier": true,
+            "packagingOptions": {
+              "pickFirst": [
+                "**/INotificationSideChannel.aidl",
+                "**/IResultReceiver.aidl",
+                "**/IconCompatParcelizer.java",
+                "**/androidx/versionedparcelable/*"
+              ]
+            }
           }
         }
       ]
