@@ -626,7 +626,7 @@ const GalleryScreen = ({ navigation }) => {
                                             }}
                                             numberOfTaps={2}
                                         >
-                                            <View style={styles.fullImgWrapper}>
+                                            <View style={[styles.fullImgWrapper, { width: width }]}>
                                                 <Image source={{ uri: item.imageUrl }} style={styles.fullImage} resizeMode="contain" />
                                             </View>
                                         </TapGestureHandler>
