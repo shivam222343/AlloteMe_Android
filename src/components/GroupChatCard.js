@@ -28,9 +28,7 @@ const GroupChatCard = ({ club, unreadCount, lastMessage, onPress }) => {
 
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <Text style={styles.name} numberOfLines={1}>
-                        {club.name}
-                    </Text>
+                    <Text style={styles.name} numberOfLines={1}>{club.name}</Text>
                     {time && <Text style={styles.time}>{time}</Text>}
                 </View>
                 <View style={styles.footer}>

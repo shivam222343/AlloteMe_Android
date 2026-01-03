@@ -710,6 +710,7 @@ const GalleryScreen = ({ navigation }) => {
                                 </>
                             )}
                         </View>
+                        {/* Closing gesture handler */}
                     </GestureHandlerRootView>
                 </Modal>
 
