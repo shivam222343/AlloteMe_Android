@@ -76,7 +76,7 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
     };
 
     const renderMedia = () => {
-        if (item.type !== 'media' || !item.fileUrl) return null;
+        if (!item.fileUrl) return null;
 
         const urlStr = typeof item.fileUrl === 'string' ? item.fileUrl : (item.fileUrl?.url || '');
         if (!urlStr) return null;
@@ -1673,6 +1673,24 @@ const ChatScreen = ({ route, navigation }) => {
                                 }}
                             >
                                 <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 16 }}>Open File</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
+                                    paddingVertical: 15,
+                                    paddingHorizontal: 30,
+                                    borderRadius: 30,
+                                    marginTop: 15
+                                }}
+                                onPress={() => {
+                                    Linking.openURL(mediaViewerData.uri);
+                                }}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="download-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                                    <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 16 }}>Download</Text>
+                                </View>
                             </TouchableOpacity>
                         </View>
                     )}
