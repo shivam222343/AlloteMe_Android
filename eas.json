@@ -7,7 +7,8 @@
         "preview": {
             "android": {
                 "buildType": "apk"
-            }
+            },
+            "prebuildCommand": "npm run postinstall"
         },
         "production": {}
     }
