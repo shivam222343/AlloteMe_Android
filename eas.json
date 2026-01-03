@@ -8,7 +8,7 @@
             "android": {
                 "buildType": "apk"
             },
-            "prebuildCommand": "npm run postinstall"
+            "prebuildCommand": "npx jetifier"
         },
         "production": {}
     }
