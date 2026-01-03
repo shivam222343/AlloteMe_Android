@@ -360,9 +360,24 @@ const ChatScreen = ({ route, navigation }) => {
     const [forwardLoading, setForwardLoading] = useState(false);
     const [uploadingMedia, setUploadingMedia] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+    const [localGroupData, setLocalGroupData] = useState(groupChatData);
+    const [currentClubName, setCurrentClubName] = useState(clubName || groupChatData?.clubId?.name);
+    const [isGroupAdmin, setIsGroupAdmin] = useState(false);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [newGroupName, setNewGroupName] = useState(currentClubName);
 
-    const isSelectionMode = selectedMessages.length > 0;
+    useEffect(() => {
+        if (isGroupChat && localGroupData) {
+            const memberInfo = localGroupData.members?.find(
+                m => (m.userId?._id || m.userId) === user._id
+            );
+            setIsGroupAdmin(memberInfo?.role === 'admin' || user.role === 'admin');
+        }
+    }, [localGroupData, user._id]);
+
+    useEffect(() => {
+        setNewGroupName(currentClubName);
+    }, [currentClubName]);
 
     const [attachments, setAttachments] = useState([]);
     const [showMediaViewer, setShowMediaViewer] = useState(false);
@@ -609,13 +624,12 @@ const ChatScreen = ({ route, navigation }) => {
         try {
             if (isGroupChat) {
                 const res = await groupChatAPI.getGroupChat(clubId);
-                if (res.data && res.data.messages) {
-                    setMessages(res.data.messages);
-                } else if (Array.isArray(res.data)) {
-                    // Fallback if data is the array directly
-                    setMessages(res.data);
-                } else {
-                    setMessages([]);
+                if (res.data) {
+                    setLocalGroupData(res.data);
+                    if (res.data.clubId?.name) setCurrentClubName(res.data.clubId.name);
+                    if (res.data.messages) {
+                        setMessages(res.data.messages);
+                    }
                 }
             } else {
                 const res = await messagesAPI.getMessages(otherUser._id);
@@ -691,6 +705,10 @@ const ChatScreen = ({ route, navigation }) => {
 
 
     const handleUpdateGroupIcon = async () => {
+        if (!isGroupAdmin) {
+            alert('Only group admins can change the icon');
+            return;
+        }
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -711,7 +729,6 @@ const ChatScreen = ({ route, navigation }) => {
                 if (res.success) {
                     alert('Group icon updated!');
                     fetchMessages();
-                    setShowGroupInfoModal(false);
                 }
             }
         } catch (error) {
@@ -719,6 +736,29 @@ const ChatScreen = ({ route, navigation }) => {
             alert('Failed to update group icon');
         } finally {
             setUploadingMedia(false);
+        }
+    };
+
+    const handleUpdateGroupName = async () => {
+        if (!isGroupAdmin) return;
+        setIsEditingName(true);
+    };
+
+    const handleSaveGroupName = async () => {
+        if (!newGroupName.trim() || newGroupName === currentClubName) {
+            setIsEditingName(false);
+            return;
+        }
+        try {
+            const res = await clubsAPI.update(clubId, { name: newGroupName });
+            if (res.success) {
+                setCurrentClubName(newGroupName);
+                setIsEditingName(false);
+                alert('Group name updated!');
+            }
+        } catch (error) {
+            console.error('Error updating group name:', error);
+            alert('Failed to update group name');
         }
     };
 
@@ -885,7 +925,14 @@ const ChatScreen = ({ route, navigation }) => {
                                     style={styles.headerAvatar}
                                 >
                                     {isGroupChat ? (
-                                        <Ionicons name="people" size={24} color="#FFF" style={{ alignSelf: 'center', marginTop: 8 }} />
+                                        localGroupData?.clubId?.logo?.url ? (
+                                            <Image
+                                                source={{ uri: localGroupData.clubId.logo.url }}
+                                                style={styles.headerAvatarImg}
+                                            />
+                                        ) : (
+                                            <Ionicons name="people" size={24} color="#FFF" style={{ alignSelf: 'center', marginTop: 8 }} />
+                                        )
                                     ) : (
                                         <Image
                                             source={otherUser?.profilePicture?.url ? { uri: otherUser.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + (otherUser?.displayName || 'Chat') }}
@@ -894,10 +941,10 @@ const ChatScreen = ({ route, navigation }) => {
                                     )}
                                 </LinearGradient>
                                 <View>
-                                    <Text style={styles.headerName}>{isGroupChat ? clubName : otherUser?.displayName}</Text>
+                                    <Text style={styles.headerName}>{isGroupChat ? currentClubName : otherUser?.displayName}</Text>
                                     <Text style={styles.headerStatus}>
                                         {isGroupChat
-                                            ? `${groupChatData?.members?.length || 0} members`
+                                            ? `${localGroupData?.members?.length || 0} members`
                                             : (isTyping ? 'typing...' : (otherUser?.isOnline ? 'online' : 'last seen recently'))}
                                     </Text>
                                 </View>
@@ -1320,10 +1367,10 @@ const ChatScreen = ({ route, navigation }) => {
                     >
                         <View style={[styles.profileCard, { maxHeight: '80%' }]}>
                             <View style={styles.profileHeader}>
-                                <TouchableOpacity onPress={handleUpdateGroupIcon}>
-                                    {groupChatData?.club?.logo?.url ? (
+                                <TouchableOpacity onPress={handleUpdateGroupIcon} disabled={!isGroupAdmin}>
+                                    {localGroupData?.clubId?.logo?.url ? (
                                         <Image
-                                            source={{ uri: groupChatData.club.logo.url }}
+                                            source={{ uri: localGroupData.clubId.logo.url }}
                                             style={styles.largeAvatar}
                                         />
                                     ) : (
@@ -1334,17 +1381,54 @@ const ChatScreen = ({ route, navigation }) => {
                                             <Ionicons name="people" size={60} color="#FFF" style={{ alignSelf: 'center', marginTop: 25 }} />
                                         </LinearGradient>
                                     )}
-                                    <View style={styles.editBadge}>
-                                        <Ionicons name="camera" size={16} color="#FFF" />
-                                    </View>
+                                    {isGroupAdmin && (
+                                        <View style={styles.editBadge}>
+                                            <Ionicons name="camera" size={16} color="#FFF" />
+                                        </View>
+                                    )}
                                 </TouchableOpacity>
-                                <Text style={styles.profileName}>{clubName}</Text>
-                                <Text style={styles.profileEmail}>{groupChatData?.members?.length || 0} Members</Text>
+                                <View style={{ width: '100%', alignItems: 'center', marginVertical: 10 }}>
+                                    {isEditingName ? (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%' }}>
+                                            <TextInput
+                                                style={{
+                                                    flex: 1,
+                                                    fontSize: 18,
+                                                    fontWeight: '700',
+                                                    color: '#1F2937',
+                                                    borderBottomWidth: 2,
+                                                    borderBottomColor: '#0A66C2',
+                                                    paddingVertical: 5,
+                                                    textAlign: 'center'
+                                                }}
+                                                value={newGroupName}
+                                                onChangeText={setNewGroupName}
+                                                autoFocus
+                                            />
+                                            <TouchableOpacity onPress={handleSaveGroupName}>
+                                                <Ionicons name="checkmark-circle" size={28} color="#10B981" />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => { setIsEditingName(false); setNewGroupName(currentClubName); }}>
+                                                <Ionicons name="close-circle" size={28} color="#EF4444" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <Text style={styles.profileName}>{currentClubName}</Text>
+                                            {isGroupAdmin && (
+                                                <TouchableOpacity onPress={handleUpdateGroupName}>
+                                                    <Ionicons name="pencil-outline" size={18} color="#0A66C2" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+                                <Text style={styles.profileEmail}>{localGroupData?.members?.length || 0} Members</Text>
                             </View>
 
                             <Text style={styles.sectionTitle}>Group Members</Text>
                             <FlatList
-                                data={groupChatData?.members || []}
+                                data={localGroupData?.members || []}
                                 keyExtractor={item => item.userId?._id || item._id}
                                 style={{ width: '100%', marginBottom: 20 }}
                                 renderItem={({ item }) => (
@@ -1623,7 +1707,7 @@ const ChatScreen = ({ route, navigation }) => {
                     </View>
                 </TouchableOpacity>
             </Modal>
-        </GestureHandlerRootView>
+        </GestureHandlerRootView >
     );
 };
 
