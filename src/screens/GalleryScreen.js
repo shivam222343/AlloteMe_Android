@@ -66,7 +66,7 @@ const GalleryScreen = ({ navigation }) => {
     const [editData, setEditData] = useState({ title: '', description: '', category: '' });
 
     const categories = ['all', 'event', 'meeting', 'workshop', 'social', 'achievement', 'other'];
-    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB limit
+    const { MAX_FILE_SIZE } = require('../services/cloudinaryService');
 
     const fetchData = useCallback(async () => {
         try {
@@ -149,7 +149,7 @@ const GalleryScreen = ({ navigation }) => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
-            quality: 0.8,
+            quality: 0.5,
         });
 
         if (!result.canceled) {

@@ -27,6 +27,8 @@
       },
       "package": "com.mycompany.myauth",
       "googleServicesFile": "./google-services.json",
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -46,6 +48,7 @@
       "@react-native-community/datetimepicker",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      "@react-native-voice/voice",
       [
         "expo-build-properties",
         {

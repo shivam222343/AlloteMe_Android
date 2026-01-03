@@ -227,6 +227,23 @@ const TasksScreen = ({ navigation }) => {
                     </View>
                 )}
 
+                <View style={styles.assigneesContainer}>
+                    <Text style={styles.assigneesLabel}>Assigned Members:</Text>
+                    <View style={styles.assigneeList}>
+                        {item.assignedTo.map((assignee, idx) => (
+                            <View key={idx} style={styles.assigneeIndividual}>
+                                <View style={[
+                                    styles.statusIndicator,
+                                    { backgroundColor: assignee.status === 'completed' ? '#10B981' : '#9CA3AF' }
+                                ]} />
+                                <Text style={styles.assigneeNameText}>
+                                    {assignee.user?.displayName || 'Unknown'}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+
                 <View style={styles.taskFooter}>
                     <View style={styles.statusBadge}>
                         <Text style={styles.statusLabel}>My Status: </Text>
@@ -661,7 +678,43 @@ const styles = StyleSheet.create({
     helperText: { fontSize: 12, color: '#9CA3AF', fontStyle: 'italic' },
     dateText: { fontSize: 16, color: '#1F2937' },
     placeholderBox: { alignItems: 'center', marginTop: 60, padding: 20 },
-    placeholderText: { color: '#9CA3AF', fontSize: 14, marginTop: 16, fontWeight: '600', textAlign: 'center' }
+    placeholderText: { color: '#9CA3AF', fontSize: 14, marginTop: 16, fontWeight: '600', textAlign: 'center' },
+    assigneesContainer: {
+        marginTop: 4,
+        marginBottom: 16,
+    },
+    assigneesLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6B7280',
+        marginBottom: 8,
+    },
+    assigneeList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    assigneeIndividual: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    statusIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 6,
+    },
+    assigneeNameText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#374151',
+    }
 });
 
 export default TasksScreen;

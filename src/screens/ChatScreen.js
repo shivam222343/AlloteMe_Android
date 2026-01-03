@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { messagesAPI, groupChatAPI, snapsAPI, clubsAPI } from '../services/api';
+import { API_CONFIG } from '../constants/theme';
 import { prepareFile } from '../services/cloudinaryService';
 import * as Animatable from 'react-native-animatable';
 import * as ImagePicker from 'expo-image-picker';
@@ -32,6 +33,7 @@ import * as DocumentPicker from 'expo-document-picker';
 
 import * as MediaLibrary from 'expo-media-library';
 import * as Clipboard from 'expo-clipboard';
+import Voice from '@react-native-voice/voice';
 
 const { width } = Dimensions.get('window');
 
@@ -236,8 +238,15 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                                     </Text>
                                 ) : (
                                     <>
-                                        {isGroupChat && !isMine && (
-                                            <Text style={styles.senderName}>{item.senderId?.displayName || 'Unknown'}</Text>
+                                        {isAI ? (
+                                            <View style={styles.aiHeader}>
+                                                <Ionicons name="sparkles" size={12} color="#7C3AED" />
+                                                <Text style={styles.aiLabel}>Eta (AI Assistant)</Text>
+                                            </View>
+                                        ) : (
+                                            isGroupChat && !isMine && (
+                                                <Text style={styles.senderName}>{item.senderId?.displayName || 'Unknown'}</Text>
+                                            )
                                         )}
 
                                         {replyingToMsg && (
@@ -299,7 +308,6 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                                             return Object.entries(reactionCounts).map(([emoji, count]) => (
                                                 <View key={emoji} style={styles.reactionChip}>
                                                     <Text style={styles.reactionEmoji}>{emoji}</Text>
-                                                    <Text style={styles.reactionCount}>{count}</Text>
                                                 </View>
                                             ));
                                         })()}
@@ -378,6 +386,11 @@ const ChatScreen = ({ route, navigation }) => {
     const [loading, setLoading] = useState(true);
     const [isTyping, setIsTyping] = useState(false);
     const [aiProcessing, setAiProcessing] = useState(false);
+    const [recording, setRecording] = useState(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingDuration, setRecordingDuration] = useState(0);
+    const [lastSentMessageId, setLastSentMessageId] = useState(null);
+    const timerRef = useRef(null);
     const [showOptionsId, setShowOptionsId] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -385,6 +398,7 @@ const ChatScreen = ({ route, navigation }) => {
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [mentionEta, setMentionEta] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
     const [messageToDelete, setMessageToDelete] = useState(null);
     const [deleteType, setDeleteType] = useState('me');
@@ -428,13 +442,133 @@ const ChatScreen = ({ route, navigation }) => {
     const flatListRef = useRef();
     const inputRef = useRef();
 
+    const webSpeechRef = useRef(null);
+
     useEffect(() => {
-        if (replyingTo && inputRef.current) {
-            inputRef.current.focus();
+        // Platform specific initialization
+        if (Platform.OS === 'web') {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                webSpeechRef.current = new SpeechRecognition();
+                webSpeechRef.current.continuous = true;
+                webSpeechRef.current.interimResults = true;
+                webSpeechRef.current.lang = 'en-US';
+
+                webSpeechRef.current.onresult = (event) => {
+                    const transcript = Array.from(event.results)
+                        .map(result => result[0])
+                        .map(result => result.transcript)
+                        .join('');
+                    setInputText(transcript);
+                };
+
+                webSpeechRef.current.onerror = (event) => {
+                    console.error('Web Speech Error:', event.error);
+                    setIsRecording(false);
+                };
+
+                webSpeechRef.current.onend = () => {
+                    setIsRecording(false);
+                };
+            }
+        } else if (Voice) {
+            Voice.onSpeechStart = onSpeechStart;
+            Voice.onSpeechEnd = onSpeechEnd;
+            Voice.onSpeechResults = onSpeechResults;
+            Voice.onSpeechError = onSpeechError;
         }
-    }, [replyingTo]);
+
+        return () => {
+            if (Platform.OS === 'web' && webSpeechRef.current) {
+                webSpeechRef.current.stop();
+            } else if (Voice) {
+                Voice.destroy().then(Voice.removeAllListeners);
+            }
+        };
+    }, []);
+
+    const onSpeechStart = (e) => {
+        console.log('onSpeechStart: ', e);
+        setIsRecording(true);
+    };
+
+    const onSpeechEnd = (e) => {
+        console.log('onSpeechEnd: ', e);
+        setIsRecording(false);
+    };
+
+    const onSpeechError = (e) => {
+        console.log('onSpeechError: ', e);
+        setIsRecording(false);
+        // alert('Speech recognition error. Please try again.');
+    };
+
+    const onSpeechResults = (e) => {
+        console.log('onSpeechResults: ', e);
+        if (e.value && e.value.length > 0) {
+            const results = e.value[0];
+            setInputText(prev => (prev.trim() ? prev.trim() + ' ' : '') + results);
+        }
+    };
 
     // ... (keep useEffects for socket and fetching same)
+
+    // Audio recording logic
+    const startRecording = async () => {
+        try {
+            setInputText('');
+            setIsRecording(true);
+            setRecordingDuration(0);
+
+            if (Platform.OS === 'web') {
+                if (webSpeechRef.current) {
+                    webSpeechRef.current.start();
+                } else {
+                    alert('Speech Recognition not supported in this browser.');
+                    setIsRecording(false);
+                }
+            } else {
+                if (Voice) {
+                    await Voice.start('en-US');
+                } else {
+                    alert('Voice module not available');
+                    setIsRecording(false);
+                    return;
+                }
+            }
+
+            timerRef.current = setInterval(() => {
+                setRecordingDuration(prev => prev + 1);
+            }, 1000);
+            Vibration.vibrate(50);
+        } catch (e) {
+            console.error(e);
+            setIsRecording(false);
+        }
+    };
+
+    const stopRecording = async (shouldSend = true) => {
+        try {
+            clearInterval(timerRef.current);
+            setRecordingDuration(0);
+
+            if (Platform.OS === 'web') {
+                webSpeechRef.current?.stop();
+            } else {
+                await Voice?.stop();
+            }
+            setIsRecording(false);
+        } catch (e) {
+            console.error(e);
+            setIsRecording(false);
+        }
+    };
+
+    const formatDuration = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
 
     const sendMessage = async () => {
         if (!inputText.trim() && attachments.length === 0) return;
@@ -467,14 +601,31 @@ const ChatScreen = ({ route, navigation }) => {
                 }
 
                 if (isGroupChat) {
-                    await groupChatAPI.sendMessage(clubId, messageData, file);
+                    if (text && /@Eta/i.test(text)) {
+                        setAiProcessing(true);
+                    }
+                    const res = await groupChatAPI.sendMessage(clubId, messageData, file);
+                    if (res.success && res.data) {
+                        setLastSentMessageId(res.data._id);
+                        setMessages(prev => {
+                            if (prev.some(m => m._id === res.data._id)) return prev;
+                            return [...prev, res.data];
+                        });
+                    }
                 } else {
                     messageData.receiverId = otherUser._id;
                     if (text && /@Eta/i.test(text)) {
                         messageData.mentionAI = true;
                         setAiProcessing(true);
                     }
-                    await messagesAPI.send(messageData, file);
+                    const res = await messagesAPI.send(messageData, file);
+                    if (res.success && res.data) {
+                        setLastSentMessageId(res.data._id);
+                        setMessages(prev => {
+                            if (prev.some(m => m._id === res.data._id)) return prev;
+                            return [...prev, res.data];
+                        });
+                    }
                 }
             };
 
@@ -511,7 +662,7 @@ const ChatScreen = ({ route, navigation }) => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.All,
-                quality: 0.8,
+                quality: 0.5,
                 allowsMultipleSelection: true,
                 selectionLimit: 5
             });
@@ -538,7 +689,7 @@ const ChatScreen = ({ route, navigation }) => {
                 alert('Permission needed to access camera');
                 return;
             }
-            const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+            const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
             if (!result.canceled) {
                 setAttachments(prev => [...prev, {
                     uri: result.assets[0].uri,
@@ -664,12 +815,30 @@ const ChatScreen = ({ route, navigation }) => {
                     setLocalGroupData(res.data);
                     if (res.data.clubId?.name) setCurrentClubName(res.data.clubId.name);
                     if (res.data.messages) {
-                        setMessages(res.data.messages);
+                        setMessages(prev => {
+                            const merged = [...prev];
+                            res.data.messages.forEach(m => {
+                                const idx = merged.findIndex(old => old._id === m._id);
+                                if (idx === -1) merged.push(m);
+                                else merged[idx] = m;
+                            });
+                            return merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                        });
                     }
                 }
             } else {
                 const res = await messagesAPI.getMessages(otherUser._id);
-                if (res.success) setMessages(res.data);
+                if (res.success) {
+                    setMessages(prev => {
+                        const merged = [...prev];
+                        res.data.forEach(m => {
+                            const idx = merged.findIndex(old => old._id === m._id);
+                            if (idx === -1) merged.push(m);
+                            else merged[idx] = m;
+                        });
+                        return merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                    });
+                }
             }
         } catch (error) {
             console.error('Error fetching messages:', error);
@@ -696,13 +865,26 @@ const ChatScreen = ({ route, navigation }) => {
         if (!message) return;
 
         const isAIMessage = message.senderId === 'AI' || message.senderId?._id === 'AI' || message.senderId === '000000000000000000000000' || message.senderId?._id === '000000000000000000000000' || message.isAI;
-        const isRelevantMessage = isAIMessage ||
-            (isGroupChat ? true : (
+        const currentConversationId = !isGroupChat && otherUser?._id ? [user._id.toString(), otherUser._id.toString()].sort().join('-') : null;
+
+        const isRelevantMessage = isGroupChat ? (
+            isAIMessage || true
+        ) : (
+            isAIMessage ? (
+                // AI messages are relevant if they belong to this conversation
+                (message.conversationId && message.conversationId === currentConversationId) ||
+                message.receiverId === user._id ||
+                message.senderId === otherUser?._id ||
+                // Fallback for missing/mismatched IDs
+                message.replyTo?.senderId === user._id ||
+                message.replyTo === lastSentMessageId
+            ) : (
                 message.senderId?._id === otherUser?._id ||
                 message.receiverId?._id === otherUser?._id ||
                 message.senderId === otherUser?._id ||
                 message.receiverId === otherUser?._id
-            ));
+            )
+        );
 
         if (isRelevantMessage) {
             setMessages(prev => {
@@ -880,9 +1062,8 @@ const ChatScreen = ({ route, navigation }) => {
         const idsToDelete = isSelectionMode ? selectedMessages : [messageToDelete];
         if (idsToDelete.length === 0) return;
 
+        setDeleting(true);
         try {
-            // If multiple, loop or use a bulk endpoint if available. 
-            // The provided API only shows single delete. We will loop for now or assume single if not in selection mode.
             for (const id of idsToDelete) {
                 if (isGroupChat) {
                     await groupChatAPI.deleteMessage(clubId, id, deleteType);
@@ -891,7 +1072,6 @@ const ChatScreen = ({ route, navigation }) => {
                 }
             }
 
-            // Completely hide for both 'me' and 'everyone'
             setMessages(prev => prev.filter(m => !idsToDelete.includes(m._id)));
 
             setSelectedMessages([]);
@@ -901,6 +1081,8 @@ const ChatScreen = ({ route, navigation }) => {
         } catch (error) {
             console.error('Error deleting messages:', error);
             alert('Failed to delete some messages');
+        } finally {
+            setDeleting(false);
             setDeleteConfirmModalVisible(false);
         }
     };
@@ -1189,52 +1371,73 @@ const ChatScreen = ({ route, navigation }) => {
 
                                     <View style={styles.inputFieldContainer}>
 
-                                        <TextInput
-                                            ref={inputRef}
-                                            style={styles.input}
-                                            placeholder="Message..."
-                                            value={inputText}
-                                            onChangeText={handleInputTyping}
-                                            onFocus={() => {
-                                                setShowEmojiPicker(false);
-                                                setShowAttachMenu(false);
-                                            }}
-                                            multiline
-                                            placeholderTextColor="#9CA3AF"
-                                        />
-
-                                        <View style={styles.inputActions}>
-                                            <TouchableOpacity
-                                                style={[styles.quickActionBtn, mentionEta && styles.quickActionActive]}
-                                                onPress={() => {
-                                                    if (!inputText.includes('@Eta')) {
-                                                        setInputText('@Eta ' + inputText);
-                                                        setMentionEta(true);
-                                                    }
-                                                }}
-                                            >
-                                                <Text style={[styles.etaText, mentionEta && { color: '#0A66C2' }]}>@Eta</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                style={styles.quickActionBtn}
-                                                onPress={() => {
-                                                    Keyboard.dismiss();
-                                                    setShowEmojiPicker(!showEmojiPicker);
+                                        {isRecording ? (
+                                            <View style={styles.recordingOverlay}>
+                                                <Animatable.View animation="pulse" iterationCount="infinite" style={styles.recordingDot} />
+                                                <Text style={styles.recordingTime}>{formatDuration(recordingDuration)}</Text>
+                                                <TouchableOpacity onPress={() => stopRecording(false)} style={styles.cancelRecord}>
+                                                    <Text style={styles.cancelText}>Cancel</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : (
+                                            <TextInput
+                                                ref={inputRef}
+                                                style={styles.input}
+                                                placeholder="Message..."
+                                                value={inputText}
+                                                onChangeText={handleInputTyping}
+                                                onFocus={() => {
+                                                    setShowEmojiPicker(false);
                                                     setShowAttachMenu(false);
                                                 }}
-                                            >
-                                                <Ionicons name="happy-outline" size={22} color="#6B7280" />
-                                            </TouchableOpacity>
+                                                multiline
+                                                placeholderTextColor="#9CA3AF"
+                                            />
+                                        )}
+
+                                        <View style={styles.inputActions}>
+                                            {!isRecording && (
+                                                <>
+                                                    <TouchableOpacity
+                                                        style={[styles.quickActionBtn, mentionEta && styles.quickActionActive]}
+                                                        onPress={() => {
+                                                            if (!inputText.includes('@Eta')) {
+                                                                setInputText('@Eta ' + inputText);
+                                                                setMentionEta(true);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Text style={[styles.etaText, mentionEta && { color: '#0A66C2' }]}>@Eta</Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        style={styles.quickActionBtn}
+                                                        onPress={() => {
+                                                            Keyboard.dismiss();
+                                                            setShowEmojiPicker(!showEmojiPicker);
+                                                            setShowAttachMenu(false);
+                                                        }}
+                                                    >
+                                                        <Ionicons name="happy-outline" size={22} color="#6B7280" />
+                                                    </TouchableOpacity>
+                                                </>
+                                            )}
                                         </View>
                                     </View>
 
-                                    {inputText.length > 0 || attachments.length > 0 ? (
-                                        <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
-                                            <Ionicons name="send" size={20} color="#FFF" />
+                                    {inputText.length > 0 || attachments.length > 0 || isRecording ? (
+                                        <TouchableOpacity
+                                            style={styles.sendButton}
+                                            onPress={() => isRecording ? stopRecording(true) : sendMessage()}
+                                        >
+                                            <Ionicons name={isRecording ? "checkmark" : "send"} size={20} color="#FFF" />
                                         </TouchableOpacity>
                                     ) : (
-                                        <TouchableOpacity style={styles.micButton}>
+                                        <TouchableOpacity
+                                            style={styles.micButton}
+                                            onLongPress={startRecording}
+                                            onPress={startRecording} // Start on simple tap too for ease
+                                        >
                                             <Ionicons name="mic" size={24} color="#0A66C2" />
                                         </TouchableOpacity>
                                     )}
@@ -1521,59 +1724,74 @@ const ChatScreen = ({ route, navigation }) => {
 
                             {isSelectionMode ? (
                                 <View style={{ width: '100%', gap: 10 }}>
-                                    <TouchableOpacity
-                                        style={[styles.confirmDeleteBtn, { width: '100%' }]}
-                                        onPress={() => {
-                                            setDeleteType('me');
-                                            confirmDeleteMessage();
-                                        }}
-                                    >
-                                        <Text style={styles.confirmDeleteBtnText}>Delete for me</Text>
-                                    </TouchableOpacity>
+                                    {deleting ? (
+                                        <View style={{ padding: 20, alignItems: 'center' }}>
+                                            <ActivityIndicator size="small" color="#0A66C2" />
+                                            <Text style={{ marginTop: 10, color: '#6B7280' }}>Deleting messages...</Text>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <TouchableOpacity
+                                                style={[styles.confirmDeleteBtn, { width: '100%' }]}
+                                                onPress={() => {
+                                                    setDeleteType('me');
+                                                    confirmDeleteMessage();
+                                                }}
+                                            >
+                                                <Text style={styles.confirmDeleteBtnText}>Delete for me</Text>
+                                            </TouchableOpacity>
 
-                                    {(() => {
-                                        const selectedItems = messages.filter(m => selectedMessages.includes(m._id));
-                                        const allMine = selectedItems.every(m => {
-                                            const senderId = m.senderId?._id || m.senderId;
-                                            return senderId === user._id && !m.deleted;
-                                        });
-                                        if (allMine && selectedItems.length > 0) {
-                                            return (
-                                                <TouchableOpacity
-                                                    style={[styles.confirmDeleteBtn, { width: '100%' }]}
-                                                    onPress={() => {
-                                                        setDeleteType('everyone');
-                                                        confirmDeleteMessage();
-                                                    }}
-                                                >
-                                                    <Text style={styles.confirmDeleteBtnText}>Delete for everyone</Text>
-                                                </TouchableOpacity>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
+                                            {(() => {
+                                                const selectedItems = messages.filter(m => selectedMessages.includes(m._id));
+                                                const allMine = selectedItems.every(m => {
+                                                    const senderId = m.senderId?._id || m.senderId;
+                                                    return senderId === user._id && !m.deleted;
+                                                });
+                                                if (allMine && selectedItems.length > 0) {
+                                                    return (
+                                                        <TouchableOpacity
+                                                            style={[styles.confirmDeleteBtn, { width: '100%' }]}
+                                                            onPress={() => {
+                                                                setDeleteType('everyone');
+                                                                confirmDeleteMessage();
+                                                            }}
+                                                        >
+                                                            <Text style={styles.confirmDeleteBtnText}>Delete for everyone</Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
 
-                                    <TouchableOpacity
-                                        style={[styles.cancelBtn, { width: '100%' }]}
-                                        onPress={() => setDeleteConfirmModalVisible(false)}
-                                    >
-                                        <Text style={styles.cancelBtnText}>Cancel</Text>
-                                    </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.cancelBtn, { width: '100%' }]}
+                                                onPress={() => setDeleteConfirmModalVisible(false)}
+                                            >
+                                                <Text style={styles.cancelBtnText}>Cancel</Text>
+                                            </TouchableOpacity>
+                                        </>
+                                    )}
                                 </View>
                             ) : (
                                 <View style={styles.deleteConfirmActions}>
-                                    <TouchableOpacity
-                                        style={[styles.cancelBtn, { flex: 1 }]}
-                                        onPress={() => setDeleteConfirmModalVisible(false)}
-                                    >
-                                        <Text style={styles.cancelBtnText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.confirmDeleteBtn, { flex: 1 }]}
-                                        onPress={confirmDeleteMessage}
-                                    >
-                                        <Text style={styles.confirmDeleteBtnText}>Delete</Text>
-                                    </TouchableOpacity>
+                                    {deleting ? (
+                                        <ActivityIndicator size="small" color="#0A66C2" style={{ flex: 1 }} />
+                                    ) : (
+                                        <>
+                                            <TouchableOpacity
+                                                style={[styles.cancelBtn, { flex: 1 }]}
+                                                onPress={() => setDeleteConfirmModalVisible(false)}
+                                            >
+                                                <Text style={styles.cancelBtnText}>Cancel</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.confirmDeleteBtn, { flex: 1 }]}
+                                                onPress={confirmDeleteMessage}
+                                            >
+                                                <Text style={styles.confirmDeleteBtnText}>Delete</Text>
+                                            </TouchableOpacity>
+                                        </>
+                                    )}
                                 </View>
                             )}
                         </View>
@@ -1733,31 +1951,55 @@ const ChatScreen = ({ route, navigation }) => {
             {/* Reaction Details Modal */}
             <Modal
                 visible={showReactionDetails}
-                borderTopLeftRadius={20}
-                borderTopRightRadius={20}
-                animationType="slide"
+                animationType="fade"
                 transparent={true}
                 onRequestClose={() => setShowReactionDetails(false)}
             >
                 <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}
                     activeOpacity={1}
                     onPress={() => setShowReactionDetails(false)}
                 >
-                    <View style={{ backgroundColor: '#FFF', height: '50%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
-                        <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 15, alignSelf: 'center' }}>Reactions</Text>
+                    <View style={{ backgroundColor: '#FFF', width: '85%', maxHeight: '60%', borderRadius: 25, padding: 20 }}>
+                        <Text style={{ fontSize: 18, fontWeight: '800', marginBottom: 20, alignSelf: 'center', color: '#1F2937' }}>Reactions</Text>
+
+                        {/* Summary at top */}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 15 }}>
+                            {(() => {
+                                const counts = reactionDetailsData.reduce((acc, curr) => {
+                                    acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
+                                    return acc;
+                                }, {});
+                                return Object.entries(counts).map(([emoji, count]) => (
+                                    <View key={emoji} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15 }}>
+                                        <Text style={{ fontSize: 18, marginRight: 4 }}>{emoji}</Text>
+                                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#4B5563' }}>{count}</Text>
+                                    </View>
+                                ));
+                            })()}
+                        </View>
+
                         <FlatList
                             data={reactionDetailsData}
                             keyExtractor={(item, index) => index.toString()}
+                            showsVerticalScrollIndicator={false}
                             renderItem={({ item }) => (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}>
-                                    <Text style={{ fontSize: 24, marginRight: 15 }}>{item.emoji}</Text>
-                                    <Text style={{ fontSize: 16, fontWeight: '600' }}>
-                                        {item.userId?.displayName || item.senderId?.displayName || item.user?.displayName || 'User'}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F9FAFB' }}>
+                                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', marginRight: 15 }}>
+                                        <Text style={{ fontSize: 22 }}>{item.emoji}</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#1F2937' }}>
+                                        {item.userId?.displayName || item.senderId?.displayName || item.user?.displayName || 'Member'}
                                     </Text>
                                 </View>
                             )}
                         />
+                        <TouchableOpacity
+                            onPress={() => setShowReactionDetails(false)}
+                            style={{ marginTop: 20, paddingVertical: 10, alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 15 }}
+                        >
+                            <Text style={{ fontWeight: '700', color: '#4B5563' }}>Close</Text>
+                        </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
             </Modal>
@@ -2011,7 +2253,11 @@ const styles = StyleSheet.create({
     },
     reactionEmoji: {
         fontSize: 12,
-        marginRight: 2,
+    },
+    reactionChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 1,
     },
     reactionCount: {
         fontSize: 10,
@@ -2495,6 +2741,36 @@ const styles = StyleSheet.create({
         padding: 10,
         backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 20
+    },
+    recordingOverlay: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 5,
+    },
+    recordingDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#EF4444',
+        marginRight: 8,
+    },
+    recordingTime: {
+        fontSize: 16,
+        color: '#1F2937',
+        fontWeight: '700',
+        flex: 1,
+    },
+    cancelRecord: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 15,
+        backgroundColor: '#F3F4F6',
+    },
+    cancelText: {
+        color: '#EF4444',
+        fontWeight: '700',
+        fontSize: 14,
     },
 });
 

@@ -95,7 +95,7 @@ const CameraScreen = ({ navigation, route }) => {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images', 'videos'], // Updated from MediaTypeOptions
                 allowsEditing: true,
-                quality: 0.8,
+                quality: 0.5,
             });
 
             if (!result.canceled) {
@@ -130,7 +130,7 @@ const CameraScreen = ({ navigation, route }) => {
     const takePicture = async () => {
         if (cameraRef.current) {
             try {
-                const photo = await cameraRef.current.takePictureAsync();
+                const photo = await cameraRef.current.takePictureAsync({ quality: 0.5 });
                 setCapturedMedia({ ...photo, type: 'image' });
                 setPreviewVisible(true);
             } catch (error) {

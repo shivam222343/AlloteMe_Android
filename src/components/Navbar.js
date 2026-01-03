@@ -17,16 +17,16 @@ import { Image } from 'react-native';
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
 
-const Navbar = ({ onMenuPress, title = 'Dashboard', showMenu = true, onNotificationsPress, onProfilePress, unreadCount = 0, unreadMessageCount = 0, navigation }) => {
+const Navbar = ({ onMenuPress, title = 'Dashboard', showMenu = true, onNotificationsPress, onProfilePress, unreadCount = 0, unreadMessageCount = 0, navigation, transparent = false }) => {
     const insets = useSafeAreaInsets();
     const { user } = useAuth(); // Get user for profile pic
 
     return (
         <LinearGradient
-            colors={['#0A66C2', '#0E76A8']}
+            colors={transparent ? ['transparent', 'transparent'] : ['#0A66C2', '#0E76A8']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.navbar, { paddingTop: insets.top }]}
+            style={[styles.navbar, { paddingTop: insets.top }, transparent && { elevation: 0, shadowOpacity: 0 }]}
         >
             <View style={styles.navbarContent}>
                 {/* Left: Menu Button (Mobile only) */}

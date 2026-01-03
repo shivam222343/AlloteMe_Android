@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG } from '../constants/theme';
 
@@ -13,10 +14,22 @@ const api = axios.create({
     }
 });
 
+console.log('[API] Initialized with BASE_URL:', API_CONFIG.BASE_URL);
+
 // Request interceptor - Add auth token to requests
 api.interceptors.request.use(
     async (config) => {
         try {
+            // Debug reachable URL
+            if (__DEV__ && Platform.OS !== 'web') {
+                const url = config.url || '';
+                const baseURL = config.baseURL || '';
+                const fullURL = url.startsWith('http') ? url : baseURL + url;
+                if (fullURL.includes('localhost') || fullURL.includes('127.0.0.1')) {
+                    console.warn(`[API] WARNING: Using localhost/127.0.0.1 on ${Platform.OS}. This WILL fail on real devices. Use your local IP instead.`);
+                }
+            }
+
             const token = await AsyncStorage.getItem('backendToken');
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
@@ -56,6 +69,7 @@ api.interceptors.response.use(
         if (error.response) {
             // Server responded with error
             const { status, data } = error.response;
+            console.log(`[API] Server Error (${status}):`, data);
 
             if (status === 401) {
                 // Unauthorized - clear token and redirect to login
@@ -80,17 +94,28 @@ api.interceptors.response.use(
             // Return the server's error data or message
             return Promise.reject(data || { success: false, message: 'Unknown server error' });
         } else if (error.request) {
-            // Request made but no response
+            // Request made but no response - THIS IS THE "NETWORK ERROR" CASE
+            console.log('[API] Network Error Details:', {
+                message: error.message,
+                code: error.code,
+                config_url: error.config?.url,
+                method: error.config?.method,
+                headers: error.config?.headers,
+                // On native, error.request is a XMLHttpRequest
+                readyState: error.request?._readyState,
+                status: error.request?._status,
+            });
+
             let message = 'Network error. Please check your connection.';
             if (error.code === 'ECONNABORTED') message = 'Request timed out. Please try again.';
-            if (error.message === 'Network Error') message = 'Network error. This might be due to a large file or poor connection.';
+            if (error.message === 'Network Error') message = 'Network error. This might be due to a local server not being reachable or CORS issues.';
 
             return Promise.reject({
                 success: false,
                 message: message,
                 originalError: error.message,
                 code: error.code,
-                config: error.config, // Pass through config for debugging
+                config: error.config,
                 url: error.config?.url
             });
         } else {

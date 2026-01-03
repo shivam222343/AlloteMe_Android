@@ -12,7 +12,7 @@ const CLOUDINARY_CLOUD_NAME = 'dmx7wqp5u'; // Placeholder - user should verify
 const CLOUDINARY_UPLOAD_PRESET = 'ml_default'; // Placeholder - user should verify
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILE_SIZE = Platform.OS === 'android' ? 8 * 1024 * 1024 : 20 * 1024 * 1024; // 8MB for Android, 20MB otherwise
 
 /**
  * Validates and prepares file for upload
@@ -102,9 +102,6 @@ export const uploadMedia = async (uri, direct = false, onProgress = null) => {
             formData.append('resource_type', 'auto');
 
             const response = await axios.post(CLOUDINARY_URL, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
                 onUploadProgress: (progressEvent) => {
                     if (onProgress && progressEvent.total) {
                         const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,8 @@ import {
     Clipboard,
     Platform,
     Modal,
+    Animated,
+    Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +26,21 @@ import { prepareFile } from '../services/cloudinaryService';
 
 const ProfileScreen = ({ navigation }) => {
     const { user, logout, uploadProfilePicture, updateProfile, loading } = useAuth();
+    const shineAnim = useRef(new Animated.Value(-150)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(shineAnim, {
+                    toValue: 150,
+                    duration: 3000,
+                    easing: Easing.bezier(0.4, 0, 0.2, 1),
+                    useNativeDriver: true,
+                }),
+                Animated.delay(1000),
+            ])
+        ).start();
+    }, []);
     const [uploading, setUploading] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -217,7 +234,7 @@ const ProfileScreen = ({ navigation }) => {
     }
 
     return (
-        <MainLayout navigation={navigation} currentRoute="Profile" title="Profile">
+        <MainLayout navigation={navigation} currentRoute="Profile" title="Profile" transparentNavbar={false}>
             <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
                 {/* Header Section */}
                 {/* Header Section */}
@@ -291,9 +308,35 @@ const ProfileScreen = ({ navigation }) => {
                     <Text style={styles.userEmail}>{user?.email || 'email@example.com'}</Text>
 
                     {user?.maverickId && (
-                        <View style={styles.idBadge}>
-                            <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                            <Text style={styles.idText}>{user.maverickId}</Text>
+                        <View style={styles.idBadgeContainer}>
+                            <LinearGradient
+                                colors={['#94A3B8', '#F8FAFC', '#94A3B8', '#CBD5E1']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.idBadge}
+                            >
+                                <Ionicons name="shield-checkmark" size={14} color="#0A66C2" style={{ marginRight: 6 }} />
+                                <Text style={styles.idText}>{user.maverickId}</Text>
+
+                                <Animated.View
+                                    style={[
+                                        styles.shineEffect,
+                                        {
+                                            transform: [
+                                                { translateX: shineAnim },
+                                                { skewX: '-20deg' }
+                                            ]
+                                        }
+                                    ]}
+                                >
+                                    <LinearGradient
+                                        colors={['transparent', 'rgba(255, 255, 255, 0.8)', 'transparent']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={StyleSheet.absoluteFill}
+                                    />
+                                </Animated.View>
+                            </LinearGradient>
                         </View>
                     )}
 
@@ -592,13 +635,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingTop: 40,
         paddingBottom: 60,
+        backgroundColor: '#0A66C2', // Fallback
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
-        overflow: 'hidden', // Ensure background image respects border radius
+        overflow: 'hidden',
+        minHeight: 220, // Ensure banner is always substantial
     },
     headerOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(10, 102, 194, 0.5)', // Transparent blue overlay matching app theme
+        backgroundColor: 'rgba(0, 0, 0, 0.3)', // Darker, more professional overlay
     },
     profileImageContainer: {
         position: 'relative',
@@ -643,21 +688,42 @@ const styles = StyleSheet.create({
         color: '#E0F2FE',
         marginBottom: 16,
     },
+    idBadgeContainer: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        marginBottom: 16,
+    },
     idBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        paddingHorizontal: 12,
+        paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
+        borderColor: '#CBD5E1', // Silver border
+        position: 'relative',
+        overflow: 'hidden',
     },
     idText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
+        color: '#1E293B',
+        fontWeight: '800',
         fontSize: 14,
-        letterSpacing: 0.5,
+        letterSpacing: 1,
+        textShadowColor: 'rgba(255, 255, 255, 0.4)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 1,
+    },
+    shineEffect: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        width: 80,
     },
     bannerEditButton: {
         position: 'absolute',

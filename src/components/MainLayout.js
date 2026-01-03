@@ -16,7 +16,7 @@ import { notificationsAPI } from '../services/api';
 const { width } = Dimensions.get('window');
 const isMobile = width < 768;
 
-const MainLayout = ({ children, navigation, currentRoute, title }) => {
+const MainLayout = ({ children, navigation, currentRoute, title, transparentNavbar = false }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
@@ -51,6 +51,7 @@ const MainLayout = ({ children, navigation, currentRoute, title }) => {
                     showMenu={true}
                     unreadCount={unreadCount}
                     unreadMessageCount={unreadMessageCount}
+                    transparent={transparentNavbar}
                 />
 
                 <NotificationsModal
@@ -66,7 +67,8 @@ const MainLayout = ({ children, navigation, currentRoute, title }) => {
                 {/* Content Area */}
                 <View style={[
                     styles.contentArea,
-                    isMobile && styles.contentAreaMobile
+                    isMobile && styles.contentAreaMobile,
+                    transparentNavbar && { marginTop: -(56 + (isMobile ? 0 : 0)) } // Overlap navbar
                 ]}>
                     {children}
                 </View>
