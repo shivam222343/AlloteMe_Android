@@ -28,7 +28,7 @@ import { galleryAPI, clubsAPI } from '../services/api';
 import { API_CONFIG } from '../constants/theme';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { TapGestureHandler, State } from 'react-native-gesture-handler';
+import { TapGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { prepareFile } from '../services/cloudinaryService';
 
 const { width } = Dimensions.get('window');
@@ -551,163 +551,166 @@ const GalleryScreen = ({ navigation }) => {
 
                 {/* Detail View Modal */}
                 <Modal visible={detailVisible} animationType="fade" transparent>
-                    <View style={styles.detailContainer}>
-                        {activeImage && (
-                            <>
-                                <View style={styles.detailHeader}>
-                                    <TouchableOpacity onPress={() => setDetailVisible(false)} style={styles.detailBack}>
-                                        <Ionicons name="close" size={30} color="#FFF" />
-                                    </TouchableOpacity>
-                                    <View style={styles.detailHeaderRow}>
-                                        <View style={styles.uploaderBox}>
-                                            <Image
-                                                source={activeImage.uploadedBy?.profilePicture?.url ? { uri: activeImage.uploadedBy.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + activeImage.uploadedBy?.displayName }}
-                                                style={styles.detailAvatar}
-                                            />
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={styles.detailAuthor}>{activeImage.uploadedBy?.displayName}</Text>
-                                                <Text style={styles.detailTime}>{new Date(activeImage.createdAt).toLocaleDateString()}</Text>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                        <View style={styles.detailContainer}>
+                            {activeImage && (
+                                <>
+                                    <View style={styles.detailHeader}>
+                                        <TouchableOpacity onPress={() => setDetailVisible(false)} style={styles.detailBack}>
+                                            <Ionicons name="close" size={30} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <View style={styles.detailHeaderRow}>
+                                            <View style={styles.uploaderBox}>
+                                                <Image
+                                                    source={activeImage.uploadedBy?.profilePicture?.url ? { uri: activeImage.uploadedBy.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + (activeImage.uploadedBy?.displayName || 'User') }}
+                                                    style={styles.detailAvatar}
+                                                />
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.detailAuthor}>{activeImage.uploadedBy?.displayName}</Text>
+                                                    <Text style={styles.detailTime}>{new Date(activeImage.createdAt).toLocaleDateString()}</Text>
+                                                </View>
                                             </View>
-                                        </View>
 
-                                        {(user?._id === activeImage.uploadedBy?._id || user?.role === 'admin') && (
-                                            <TouchableOpacity
-                                                style={styles.detailMoreBtn}
-                                                onPress={() => {
-                                                    Alert.alert('Manage Photo', 'What would you like to do?', [
-                                                        { text: 'Cancel', style: 'cancel' },
-                                                        {
-                                                            text: 'Edit Details',
-                                                            onPress: () => {
-                                                                setEditData({
-                                                                    title: activeImage.title,
-                                                                    description: activeImage.description,
-                                                                    category: activeImage.category,
-                                                                    clubId: activeImage.clubId?._id || activeImage.clubId || ''
-                                                                });
-                                                                setEditModalVisible(true);
+                                            {(user?._id === activeImage.uploadedBy?._id || user?.role === 'admin') && (
+                                                <TouchableOpacity
+                                                    style={styles.detailMoreBtn}
+                                                    onPress={() => {
+                                                        Alert.alert('Manage Photo', 'What would you like to do?', [
+                                                            { text: 'Cancel', style: 'cancel' },
+                                                            {
+                                                                text: 'Edit Details',
+                                                                onPress: () => {
+                                                                    setEditData({
+                                                                        title: activeImage.title,
+                                                                        description: activeImage.description,
+                                                                        category: activeImage.category,
+                                                                        clubId: activeImage.clubId?._id || activeImage.clubId || ''
+                                                                    });
+                                                                    setEditModalVisible(true);
+                                                                }
+                                                            },
+                                                            {
+                                                                text: 'Delete Permanently',
+                                                                style: 'destructive',
+                                                                onPress: () => handleDeleteGalleryImage(activeImage._id)
                                                             }
-                                                        },
-                                                        {
-                                                            text: 'Delete Permanently',
-                                                            style: 'destructive',
-                                                            onPress: () => handleDeleteGalleryImage(activeImage._id)
-                                                        }
-                                                    ]);
-                                                }}
-                                            >
-                                                <Ionicons name="ellipsis-vertical" size={24} color="#FFF" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                </View>
-
-                                <FlatList
-                                    style={{ flex: 1 }}
-                                    data={images}
-                                    horizontal
-                                    pagingEnabled
-                                    initialScrollIndex={activeImageIndex}
-                                    getItemLayout={(data, index) => (
-                                        { length: width, offset: width * index, index }
-                                    )}
-                                    onMomentumScrollEnd={(e) => {
-                                        const index = Math.round(e.nativeEvent.contentOffset.x / width);
-                                        setActiveImageIndex(index);
-                                        setActiveImage(images[index]);
-                                    }}
-                                    keyExtractor={item => item._id}
-                                    showsHorizontalScrollIndicator={false}
-                                    renderItem={({ item }) => (
-                                        <TapGestureHandler
-                                            onHandlerStateChange={(e) => {
-                                                if (e.nativeEvent.state === State.ACTIVE) {
-                                                    toggleLike(item._id);
-                                                }
-                                            }}
-                                            numberOfTaps={2}
-                                        >
-                                            <View style={[styles.fullImgWrapper, { width: width }]}>
-                                                <Image source={{ uri: item.imageUrl }} style={styles.fullImage} resizeMode="contain" />
-                                            </View>
-                                        </TapGestureHandler>
-                                    )}
-                                />
-
-                                <View style={styles.detailBottom}>
-                                    <View style={styles.detailActions}>
-                                        <TouchableOpacity
-                                            style={styles.detailActionBtn}
-                                            onPress={() => toggleLike(activeImage._id)}
-                                        >
-                                            <Ionicons
-                                                name={activeImage.likes?.includes(user._id) ? "heart" : "heart-outline"}
-                                                size={28}
-                                                color={activeImage.likes?.includes(user._id) ? "#EF4444" : "#FFF"}
-                                            />
-                                            <TouchableOpacity onPress={fetchLikesList}>
-                                                <Text style={styles.actionCount}>{activeImage.likes?.length || 0}</Text>
-                                            </TouchableOpacity>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={styles.detailActionBtn}
-                                            onPress={() => setShowComments(!showComments)}
-                                        >
-                                            <Ionicons name="chatbubble-outline" size={26} color="#FFF" />
-                                            <Text style={styles.actionCount}>{activeImage.comments?.length || 0}</Text>
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View style={styles.detailTextContent}>
-                                        <Text style={styles.detailTitle}>{activeImage.title}</Text>
-                                        <Text style={styles.detailDesc}>{activeImage.description}</Text>
-                                    </View>
-
-                                    {/* Comments Area */}
-                                    {showComments && (
-                                        <View style={styles.commentsOverlay}>
-                                            <View style={styles.commentsHeader}>
-                                                <Text style={styles.commentsTitle}>Comments</Text>
-                                                <TouchableOpacity onPress={() => setShowComments(false)}>
-                                                    <Ionicons name="chevron-down" size={24} color="#FFF" />
+                                                        ]);
+                                                    }}
+                                                >
+                                                    <Ionicons name="ellipsis-vertical" size={24} color="#FFF" />
                                                 </TouchableOpacity>
-                                            </View>
-                                            <FlatList
-                                                data={activeImage.comments}
-                                                keyExtractor={(c, i) => i.toString()}
-                                                renderItem={({ item }) => (
-                                                    <View style={styles.commentItem}>
-                                                        <Image source={{ uri: item.user?.profilePicture?.url || 'https://ui-avatars.com/api/?name=' + item.user?.displayName }} style={styles.commentAvatar} />
-                                                        <View style={styles.commentInfo}>
-                                                            <Text style={styles.commentUser}>{item.user?.displayName}</Text>
-                                                            <Text style={styles.commentText}>{item.text}</Text>
-                                                            <Text style={styles.commentDate}>{new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                                                        </View>
-                                                    </View>
-                                                )}
-                                                contentContainerStyle={{ paddingBottom: 100 }}
-                                            />
+                                            )}
                                         </View>
-                                    )}
-
-                                    {/* Comment Input */}
-                                    <View style={styles.commentInputBox}>
-                                        <TextInput
-                                            style={styles.commentInput}
-                                            placeholder="Add a comment..."
-                                            placeholderTextColor="rgba(255,255,255,0.6)"
-                                            value={commentText}
-                                            onChangeText={setCommentText}
-                                        />
-                                        <TouchableOpacity onPress={submitComment}>
-                                            <Ionicons name="send" size={24} color="#34B7F1" />
-                                        </TouchableOpacity>
                                     </View>
-                                </View>
-                            </>
-                        )}
-                    </View>
+
+                                    <FlatList
+                                        style={{ flex: 1 }}
+                                        data={images}
+                                        horizontal
+                                        pagingEnabled
+                                        initialScrollIndex={activeImageIndex}
+                                        getItemLayout={(data, index) => (
+                                            { length: width, offset: width * index, index }
+                                        )}
+                                        onMomentumScrollEnd={(e) => {
+                                            const index = Math.round(e.nativeEvent.contentOffset.x / width);
+                                            setActiveImageIndex(index);
+                                            setActiveImage(images[index]);
+                                        }}
+                                        keyExtractor={item => item._id.toString()}
+                                        showsHorizontalScrollIndicator={false}
+                                        renderItem={({ item }) => (
+                                            <TapGestureHandler
+                                                onHandlerStateChange={(e) => {
+                                                    if (e.nativeEvent.state === State.ACTIVE) {
+                                                        toggleLike(item._id);
+                                                    }
+                                                }}
+                                                numberOfTaps={2}
+                                            >
+                                                <View style={[styles.fullImgWrapper, { width: width, height: '100%' }]}>
+                                                    <Image source={{ uri: item.imageUrl }} style={styles.fullImage} resizeMode="contain" />
+                                                </View>
+                                            </TapGestureHandler>
+                                        )}
+                                    />
+
+
+                                    <View style={styles.detailBottom}>
+                                        <View style={styles.detailActions}>
+                                            <TouchableOpacity
+                                                style={styles.detailActionBtn}
+                                                onPress={() => toggleLike(activeImage._id)}
+                                            >
+                                                <Ionicons
+                                                    name={activeImage.likes?.includes(user._id) ? "heart" : "heart-outline"}
+                                                    size={28}
+                                                    color={activeImage.likes?.includes(user._id) ? "#EF4444" : "#FFF"}
+                                                />
+                                                <TouchableOpacity onPress={fetchLikesList}>
+                                                    <Text style={styles.actionCount}>{activeImage.likes?.length || 0}</Text>
+                                                </TouchableOpacity>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                style={styles.detailActionBtn}
+                                                onPress={() => setShowComments(!showComments)}
+                                            >
+                                                <Ionicons name="chatbubble-outline" size={26} color="#FFF" />
+                                                <Text style={styles.actionCount}>{activeImage.comments?.length || 0}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        <View style={styles.detailTextContent}>
+                                            <Text style={styles.detailTitle}>{activeImage.title}</Text>
+                                            <Text style={styles.detailDesc}>{activeImage.description}</Text>
+                                        </View>
+
+                                        {/* Comments Area */}
+                                        {showComments && (
+                                            <View style={styles.commentsOverlay}>
+                                                <View style={styles.commentsHeader}>
+                                                    <Text style={styles.commentsTitle}>Comments</Text>
+                                                    <TouchableOpacity onPress={() => setShowComments(false)}>
+                                                        <Ionicons name="chevron-down" size={24} color="#FFF" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                                <FlatList
+                                                    data={activeImage.comments}
+                                                    keyExtractor={(c, i) => i.toString()}
+                                                    renderItem={({ item }) => (
+                                                        <View style={styles.commentItem}>
+                                                            <Image source={{ uri: item.user?.profilePicture?.url || 'https://ui-avatars.com/api/?name=' + item.user?.displayName }} style={styles.commentAvatar} />
+                                                            <View style={styles.commentInfo}>
+                                                                <Text style={styles.commentUser}>{item.user?.displayName}</Text>
+                                                                <Text style={styles.commentText}>{item.text}</Text>
+                                                                <Text style={styles.commentDate}>{new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                                                            </View>
+                                                        </View>
+                                                    )}
+                                                    contentContainerStyle={{ paddingBottom: 100 }}
+                                                />
+                                            </View>
+                                        )}
+
+                                        {/* Comment Input */}
+                                        <View style={styles.commentInputBox}>
+                                            <TextInput
+                                                style={styles.commentInput}
+                                                placeholder="Add a comment..."
+                                                placeholderTextColor="rgba(255,255,255,0.6)"
+                                                value={commentText}
+                                                onChangeText={setCommentText}
+                                            />
+                                            <TouchableOpacity onPress={submitComment}>
+                                                <Ionicons name="send" size={24} color="#34B7F1" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </>
+                            )}
+                        </View>
+                    </GestureHandlerRootView>
                 </Modal>
 
                 {/* Edit Modal */}
