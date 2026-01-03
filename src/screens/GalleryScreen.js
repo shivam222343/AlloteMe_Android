@@ -603,6 +603,7 @@ const GalleryScreen = ({ navigation }) => {
                                 </View>
 
                                 <FlatList
+                                    style={{ flex: 1 }}
                                     data={images}
                                     horizontal
                                     pagingEnabled
