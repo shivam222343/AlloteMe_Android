@@ -194,7 +194,8 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                             <View style={[
                                 styles.bubble,
                                 isMine ? styles.myBubble : (isAI ? styles.aiBubble : styles.otherBubble),
-                                item.deleted && styles.deletedBubble
+                                item.deleted && styles.deletedBubble,
+                                isSelected && { borderWidth: 3, borderColor: '#0A66C2' }
                             ]}>
                                 {item.deleted ? (
                                     <Text style={[styles.messageText, styles.deletedText]}>
