@@ -37,6 +37,33 @@ import Voice from '@react-native-voice/voice';
 
 const { width } = Dimensions.get('window');
 
+const isDifferentDay = (d1, d2) => {
+    if (!d1 || !d2) return true;
+    const date1 = new Date(d1);
+    const date2 = new Date(d2);
+    return date1.toDateString() !== date2.toDateString();
+};
+
+const getDateLabel = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+    } else {
+        return date.toLocaleDateString(undefined, {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    }
+};
+
 const MessageItem = React.memo(({ item, index, user, otherUser, messages, setReplyingTo, setShowOptionsId, isSelected, toggleSelection, isSelectionMode, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails }) => {
     // Filter out malformed messages (e.g. error objects)
     if (!item) return null;
@@ -1087,25 +1114,40 @@ const ChatScreen = ({ route, navigation }) => {
         }
     };
 
-    const renderMessage = useCallback(({ item, index }) => (
-        <MessageItem
-            item={item}
-            index={index}
-            user={user}
-            otherUser={otherUser}
-            messages={messages}
-            setReplyingTo={setReplyingTo}
-            setShowOptionsId={setShowOptionsId}
-            isSelected={selectedMessages.includes(item._id)}
-            toggleSelection={toggleSelection}
-            isSelectionMode={isSelectionMode}
-            isGroupChat={isGroupChat}
-            setMediaViewerData={setMediaViewerData}
-            setShowMediaViewer={setShowMediaViewer}
-            setReactionDetailsData={setReactionDetailsData}
-            setShowReactionDetails={setShowReactionDetails}
-        />
-    ), [user?._id, otherUser?._id, messages.length, selectedMessages, isSelectionMode, toggleSelection, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails]);
+    const renderMessage = useCallback(({ item, index }) => {
+        const showDateLabel = index === 0 || (index > 0 && isDifferentDay(messages[index - 1].createdAt, item.createdAt));
+
+        return (
+            <View key={item._id}>
+                {showDateLabel && (
+                    <View style={styles.dateLabelContainer}>
+                        <View style={styles.dateLabelLine} />
+                        <View style={styles.dateLabelBadge}>
+                            <Text style={styles.dateLabelText}>{getDateLabel(item.createdAt)}</Text>
+                        </View>
+                        <View style={styles.dateLabelLine} />
+                    </View>
+                )}
+                <MessageItem
+                    item={item}
+                    index={index}
+                    user={user}
+                    otherUser={otherUser}
+                    messages={messages}
+                    setReplyingTo={setReplyingTo}
+                    setShowOptionsId={setShowOptionsId}
+                    isSelected={selectedMessages.includes(item._id)}
+                    toggleSelection={toggleSelection}
+                    isSelectionMode={isSelectionMode}
+                    isGroupChat={isGroupChat}
+                    setMediaViewerData={setMediaViewerData}
+                    setShowMediaViewer={setShowMediaViewer}
+                    setReactionDetailsData={setReactionDetailsData}
+                    setShowReactionDetails={setShowReactionDetails}
+                />
+            </View>
+        );
+    }, [user?._id, otherUser?._id, messages, selectedMessages, isSelectionMode, toggleSelection, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails]);
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -2301,6 +2343,33 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
+    },
+    dateLabelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 15,
+        paddingHorizontal: 20,
+    },
+    dateLabelLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+    },
+    dateLabelBadge: {
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 15,
+        marginHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    dateLabelText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#6B7280',
+        textTransform: 'uppercase',
     },
     attachLabelText: {
         fontSize: 12,
