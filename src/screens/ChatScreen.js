@@ -76,10 +76,25 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
     };
 
     const renderMedia = () => {
-        if (!item.fileUrl) return null;
+        // Show if we have a URL, OR a fileName, OR type is media
+        if (!item.fileUrl && !item.fileName && item.type !== 'media') return null;
 
         const urlStr = typeof item.fileUrl === 'string' ? item.fileUrl : (item.fileUrl?.url || '');
-        if (!urlStr) return null;
+
+        // If it's media but no URL yet, show a placeholder
+        if (!urlStr) {
+            return (
+                <View style={styles.fileContainer}>
+                    <View style={[styles.fileIconContainer, { backgroundColor: '#F3F4F6' }]}>
+                        <ActivityIndicator size="small" color="#0A66C2" />
+                    </View>
+                    <View style={styles.fileInfo}>
+                        <Text style={styles.fileName}>{item.fileName || 'Uploading...'}</Text>
+                        <Text style={styles.fileSubtext}>Please wait</Text>
+                    </View>
+                </View>
+            );
+        }
 
         // More robust detection
         const isImage = /\.(jpeg|jpg|gif|png|webp|bmp)$/i.test(urlStr) || urlStr.includes('image/upload');
@@ -111,9 +126,27 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => {
-                    setMediaViewerData({ uri: urlStr, type: isVideo ? 'video' : 'file', fileName: item.fileName || 'Attachment' });
-                    setShowMediaViewer(true);
+                onPress={async () => {
+                    try {
+                        // For documents, try to open directly or show viewer
+                        if (isVideo) {
+                            setMediaViewerData({ uri: urlStr, type: 'video', fileName: item.fileName || 'Attachment' });
+                            setShowMediaViewer(true);
+                        } else {
+                            // Try opening directly first
+                            const supported = await Linking.canOpenURL(urlStr);
+                            if (supported) {
+                                await Linking.openURL(urlStr);
+                            } else {
+                                // Fallback to modal viewer -> download
+                                setMediaViewerData({ uri: urlStr, type: 'file', fileName: item.fileName || 'Attachment' });
+                                setShowMediaViewer(true);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Could not open URL:", err);
+                        alert("Could not open file: " + (item.fileName || "Unknown"));
+                    }
                 }}
             >
                 <View style={styles.fileContainer}>
