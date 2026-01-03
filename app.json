@@ -56,7 +56,15 @@
             "useFrameworks": "static"
           },
           "android": {
-            "googleServicesFile": "./google-services.json"
+            "googleServicesFile": "./google-services.json",
+            "enableJetifier": true,
+            "packagingOptions": {
+              "pickFirst": [
+                "**/INotificationSideChannel.aidl",
+                "**/IResultReceiver.aidl",
+                "**/IconCompatParcelizer.java"
+              ]
+            }
           }
         }
       ]
