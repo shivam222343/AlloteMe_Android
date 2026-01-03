@@ -17,6 +17,7 @@ import {
     Animated,
     Easing,
     Vibration,
+    Linking,
 } from 'react-native';
 import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
@@ -77,25 +78,23 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
     const renderMedia = () => {
         if (item.type !== 'media' || !item.fileUrl) return null;
 
-        // Safety check if fileUrl is not a string
         const urlStr = typeof item.fileUrl === 'string' ? item.fileUrl : (item.fileUrl?.url || '');
         if (!urlStr) return null;
 
-        const isImage = urlStr.match(/\.(jpeg|jpg|gif|png|webp)|http/i);
-        const isVideo = urlStr.match(/\.(mp4|mov|avi|wmv)/i);
+        // More robust detection
+        const isImage = /\.(jpeg|jpg|gif|png|webp|bmp)$/i.test(urlStr) || urlStr.includes('image/upload');
+        const isVideo = /\.(mp4|mov|avi|wmv|mkv|flv)$/i.test(urlStr) || urlStr.includes('video/upload');
+        const isAudio = /\.(mp3|wav|ogg|m4a|aac)$/i.test(urlStr);
 
         if (isImage) {
             return (
                 <TouchableOpacity
                     activeOpacity={0.9}
                     onPress={() => {
-                        console.log('Opening Media Viewer for:', urlStr); // Debug log
-                        setMediaViewerData({ uri: urlStr, type: 'image' });
+                        setMediaViewerData({ uri: urlStr, type: 'image', fileName: item.fileName || 'Image' });
                         setShowMediaViewer(true);
                     }}
-                    onLongPress={() => {
-                        setShowOptionsId(item._id);
-                    }}
+                    onLongPress={() => setShowOptionsId(item._id)}
                     delayLongPress={200}
                 >
                     <Image
@@ -107,17 +106,30 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
             );
         }
 
+        const iconName = isVideo ? "videocam" : isAudio ? "musical-notes" : "document-text";
+
         return (
-            <TouchableOpacity onPress={() => Linking.openURL(urlStr)}>
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                    setMediaViewerData({ uri: urlStr, type: isVideo ? 'video' : 'file', fileName: item.fileName || 'Attachment' });
+                    setShowMediaViewer(true);
+                }}
+            >
                 <View style={styles.fileContainer}>
-                    <Ionicons
-                        name={isVideo ? "videocam" : "document-text"}
-                        size={24}
-                        color={isMine ? "#0A66C2" : "#6B7280"}
-                    />
-                    <Text style={[styles.fileName, isMine ? styles.myText : styles.otherText]} numberOfLines={1}>
-                        {item.fileName || 'Attachment'}
-                    </Text>
+                    <View style={[styles.fileIconContainer, { backgroundColor: isMine ? '#D1E5FF' : '#F3F4F6' }]}>
+                        <Ionicons
+                            name={iconName}
+                            size={28}
+                            color="#0A66C2"
+                        />
+                    </View>
+                    <View style={styles.fileInfo}>
+                        <Text style={[styles.fileName, isMine ? styles.myText : styles.otherText]} numberOfLines={1}>
+                            {item.fileName || 'Attachment'}
+                        </Text>
+                        <Text style={styles.fileSubtext}>Tap to view</Text>
+                    </View>
                 </View>
             </TouchableOpacity>
         );
@@ -1543,12 +1555,39 @@ const ChatScreen = ({ route, navigation }) => {
                         <Ionicons name="close" size={30} color="#FFF" />
                     </TouchableOpacity>
 
-                    {mediaViewerData?.type === 'image' && (
+                    {mediaViewerData?.type === 'image' ? (
                         <Image
                             source={{ uri: mediaViewerData.uri }}
                             style={{ width: '100%', height: '100%' }}
                             resizeMode="contain"
                         />
+                    ) : (
+                        <View style={{ alignItems: 'center', padding: 20 }}>
+                            <Ionicons
+                                name={mediaViewerData?.type === 'video' ? "videocam" : "document-text"}
+                                size={80}
+                                color="#FFF"
+                                style={{ marginBottom: 20 }}
+                            />
+                            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 10 }}>
+                                {mediaViewerData?.fileName || 'Attachment'}
+                            </Text>
+                            <TouchableOpacity
+                                style={{
+                                    backgroundColor: '#0A66C2',
+                                    paddingVertical: 15,
+                                    paddingHorizontal: 30,
+                                    borderRadius: 30,
+                                    marginTop: 20
+                                }}
+                                onPress={() => {
+                                    Linking.openURL(mediaViewerData.uri);
+                                    setShowMediaViewer(false);
+                                }}
+                            >
+                                <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 16 }}>Open File</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
             </Modal>
@@ -1744,15 +1783,33 @@ const styles = StyleSheet.create({
     fileContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 8,
-        backgroundColor: 'rgba(0,0,0,0.05)',
-        borderRadius: 8,
+        padding: 10,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
         marginBottom: 4,
-        maxWidth: width * 0.6,
+        width: width * 0.7,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    fileIconContainer: {
+        width: 45,
+        height: 45,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    fileInfo: {
+        flex: 1,
+    },
+    fileSubtext: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 2,
     },
     fileName: {
         fontSize: 14,
-        marginLeft: 8,
+        fontWeight: '600',
         flex: 1,
     },
     myText: {
