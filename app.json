@@ -65,8 +65,8 @@
                 "**/IResultReceiver.aidl",
                 "**/IconCompatParcelizer.java",
                 "**/androidx/versionedparcelable/*",
-                "META-INF/androidx.localbroadcastmanager_localbroadcastmanager.version",
-                "META-INF/androidx.customview_customview.version"
+                "META-INF/androidx.*.version",
+                "META-INF/*.version"
               ]
             }
           }
