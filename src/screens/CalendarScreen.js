@@ -29,6 +29,7 @@ const CalendarScreen = ({ navigation }) => {
     const [selectedDate, setSelectedDate] = useState(null);
     const [dayEvents, setDayEvents] = useState({ meetings: [], holiday: null });
     const [modalVisible, setModalVisible] = useState(false);
+    const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
     const [todayHighlight, setTodayHighlight] = useState('#FFD700');
 
     const handleTodayView = () => {
