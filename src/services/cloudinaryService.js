@@ -28,7 +28,7 @@ export const prepareFile = async (fileRef) => {
             }
 
             const uri = typeof fileRef === 'object' ? fileRef.uri : fileRef;
-            if (uri && uri.startsWith('blob:')) {
+            if (uri && (uri.startsWith('blob:') || uri.startsWith('data:'))) {
                 const response = await fetch(uri);
                 const blob = await response.blob();
                 const extension = blob.type.split('/')[1] || 'jpg';
