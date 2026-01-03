@@ -56,6 +56,7 @@ const GalleryScreen = ({ navigation }) => {
     // Detail Modal States
     const [detailVisible, setDetailVisible] = useState(false);
     const [activeImage, setActiveImage] = useState(null);
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
     const [commentText, setCommentText] = useState('');
     const [showComments, setShowComments] = useState(false);
     const [likesListVisible, setLikesListVisible] = useState(false);
@@ -312,6 +313,8 @@ const GalleryScreen = ({ navigation }) => {
             <TouchableOpacity
                 style={styles.card}
                 onPress={() => {
+                    const index = images.findIndex(img => img._id === item._id);
+                    setActiveImageIndex(index !== -1 ? index : 0);
                     setActiveImage(item);
                     setDetailVisible(true);
                 }}
@@ -599,18 +602,36 @@ const GalleryScreen = ({ navigation }) => {
                                     </View>
                                 </View>
 
-                                <TapGestureHandler
-                                    onHandlerStateChange={(e) => {
-                                        if (e.nativeEvent.state === State.ACTIVE) {
-                                            toggleLike(activeImage._id);
-                                        }
+                                <FlatList
+                                    data={images}
+                                    horizontal
+                                    pagingEnabled
+                                    initialScrollIndex={activeImageIndex}
+                                    getItemLayout={(data, index) => (
+                                        { length: width, offset: width * index, index }
+                                    )}
+                                    onMomentumScrollEnd={(e) => {
+                                        const index = Math.round(e.nativeEvent.contentOffset.x / width);
+                                        setActiveImageIndex(index);
+                                        setActiveImage(images[index]);
                                     }}
-                                    numberOfTaps={2}
-                                >
-                                    <View style={styles.fullImgWrapper}>
-                                        <Image source={{ uri: activeImage.imageUrl }} style={styles.fullImage} resizeMode="contain" />
-                                    </View>
-                                </TapGestureHandler>
+                                    keyExtractor={item => item._id}
+                                    showsHorizontalScrollIndicator={false}
+                                    renderItem={({ item }) => (
+                                        <TapGestureHandler
+                                            onHandlerStateChange={(e) => {
+                                                if (e.nativeEvent.state === State.ACTIVE) {
+                                                    toggleLike(item._id);
+                                                }
+                                            }}
+                                            numberOfTaps={2}
+                                        >
+                                            <View style={styles.fullImgWrapper}>
+                                                <Image source={{ uri: item.imageUrl }} style={styles.fullImage} resizeMode="contain" />
+                                            </View>
+                                        </TapGestureHandler>
+                                    )}
+                                />
 
                                 <View style={styles.detailBottom}>
                                     <View style={styles.detailActions}>

@@ -524,7 +524,10 @@ const MessagesScreen = ({ navigation }) => {
                             <FlatList
                                 data={snaps}
                                 renderItem={renderSnapItem}
-                                keyExtractor={item => item.user?._id || Math.random().toString()}
+                                keyExtractor={(item, index) => {
+                                    const id = item.user?._id || item.user || index;
+                                    return typeof id === 'object' ? id.toString() : id.toString();
+                                }}
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
                                 contentContainerStyle={styles.snapList}

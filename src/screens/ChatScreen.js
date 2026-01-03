@@ -347,6 +347,7 @@ const ChatScreen = ({ route, navigation }) => {
     const [showOptionsId, setShowOptionsId] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [mentionEta, setMentionEta] = useState(false);
@@ -365,6 +366,7 @@ const ChatScreen = ({ route, navigation }) => {
     const [isGroupAdmin, setIsGroupAdmin] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
     const [newGroupName, setNewGroupName] = useState(currentClubName);
+    const isSelectionMode = selectedMessages.length > 0;
 
     useEffect(() => {
         if (isGroupChat && localGroupData) {

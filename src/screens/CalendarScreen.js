@@ -29,12 +29,22 @@ const CalendarScreen = ({ navigation }) => {
     const [selectedDate, setSelectedDate] = useState(null);
     const [dayEvents, setDayEvents] = useState({ meetings: [], holiday: null });
     const [modalVisible, setModalVisible] = useState(false);
-    const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+    const [todayHighlight, setTodayHighlight] = useState('#FFD700');
 
     const handleTodayView = () => {
         const today = new Date().toISOString().split('T')[0];
         setCurrentDate(today);
-        handleDayPress({ dateString: today });
+
+        // Blink animation logic
+        let count = 0;
+        const interval = setInterval(() => {
+            setTodayHighlight(prev => prev === '#FFD700' ? 'transparent' : '#FFD700');
+            count++;
+            if (count >= 6) { // Blink 3 times
+                clearInterval(interval);
+                setTodayHighlight('#FFD700'); // Ensure it stays visible at the end
+            }
+        }, 400); // Toggle every 400ms
     };
 
     const fetchAllMeetings = async () => {
@@ -44,7 +54,7 @@ const CalendarScreen = ({ navigation }) => {
             if (res.success) {
                 const allMeetings = [...res.data.upcoming, ...res.data.past];
                 setMeetings(allMeetings);
-                generateCalendarData(allMeetings);
+                // Data generation is now handled by useEffect
             }
         } catch (error) {
             console.error('Error fetching meetings for calendar:', error);
@@ -59,11 +69,17 @@ const CalendarScreen = ({ navigation }) => {
         }, [])
     );
 
+    useEffect(() => {
+        if (meetings.length > 0 || todayHighlight) {
+            generateCalendarData(meetings);
+        }
+    }, [meetings, todayHighlight]);
+
     const generateCalendarData = (meetingsList) => {
         const marked = {};
         const todayStr = new Date().toISOString().split('T')[0];
 
-        // Group meetings by date and then by club
+        // Group meetings by date
         const meetingsByDate = {};
         meetingsList.forEach(m => {
             const dateStr = new Date(m.date).toISOString().split('T')[0];
@@ -76,9 +92,7 @@ const CalendarScreen = ({ navigation }) => {
             const dayMeetings = meetingsByDate[dateStr];
             const uniqueClubs = new Set(dayMeetings.map(m => m.clubId?._id?.toString() || 'unknown'));
 
-            // Background Logic: 
-            // If any upcoming -> Green, Else if any cancelled -> Red, Else -> Gray
-            let bgColor = Colors.secondary[100]; // Default Past (Gray)
+            let bgColor = Colors.secondary[100];
             let textColor = Colors.secondary[600];
 
             if (dayMeetings.some(m => m.status === 'upcoming' || m.status === 'ongoing')) {
@@ -89,7 +103,6 @@ const CalendarScreen = ({ navigation }) => {
                 textColor = Colors.error[700];
             }
 
-            // Border Logic:
             let customStyles = {
                 container: {
                     backgroundColor: bgColor,
@@ -102,22 +115,20 @@ const CalendarScreen = ({ navigation }) => {
                 }
             };
 
-            // Today Special Style (Orange bg, Red border, Circular)
+            // Today Special Style with Blinking
             if (dateStr === todayStr) {
-                customStyles.container.backgroundColor = '#FFD700'; // Gold/Orange
-                customStyles.container.borderColor = '#FF3B30'; // Red
+                customStyles.container.backgroundColor = todayHighlight;
+                customStyles.container.borderColor = '#FF3B30';
                 customStyles.container.borderWidth = 3;
-                customStyles.container.borderRadius = 25; // Create a circular effect
-                customStyles.text.color = '#000000';
+                customStyles.container.borderRadius = 25;
+                customStyles.text.color = todayHighlight === 'transparent' ? Colors.secondary[800] : '#000000';
             }
 
             // Multi-club Borders
             if (uniqueClubs.size === 2) {
-                // Two clubs: Inner and outer border effect using composite style
-                customStyles.container.borderColor = '#A3CBFF'; // Light blue outer
+                customStyles.container.borderColor = '#A3CBFF';
                 customStyles.container.borderWidth = 3;
             } else if (uniqueClubs.size > 2) {
-                // More than two: Orange border
                 customStyles.container.borderColor = Colors.warning[500];
                 customStyles.container.borderWidth = 2;
             }
@@ -125,33 +136,29 @@ const CalendarScreen = ({ navigation }) => {
             marked[dateStr] = {
                 customStyles,
                 meetings: dayMeetings,
-                dots: [] // Initialize dots array
+                dots: []
             };
         });
 
-        // 2. Add Festivals with colored dots for next 20 years
+        // 2. Add Festivals
         const currentYear = new Date().getFullYear();
-        const endYear = currentYear + 20; // Show festivals for next 20 years
+        const endYear = currentYear + 20;
 
         for (let year = currentYear; year <= endYear; year++) {
             Object.keys(FESTIVALS).forEach(dayKey => {
                 const dateStr = `${year}-${dayKey}`;
                 const festival = FESTIVALS[dayKey];
-
-                // Create a colored dot for the festival
                 const festivalDot = {
                     key: `${year}-${dayKey}`,
                     color: festival.color || CATEGORY_COLORS[festival.category] || '#FFD700',
                 };
 
                 if (!marked[dateStr]) {
-                    // No meetings on this day, just show the festival dot
                     marked[dateStr] = {
                         dots: [festivalDot],
                         festival: festival
                     };
                 } else {
-                    // Add festival dot to existing meeting day
                     if (!marked[dateStr].dots) marked[dateStr].dots = [];
                     marked[dateStr].dots.push(festivalDot);
                     marked[dateStr].festival = festival;
@@ -159,44 +166,40 @@ const CalendarScreen = ({ navigation }) => {
             });
         }
 
-        // 3. Ensure Today is consistently highlighted
+        // 3. Ensure Today is highlighted even if no events
         if (!marked[todayStr]) {
             marked[todayStr] = {
                 customStyles: {
                     container: {
-                        backgroundColor: '#FFD700',
+                        backgroundColor: todayHighlight,
                         borderColor: '#FF3B30',
                         borderWidth: 3,
                         borderRadius: 25,
                     },
                     text: {
-                        color: '#000000',
+                        color: todayHighlight === 'transparent' ? Colors.secondary[800] : '#000000',
                         fontWeight: 'bold',
                     }
                 }
             };
-        } else {
-            // Merge today's highlight with existing meeting/holiday data
-            if (!marked[todayStr].customStyles) {
-                marked[todayStr].customStyles = {
-                    container: {},
-                    text: {}
-                };
-            }
+        } else if (marked[todayStr] && !marked[todayStr].customStyles) {
             marked[todayStr].customStyles = {
                 container: {
-                    ...marked[todayStr].customStyles.container,
-                    backgroundColor: '#FFD700',
+                    backgroundColor: todayHighlight,
                     borderColor: '#FF3B30',
                     borderWidth: 3,
                     borderRadius: 25,
                 },
                 text: {
-                    ...marked[todayStr].customStyles.text,
-                    color: '#000000',
+                    color: todayHighlight === 'transparent' ? Colors.secondary[800] : '#000000',
                     fontWeight: 'bold',
                 }
             };
+        } else {
+            // If already processed as meeting, override colors for blinking
+            if (marked[todayStr].customStyles && marked[todayStr].customStyles.container) {
+                marked[todayStr].customStyles.container.backgroundColor = todayHighlight;
+            }
         }
 
         setMarkedDates(marked);

@@ -212,7 +212,7 @@ const CameraScreen = ({ navigation, route }) => {
 
             // Prepare file using centralized service
             const file = await prepareFile(capturedMedia.uri);
-            formData.append('image', file);
+            formData.append('file', file);
 
             formData.append('clubId', selectedClubId);
             formData.append('type', capturedMedia.type); // 'image' or 'video'
