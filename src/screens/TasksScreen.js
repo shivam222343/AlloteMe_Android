@@ -22,6 +22,10 @@ import { tasksAPI, clubsAPI, meetingsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
+import MediaUploadModal from '../components/MediaUploadModal';
+import { useWebUpload } from '../hooks/useWebUpload';
+import { Colors } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -46,10 +50,13 @@ const TasksScreen = ({ navigation }) => {
         assignedTo: [],
         dueDate: new Date(Date.now() + 86400000),
         priority: 'medium',
-        meetingId: ''
+        meetingId: '',
+        attachments: []
     });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedClubMembers, setSelectedClubMembers] = useState([]);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const { startWebUpload } = useWebUpload();
 
     const isAdmin = user?.role === 'admin' || user?.role === 'subadmin';
 
@@ -137,7 +144,8 @@ const TasksScreen = ({ navigation }) => {
                     assignedTo: [],
                     dueDate: new Date(Date.now() + 86400000),
                     priority: 'medium',
-                    meetingId: ''
+                    meetingId: '',
+                    attachments: []
                 });
                 Alert.alert('Success', 'Task created successfully!');
             }
@@ -145,6 +153,55 @@ const TasksScreen = ({ navigation }) => {
             Alert.alert('Error', error.message || 'Failed to create task');
         } finally {
             setCreateLoading(false);
+        }
+    };
+
+    const handleNativePick = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.All,
+                allowsEditing: true,
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const asset = result.assets[0];
+                // For now, we'll just handle one attachment or upload immediately
+                // But native picking here requires a direct upload usually.
+                // For simplicity in this Task flow, let's just use it to select
+                // and we'll handle actual upload during creation OR use the existing upload API.
+
+                // Let's assume we want to upload it immediately and get the URL
+                // Actually, let's keep it simple: browser upload provides URL directly.
+                // Native pick would need FormData upload which tasksAPI.create doesn't support yet.
+                // So I'll encourage browser upload or implement a quick upload helper.
+
+                Alert.alert('Notice', 'Direct native upload for tasks is coming soon. Please use the Browser option for now.');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to pick media');
+        }
+    };
+
+    const handleWebUploadFlow = async () => {
+        const result = await startWebUpload({
+            type: 'task',
+            clubId: newTask.clubId
+        });
+
+        if (result.success) {
+            setNewTask(prev => ({
+                ...prev,
+                attachments: [...prev.attachments, {
+                    url: result.url,
+                    publicId: result.publicId,
+                    fileName: 'Attachment',
+                    fileType: 'image'
+                }]
+            }));
+            Alert.alert('Success', 'Media attached successfully!');
+        } else if (result.message !== 'Upload cancelled or failed') {
+            Alert.alert('Upload Failed', result.message || 'Could not upload media');
         }
     };
 
@@ -224,6 +281,21 @@ const TasksScreen = ({ navigation }) => {
                     <View style={styles.meetingLink}>
                         <Ionicons name="calendar-outline" size={14} color="#0A66C2" />
                         <Text style={styles.meetingLinkText}>Meeting: {item.meetingId.name}</Text>
+                    </View>
+                )}
+
+                {item.attachments && item.attachments.length > 0 && (
+                    <View style={styles.taskAttachments}>
+                        {item.attachments.map((att, i) => (
+                            <TouchableOpacity
+                                key={i}
+                                style={styles.taskAttachmentItem}
+                                onPress={() => navigation.navigate('MediaViewer', { uri: att.url })}
+                            >
+                                <Ionicons name="document-attach-outline" size={14} color="#0A66C2" />
+                                <Text style={styles.taskAttachmentText}>Attachment {i + 1}</Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
                 )}
 
@@ -505,6 +577,34 @@ const TasksScreen = ({ navigation }) => {
                                         multiline
                                     />
 
+                                    <View style={{ marginBottom: 12 }}>
+                                        <Text style={styles.label}>4. Attachments ({newTask.attachments.length})</Text>
+                                        <TouchableOpacity
+                                            style={styles.attachBtn}
+                                            onPress={() => setShowUploadModal(true)}
+                                        >
+                                            <Ionicons name="add-circle-outline" size={20} color="#0A66C2" />
+                                            <Text style={styles.attachBtnText}>Add Attachment</Text>
+                                        </TouchableOpacity>
+
+                                        {newTask.attachments.map((att, index) => (
+                                            <View key={index} style={styles.attachmentItem}>
+                                                <Ionicons name="image-outline" size={16} color="#6B7280" />
+                                                <Text style={styles.attachmentName} numberOfLines={1}>
+                                                    {att.fileName}
+                                                </Text>
+                                                <TouchableOpacity
+                                                    onPress={() => setNewTask(prev => ({
+                                                        ...prev,
+                                                        attachments: prev.attachments.filter((_, i) => i !== index)
+                                                    }))}
+                                                >
+                                                    <Ionicons name="close-circle" size={18} color="#EF4444" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ))}
+                                    </View>
+
                                     <Text style={styles.label}>Due Date</Text>
                                     <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowDatePicker(true)}>
                                         <Text style={styles.dateText}>{newTask.dueDate.toLocaleDateString()}</Text>
@@ -554,6 +654,14 @@ const TasksScreen = ({ navigation }) => {
                         )}
                     </View>
                 </Modal>
+
+                <MediaUploadModal
+                    visible={showUploadModal}
+                    onClose={() => setShowUploadModal(false)}
+                    onNativePick={handleNativePick}
+                    onWebUpload={handleWebUploadFlow}
+                    title="Task Attachment"
+                />
             </View>
         </MainLayout>
     );
@@ -714,6 +822,60 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '600',
         color: '#374151',
+    },
+    attachBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E8F2FF',
+        padding: 12,
+        borderRadius: 12,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#0A66C2',
+        borderStyle: 'dashed',
+    },
+    attachBtnText: {
+        color: '#0A66C2',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    attachmentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 8,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    attachmentName: {
+        flex: 1,
+        fontSize: 13,
+        color: '#374151',
+    },
+    taskAttachments: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 16,
+    },
+    taskAttachmentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0F9FF',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        gap: 4,
+        borderWidth: 1,
+        borderColor: '#B9E6FE',
+    },
+    taskAttachmentText: {
+        fontSize: 12,
+        color: '#0284C7',
+        fontWeight: '600',
     }
 });
 

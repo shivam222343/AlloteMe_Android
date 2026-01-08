@@ -72,8 +72,11 @@ export const prepareFile = async (fileRef) => {
             ? fileName
             : `${fileName}.${extension}`;
 
+        // Remove file:// prefix for both platforms - FormData needs clean path
+        const cleanUri = uri.replace('file://', '');
+
         return {
-            uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+            uri: cleanUri,
             type,
             name: finalName,
         };

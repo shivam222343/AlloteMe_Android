@@ -1,11 +1,17 @@
-import messaging from '@react-native-firebase/messaging';
 import * as Notifications from 'expo-notifications';
-import { Platform, Alert } from 'react-native';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
 import { authAPI, messagesAPI, groupChatAPI } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// No need for Notifications.setNotificationHandler with strict RNFirebase unless using local notifications
-// For foreground messages, we use messaging().onMessage()
+// Configure notification handler
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+    }),
+});
 
 /**
  * Register user for push notifications and update token in backend
@@ -14,42 +20,54 @@ export const registerForPushNotificationsAsync = async (userId) => {
     try {
         if (Platform.OS === 'web') return null;
 
-        // 1. Request Permission
-        const authStatus = await messaging().requestPermission();
-        const enabled =
-            authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-            authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-        if (!enabled) {
-            console.log('FCM Authorization status:', authStatus);
+        // Check if running on physical device
+        if (!Device.isDevice) {
+            console.log('Must use physical device for Push Notifications');
             return null;
         }
 
-        // Expo Notifications Permission (needed for local display of actions)
+        // Request permissions
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
+
         if (existingStatus !== 'granted') {
             const { status } = await Notifications.requestPermissionsAsync();
             finalStatus = status;
         }
 
         if (finalStatus !== 'granted') {
-            console.log('Expo Notifications permission not granted');
+            console.log('Failed to get push token for push notification!');
+            return null;
         }
 
-        // 2. Get FCM Token
-        const token = await messaging().getToken();
-        console.log('Mobile FCM Token:', token);
+        // Get Expo push token
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId: 'c17b5aac-9e6c-4e09-ae8f-9309e8f25b22', // Your EAS project ID
+        });
+        const token = tokenData.data;
+        console.log('Expo Push Token:', token);
 
+        // Update token in backend
         if (userId && token) {
             await authAPI.updateFCMToken(token);
         }
 
-        // 3. Setup Categories (for Quick Reply)
+        // Setup notification categories
         await initNotificationCategories();
 
-    } catch (e) {
-        console.error('Error registering for push:', e);
+        // Configure notification channel for Android
+        if (Platform.OS === 'android') {
+            await Notifications.setNotificationChannelAsync('default', {
+                name: 'default',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 250, 250, 250],
+                lightColor: '#0A66C2',
+            });
+        }
+
+        return token;
+    } catch (error) {
+        console.error('Error registering for push notifications:', error);
         return null;
     }
 };
@@ -82,16 +100,12 @@ export const initNotificationCategories = async () => {
 export const handleNotificationResponse = async (response, navigation) => {
     if (!response) return;
 
-    // Response can be from messaging() (remoteMessage) or expo-notifications (notificationResponse)
-    const remoteMessage = response.notification ? response : (response.notification ? response.notification : null);
-    const notificationResponse = response.actionIdentifier ? response : null;
-
     console.log('Notification Response Received:', response);
 
-    // 1. Handle Quick Reply (Action)
-    if (notificationResponse && notificationResponse.actionIdentifier === 'reply') {
-        const replyText = notificationResponse.userText;
-        const data = notificationResponse.notification.request.content.data;
+    // Handle Quick Reply (Action)
+    if (response.actionIdentifier === 'reply') {
+        const replyText = response.userText;
+        const data = response.notification.request.content.data;
 
         if (replyText && data) {
             await handleBackgroundReply(data, replyText);
@@ -99,10 +113,8 @@ export const handleNotificationResponse = async (response, navigation) => {
         }
     }
 
-    // 2. Handle Navigation
-    const data = notificationResponse
-        ? notificationResponse.notification.request.content.data
-        : (remoteMessage?.data || {});
+    // Handle Navigation
+    const data = response.notification.request.content.data;
 
     if (data?.screen) {
         try {
@@ -116,9 +128,18 @@ export const handleNotificationResponse = async (response, navigation) => {
     }
 
     if (data?.type === 'new_message' || data?.senderId) {
-        navigation.navigate('Chat', { otherUser: { _id: data.senderId, displayName: data.senderName } });
+        navigation.navigate('Chat', {
+            otherUser: {
+                _id: data.senderId,
+                displayName: data.senderName
+            }
+        });
     } else if (data?.clubId) {
-        navigation.navigate('Chat', { isGroupChat: true, clubId: data.clubId, clubName: data.clubName });
+        navigation.navigate('Chat', {
+            isGroupChat: true,
+            clubId: data.clubId,
+            clubName: data.clubName
+        });
     } else {
         navigation.navigate('Dashboard');
     }
@@ -139,7 +160,7 @@ export const handleBackgroundReply = async (data, text) => {
         }
         console.log('✅ Background reply sent successfully');
 
-        // Show success local notification summary if needed
+        // Show success local notification
         await Notifications.scheduleNotificationAsync({
             content: {
                 title: 'Reply Sent',
@@ -158,41 +179,34 @@ export const handleBackgroundReply = async (data, text) => {
 export const setupNotificationListeners = (navigation) => {
     if (Platform.OS === 'web') return;
 
-    // 1. FCM Background / Quit state handler (Opening App)
-    const unsubscribeFCMOpened = messaging().onNotificationOpenedApp(remoteMessage => {
-        handleNotificationResponse(remoteMessage, navigation);
-    });
-
-    messaging().getInitialNotification().then(remoteMessage => {
-        if (remoteMessage) {
-            handleNotificationResponse(remoteMessage, navigation);
-        }
-    });
-
-    // 2. Expo Notifications Response Listener (Handles Actions like Reply)
+    // Listen for notification responses (when user taps notification)
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
         handleNotificationResponse(response, navigation);
     });
 
-    // 3. Foreground handler
-    const unsubscribeFCMForeground = messaging().onMessage(async remoteMessage => {
-        console.log('Foreground FCM:', remoteMessage);
-
-        // Display local notification in foreground to ensure high visibility and consistency
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: remoteMessage.notification?.title || 'New Message',
-                body: remoteMessage.notification?.body || '',
-                data: remoteMessage.data,
-                categoryIdentifier: 'chat-reply',
-            },
-            trigger: null,
-        });
+    // Listen for notifications received while app is in foreground
+    const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
+        console.log('Notification received in foreground:', notification);
+        // Notification will be displayed automatically by the handler
     });
 
     return () => {
-        unsubscribeFCMOpened();
-        unsubscribeFCMForeground();
         responseSubscription.remove();
+        receivedSubscription.remove();
     };
+};
+
+/**
+ * Send a local notification (for testing)
+ */
+export const sendLocalNotification = async (title, body, data = {}) => {
+    await Notifications.scheduleNotificationAsync({
+        content: {
+            title,
+            body,
+            data,
+            categoryIdentifier: 'chat-reply',
+        },
+        trigger: null, // null means immediate
+    });
 };

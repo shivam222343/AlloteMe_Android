@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
+    Pressable,
     FlatList,
     Image,
     TextInput,
@@ -30,12 +31,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { prepareFile } from '../services/cloudinaryService';
+import MediaUploadModal from '../components/MediaUploadModal';
+import { useWebUpload } from '../hooks/useWebUpload';
+
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 45) / 2;
 
 const GalleryScreen = ({ navigation }) => {
     const { user, socket } = useAuth();
+    const { startWebUpload } = useWebUpload();
+
     const [images, setImages] = useState([]);
     const [clubs, setClubs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -63,7 +69,9 @@ const GalleryScreen = ({ navigation }) => {
     const [likedUsers, setLikedUsers] = useState([]);
     const [fileSizeError, setFileSizeError] = useState(null);
     const [editModalVisible, setEditModalVisible] = useState(false);
+    const [choiceModalVisible, setChoiceModalVisible] = useState(false);
     const [editData, setEditData] = useState({ title: '', description: '', category: '' });
+
 
     const categories = ['all', 'event', 'meeting', 'workshop', 'social', 'achievement', 'other'];
     const { MAX_FILE_SIZE } = require('../services/cloudinaryService');
@@ -149,21 +157,42 @@ const GalleryScreen = ({ navigation }) => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
-            quality: 0.5,
+            aspect: [4, 3],
+            quality: 0.3, // Lower quality for smaller file size on Android
+            base64: true, // Enable base64 for Android compatibility
+            exif: false,
         });
 
         if (!result.canceled) {
             const asset = result.assets[0];
-            setSelectedImage(asset);
 
-            // Initial size check for Mobile (often available in assets)
+            // Check file size
             if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE) {
                 setFileSizeError('This image is too large (over 20MB). Please pick a smaller one.');
-            } else {
-                setFileSizeError(null);
+                Alert.alert(
+                    'File Too Large',
+                    'The selected image is too large. Please choose a smaller image or use the camera to take a new photo.',
+                    [{ text: 'OK' }]
+                );
+                return;
             }
+
+            setSelectedImage(asset);
+            setFileSizeError(null);
         }
     };
+
+    const handleWebUploadFlow = async () => {
+        const result = await startWebUpload({ type: 'gallery' });
+        if (result.success && result.url) {
+            // Set the uploaded image and open the gallery upload modal to fill details
+            setSelectedImage({ uri: result.url, isWebUpload: true, publicId: result.publicId });
+            setUploadModalVisible(true);
+        } else if (result.message && result.message !== 'Upload cancelled or failed' && result.message !== 'Upload cancelled') {
+            Alert.alert('Upload Failed', result.message);
+        }
+    };
+
 
     const handleUpload = async () => {
         if (!selectedImage) return Alert.alert('Error', 'Please select an image');
@@ -171,25 +200,34 @@ const GalleryScreen = ({ navigation }) => {
 
         try {
             setUploading(true);
-            const formData = new FormData();
 
-            // Prepare file using centralized service
-            const file = await prepareFile(selectedImage.uri);
-            formData.append('image', file);
+            // Prepare base64 image data (like Donation app)
+            const base64Img = selectedImage.base64
+                ? `data:image/jpeg;base64,${selectedImage.base64}`
+                : selectedImage.uri;
 
-            formData.append('title', uploadData.title || '');
-            formData.append('description', uploadData.description || '');
-            formData.append('category', uploadData.category || 'other');
+            console.log('Uploading with base64, data length:', base64Img.length);
+            console.log('Upload data:', {
+                title: uploadData.title,
+                category: uploadData.category,
+                clubId: uploadData.clubId
+            });
 
-            // Only append clubId if it's a valid ID (not empty string)
+            // Send as JSON with base64 image
+            const uploadPayload = {
+                image: base64Img,
+                title: uploadData.title || '',
+                description: uploadData.description || '',
+                category: uploadData.category || 'other',
+            };
+
+            // Only include clubId if it's valid
             if (uploadData.clubId && uploadData.clubId !== 'all') {
-                formData.append('clubId', uploadData.clubId);
+                uploadPayload.clubId = uploadData.clubId;
             }
 
-            console.log('Uploading Gallery Image to:', API_CONFIG.BASE_URL);
-            const res = await galleryAPI.upload(formData, (progress) => {
-                setUploadProgress(progress);
-            });
+            const res = await galleryAPI.uploadBase64(uploadPayload);
+
             if (res.success) {
                 setUploadModalVisible(false);
                 setSelectedImage(null);
@@ -432,12 +470,24 @@ const GalleryScreen = ({ navigation }) => {
                 )}
 
                 {/* Floating Add Button */}
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={() => setUploadModalVisible(true)}
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.fab,
+                        { transform: [{ scale: pressed ? 0.9 : 1 }], opacity: pressed ? 0.9 : 1 }
+                    ]}
+                    onPress={() => setChoiceModalVisible(true)}
                 >
                     <Ionicons name="add" size={30} color="#FFF" />
-                </TouchableOpacity>
+                </Pressable>
+
+                <MediaUploadModal
+                    visible={choiceModalVisible}
+                    onClose={() => setChoiceModalVisible(false)}
+                    onNativePick={() => setUploadModalVisible(true)}
+                    onWebUpload={handleWebUploadFlow}
+                    title="Upload to Gallery"
+                />
+
 
                 {/* Upload Modal */}
                 <Modal visible={uploadModalVisible} animationType="slide" transparent>
@@ -681,9 +731,15 @@ const GalleryScreen = ({ navigation }) => {
                                                 keyExtractor={(c, i) => i.toString()}
                                                 renderItem={({ item }) => (
                                                     <View style={styles.commentItem}>
-                                                        <Image source={{ uri: item.user?.profilePicture?.url || 'https://ui-avatars.com/api/?name=' + item.user?.displayName }} style={styles.commentAvatar} />
+                                                        <Image
+                                                            source={{
+                                                                uri: item.user?.profilePicture?.url ||
+                                                                    `https://api.dicebear.com/9.x/notionists/png?seed=${item.user?._id || 'default'}&backgroundColor=b6e3f4,c0aede,d1d4f9`
+                                                            }}
+                                                            style={styles.commentAvatar}
+                                                        />
                                                         <View style={styles.commentInfo}>
-                                                            <Text style={styles.commentUser}>{item.user?.displayName}</Text>
+                                                            <Text style={styles.commentUser}>{item.user?.displayName || 'Unknown User'}</Text>
                                                             <Text style={styles.commentText}>{item.text}</Text>
                                                             <Text style={styles.commentDate}>{new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                                                         </View>

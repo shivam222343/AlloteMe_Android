@@ -3,6 +3,7 @@
     "name": "Mavericks",
     "slug": "mavericks",
     "version": "1.0.0",
+    "scheme": "mavericks",
     "orientation": "portrait",
     "icon": "./assets/padded_icon.png",
     "userInterfaceStyle": "automatic",
@@ -26,7 +27,6 @@
         "backgroundColor": "#0A66C2"
       },
       "package": "com.mycompany.myauth",
-      "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
@@ -47,8 +47,6 @@
     "plugins": [
       "./withAndroidXFix",
       "@react-native-community/datetimepicker",
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging",
       "@react-native-voice/voice",
       [
         "expo-build-properties",
@@ -57,7 +55,6 @@
             "useFrameworks": "static"
           },
           "android": {
-            "googleServicesFile": "./google-services.json",
             "enableJetifier": true,
             "packagingOptions": {
               "pickFirst": [
@@ -70,6 +67,14 @@
               ]
             }
           }
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/AS.png",
+          "color": "#0A66C2"
         }
       ]
     ],

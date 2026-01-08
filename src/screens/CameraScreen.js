@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
+    Pressable,
     Image,
     ActivityIndicator,
     Platform,
@@ -22,6 +23,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { snapsAPI, clubsAPI, membersAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { prepareFile } from '../services/cloudinaryService';
+import { useWebUpload } from '../hooks/useWebUpload';
+import MediaUploadModal from '../components/MediaUploadModal';
+
 
 const CameraScreen = ({ navigation, route }) => {
     const { user } = useAuth();
@@ -45,7 +49,10 @@ const CameraScreen = ({ navigation, route }) => {
     const [showRecipientModal, setShowRecipientModal] = useState(false);
     const [snapCaption, setSnapCaption] = useState('');
 
+    const { startWebUpload } = useWebUpload();
+    const [showUploadModal, setShowUploadModal] = useState(false);
     const cameraRef = useRef();
+
 
     const recordingTimer = useRef(null);
 
@@ -91,11 +98,20 @@ const CameraScreen = ({ navigation, route }) => {
     };
 
     const pickMedia = async () => {
+        if (Platform.OS === 'android') {
+            setShowUploadModal(true);
+        } else {
+            handleNativePick();
+        }
+    };
+
+    const handleNativePick = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images', 'videos'], // Updated from MediaTypeOptions
+                mediaTypes: ['images', 'videos'],
                 allowsEditing: true,
-                quality: 0.5,
+                quality: 0.3,
+                base64: true, // Enable base64 for Android
             });
 
             if (!result.canceled) {
@@ -114,6 +130,22 @@ const CameraScreen = ({ navigation, route }) => {
         }
     };
 
+    const handleWebUploadFlow = async () => {
+        const result = await startWebUpload({ type: 'snap' });
+        if (result.success && result.url) {
+            setCapturedMedia({
+                uri: result.url,
+                type: 'image', // Snaps are usually images via web for now
+                isWebUpload: true,
+                publicId: result.publicId
+            });
+            setPreviewVisible(true);
+        } else if (result.message && result.message !== 'Upload cancelled or failed' && result.message !== 'Upload cancelled') {
+            Alert.alert('Upload Failed', result.message);
+        }
+    };
+
+
     const handleShutterPress = () => {
         if (mode === 'picture') {
             takePicture();
@@ -130,7 +162,10 @@ const CameraScreen = ({ navigation, route }) => {
     const takePicture = async () => {
         if (cameraRef.current) {
             try {
-                const photo = await cameraRef.current.takePictureAsync({ quality: 0.5 });
+                const photo = await cameraRef.current.takePictureAsync({
+                    quality: 0.3,
+                    base64: true // Enable base64 for Android
+                });
                 setCapturedMedia({ ...photo, type: 'image' });
                 setPreviewVisible(true);
             } catch (error) {
@@ -208,20 +243,23 @@ const CameraScreen = ({ navigation, route }) => {
 
         try {
             setUploading(true);
-            const formData = new FormData();
 
-            // Prepare file using centralized service
-            const file = await prepareFile(capturedMedia.uri);
-            formData.append('file', file);
+            // Use base64 for all uploads (Android compatibility)
+            const base64Data = capturedMedia.base64
+                ? `data:image/jpeg;base64,${capturedMedia.base64}`
+                : capturedMedia.uri;
 
-            formData.append('clubId', selectedClubId);
-            formData.append('type', capturedMedia.type); // 'image' or 'video'
-            formData.append('caption', snapCaption);
-            formData.append('recipients', JSON.stringify(selectedRecipients));
+            const snapData = {
+                clubId: selectedClubId,
+                type: capturedMedia.type,
+                caption: snapCaption,
+                recipients: selectedRecipients,
+                media: base64Data // Send base64 data
+            };
 
-            const res = await snapsAPI.upload(formData, (progress) => {
-                setUploadProgress(progress);
-            });
+            console.log('Uploading snap with base64');
+            const res = await snapsAPI.uploadBase64(snapData);
+
             if (res.success) {
                 navigation.goBack();
             } else {
@@ -415,9 +453,15 @@ const CameraScreen = ({ navigation, route }) => {
 
                     <View style={styles.controlsRow}>
                         {/* Gallery Button */}
-                        <TouchableOpacity style={styles.iconButton} onPress={pickMedia}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.iconButton,
+                                { transform: [{ scale: pressed ? 0.9 : 1 }], opacity: pressed ? 0.8 : 1 }
+                            ]}
+                            onPress={pickMedia}
+                        >
                             <Ionicons name="images" size={28} color="#FFF" />
-                        </TouchableOpacity>
+                        </Pressable>
 
                         {/* Shutter Button */}
                         <View style={styles.shootButtonContainer}>
@@ -458,11 +502,19 @@ const CameraScreen = ({ navigation, route }) => {
                         </TouchableOpacity>
                     </View>
                 </View>
+                {/* Media Upload Choice Modal */}
+                <MediaUploadModal
+                    visible={showUploadModal}
+                    onClose={() => setShowUploadModal(false)}
+                    onNativePick={handleNativePick}
+                    onWebUpload={handleWebUploadFlow}
+                />
             </View>
         </View>
 
     );
 };
+
 
 const styles = StyleSheet.create({
     container: {

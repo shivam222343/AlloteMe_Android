@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
+    Pressable,
     FlatList,
     Image,
     TextInput,
@@ -30,6 +31,10 @@ import { prepareFile } from '../services/cloudinaryService';
 import * as Animatable from 'react-native-animatable';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useWebUpload } from '../hooks/useWebUpload';
+import MediaUploadModal from '../components/MediaUploadModal';
+
+
 
 import * as MediaLibrary from 'expo-media-library';
 import * as Clipboard from 'expo-clipboard';
@@ -408,7 +413,9 @@ const ChatScreen = ({ route, navigation }) => {
         ? (rawClubId._id?.toString() || rawClubId.toString())
         : rawClubId;
     const { user, socket, refreshUnreadMessageCount } = useAuth();
+    const { startWebUpload } = useWebUpload();
     const [messages, setMessages] = useState([]);
+
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(true);
     const [isTyping, setIsTyping] = useState(false);
@@ -456,6 +463,13 @@ const ChatScreen = ({ route, navigation }) => {
         setNewGroupName(currentClubName);
     }, [currentClubName]);
 
+    // Refresh group data when modal opens to show latest members
+    useEffect(() => {
+        if (showGroupInfoModal && isGroupChat) {
+            fetchMessages();
+        }
+    }, [showGroupInfoModal]);
+
     const [attachments, setAttachments] = useState([]);
     const [showMediaViewer, setShowMediaViewer] = useState(false);
     const [mediaViewerData, setMediaViewerData] = useState(null);
@@ -463,6 +477,8 @@ const ChatScreen = ({ route, navigation }) => {
     // Reaction & Details State
     const [showReactionPicker, setShowReactionPicker] = useState(false);
     const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
+    const [showGroupIconModalChoice, setShowGroupIconModalChoice] = useState(false);
+
     const [showReactionDetails, setShowReactionDetails] = useState(false);
     const [reactionDetailsData, setReactionDetailsData] = useState([]);
 
@@ -613,7 +629,7 @@ const ChatScreen = ({ route, navigation }) => {
         try {
             const sendSingle = async (text, attachmentItem) => {
                 let file = null;
-                if (attachmentItem) {
+                if (attachmentItem && !attachmentItem.isWebUpload) {
                     file = await prepareFile(attachmentItem.uri);
                 }
 
@@ -622,6 +638,13 @@ const ChatScreen = ({ route, navigation }) => {
                     type: attachmentItem ? 'media' : 'text',
                     replyTo: tempReply?._id
                 };
+
+                if (attachmentItem && attachmentItem.isWebUpload) {
+                    messageData.fileUrl = attachmentItem.uri;
+                    messageData.publicId = attachmentItem.publicId || '';
+                    messageData.fileName = attachmentItem.name || 'Attachment';
+                }
+
 
                 if (!messageData.content && attachmentItem) {
                     messageData.content = ''; // No default text for secondary attachments
@@ -766,6 +789,44 @@ const ChatScreen = ({ route, navigation }) => {
         } catch (err) { console.log(err); }
         setShowAttachMenu(false);
     }
+
+    const handleWebUploadFlow = async () => {
+        const result = await startWebUpload({ type: 'chat' });
+        if (result.success && result.url) {
+            const newAttachment = {
+                uri: result.url,
+                type: 'image', // Assume image for now or detect from URL
+                name: 'BrowserUpload.jpg',
+                isWebUpload: true,
+                publicId: result.publicId
+            };
+            setAttachments(prev => [...prev, newAttachment]);
+        } else if (result.message && result.message !== 'Upload cancelled or failed' && result.message !== 'Upload cancelled') {
+            alert(result.message);
+        }
+        setShowAttachMenu(false);
+    };
+
+    const handleGroupIconWebUpload = async () => {
+        const result = await startWebUpload({ type: 'profile' }); // Reuse profile type for logos
+        if (result.success && result.url) {
+            setUploadingMedia(true);
+            const res = await clubsAPI.update(clubId, {
+                logoUrl: result.url,
+                publicId: result.publicId
+            });
+
+            if (res.success) {
+                alert('Group icon updated!');
+                fetchMessages();
+            } else {
+                alert('Failed to update group icon');
+            }
+            setUploadingMedia(false);
+        }
+    };
+
+
 
     // ... handleUpdateGroupIcon (unchanged)
 
@@ -954,6 +1015,14 @@ const ChatScreen = ({ route, navigation }) => {
             alert('Only group admins can change the icon');
             return;
         }
+        if (Platform.OS === 'android') {
+            setShowGroupIconModalChoice(true);
+        } else {
+            handleNativeGroupIconPick();
+        }
+    };
+
+    const handleNativeGroupIconPick = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -974,6 +1043,8 @@ const ChatScreen = ({ route, navigation }) => {
                 if (res.success) {
                     alert('Group icon updated!');
                     fetchMessages();
+                } else {
+                    alert('Failed to update group icon');
                 }
             }
         } catch (error) {
@@ -983,6 +1054,7 @@ const ChatScreen = ({ route, navigation }) => {
             setUploadingMedia(false);
         }
     };
+
 
     const handleUpdateGroupName = async () => {
         if (!isGroupAdmin) return;
@@ -1223,7 +1295,7 @@ const ChatScreen = ({ route, navigation }) => {
 
                 <KeyboardAvoidingView
                     style={{ flex: 1 }}
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
                 >
                     <View style={{ flex: 1, backgroundColor: '#E5DDD5' }}>
@@ -1243,7 +1315,6 @@ const ChatScreen = ({ route, navigation }) => {
                                 data={messages}
                                 renderItem={renderMessage}
                                 keyExtractor={item => item._id}
-                                style={{ flex: 1 }}
                                 contentContainerStyle={[styles.messageList, { paddingBottom: 20 }]}
                                 onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                                 onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
@@ -1268,222 +1339,226 @@ const ChatScreen = ({ route, navigation }) => {
                                 )}
                             />
                         )}
+                    </View>
 
-                        {/* Input Area - Now part of flex flow */}
-                        <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+                    {/* Input Area - Outside the scrollable area */}
+                    <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
 
-                            {replyingTo && (
-                                <View style={styles.inputReplyBar}>
-                                    <View style={styles.replyBarIndicator} />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.replyBarUser}>Replying to {replyingTo.senderId === user._id ? 'yourself' : 'member'}</Text>
-                                        <Text style={styles.replyBarText} numberOfLines={1}>{replyingTo.content}</Text>
-                                    </View>
-                                    <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                                        <Ionicons name="close-circle" size={20} color="#6B7280" />
-                                    </TouchableOpacity>
+                        {replyingTo && (
+                            <View style={styles.inputReplyBar}>
+                                <View style={styles.replyBarIndicator} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.replyBarUser}>Replying to {replyingTo.senderId === user._id ? 'yourself' : 'member'}</Text>
+                                    <Text style={styles.replyBarText} numberOfLines={1}>{replyingTo.content}</Text>
                                 </View>
-                            )}
+                                <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                                    <Ionicons name="close-circle" size={20} color="#6B7280" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
-                            {/* Attachment Menu */}
-                            {showAttachMenu && (
-                                <View style={styles.attachMenu}>
-                                    <View style={styles.attachRow}>
-                                        <View style={styles.attachOptionContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.attachOption, { backgroundColor: '#7F66FF' }]}
-                                                onPress={handlePickDocument}
-                                            >
-                                                <Ionicons name="document" size={26} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <Text style={styles.attachLabelText}>Document</Text>
-                                        </View>
-                                        <View style={styles.attachOptionContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.attachOption, { backgroundColor: '#FF4B4B' }]}
-                                                onPress={handlePickCamera}
-                                            >
-                                                <Ionicons name="camera" size={26} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <Text style={styles.attachLabelText}>Camera</Text>
-                                        </View>
-                                        <View style={styles.attachOptionContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.attachOption, { backgroundColor: '#A33BEF' }]}
-                                                onPress={handlePickImage}
-                                            >
-                                                <Ionicons name="images" size={26} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <Text style={styles.attachLabelText}>Gallery</Text>
-                                        </View>
+                        {/* Attachment Menu */}
+                        {showAttachMenu && (
+                            <View style={styles.attachMenu}>
+                                <View style={styles.attachRow}>
+                                    <View style={styles.attachOptionContainer}>
+                                        <TouchableOpacity
+                                            style={[styles.attachOption, { backgroundColor: '#7F66FF' }]}
+                                            onPress={handlePickDocument}
+                                        >
+                                            <Ionicons name="document" size={26} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <Text style={styles.attachLabelText}>Document</Text>
                                     </View>
-                                    <View style={styles.attachRow}>
-                                        <View style={styles.attachOptionContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.attachOption, { backgroundColor: '#00A884' }]}
-                                                onPress={handlePickAudio}
-                                            >
-                                                <Ionicons name="headset" size={26} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <Text style={styles.attachLabelText}>Audio</Text>
-                                        </View>
-                                        <View style={styles.attachOptionContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.attachOption, { backgroundColor: '#2196F3' }]}
-                                                onPress={() => alert('Location sharing coming soon!')}
-                                            >
-                                                <Ionicons name="location" size={26} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <Text style={styles.attachLabelText}>Location</Text>
-                                        </View>
-                                        <View style={styles.attachOptionContainer}>
-                                            <TouchableOpacity
-                                                style={[styles.attachOption, { backgroundColor: '#00D95A' }]}
-                                                onPress={() => { }} // Contact placeholder
-                                            >
-                                                <Ionicons name="person" size={26} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <Text style={styles.attachLabelText}>Contact</Text>
-                                        </View>
+                                    <View style={styles.attachOptionContainer}>
+                                        <TouchableOpacity
+                                            style={[styles.attachOption, { backgroundColor: '#FF4B4B' }]}
+                                            onPress={handlePickCamera}
+                                        >
+                                            <Ionicons name="camera" size={26} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <Text style={styles.attachLabelText}>Camera</Text>
+                                    </View>
+                                    <View style={styles.attachOptionContainer}>
+                                        <TouchableOpacity
+                                            style={[styles.attachOption, { backgroundColor: '#A33BEF' }]}
+                                            onPress={handlePickImage}
+                                        >
+                                            <Ionicons name="images" size={26} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <Text style={styles.attachLabelText}>Gallery</Text>
                                     </View>
                                 </View>
-                            )}
+                                <View style={styles.attachRow}>
+                                    <View style={styles.attachOptionContainer}>
+                                        <TouchableOpacity
+                                            style={[styles.attachOption, { backgroundColor: '#00A884' }]}
+                                            onPress={handlePickAudio}
+                                        >
+                                            <Ionicons name="headset" size={26} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <Text style={styles.attachLabelText}>Audio</Text>
+                                    </View>
+                                    <View style={styles.attachOptionContainer}>
+                                        <TouchableOpacity
+                                            style={[styles.attachOption, { backgroundColor: '#2196F3' }]}
+                                            onPress={() => alert('Location sharing coming soon!')}
+                                        >
+                                            <Ionicons name="location" size={26} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <Text style={styles.attachLabelText}>Location</Text>
+                                    </View>
+                                    <View style={styles.attachOptionContainer}>
+                                        <Pressable
+                                            style={({ pressed }) => [
+                                                styles.attachOption,
+                                                { backgroundColor: '#F59E0B', opacity: pressed ? 0.8 : 1 }
+                                            ]}
+                                            onPress={handleWebUploadFlow}
+                                        >
+                                            <Ionicons name="globe" size={26} color="#FFF" />
+                                        </Pressable>
+                                        <Text style={styles.attachLabelText}>Browser</Text>
+                                    </View>
+                                </View>
 
-                            {/* Emoji Picker */}
-                            {showEmojiPicker && (
-                                <View style={styles.emojiPicker}>
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                        {['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '👏', '🙏', '❤️', '🔥', '✨', '🎉', '💯', '👌', '✅'].map(emoji => (
-                                            <TouchableOpacity
-                                                key={emoji}
-                                                style={styles.emojiButton}
-                                                onPress={() => {
-                                                    setInputText(prev => prev + emoji);
-                                                    setShowEmojiPicker(false);
-                                                }}
-                                            >
-                                                <Text style={styles.emojiText}>{emoji}</Text>
-                                            </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Emoji Picker */}
+                        {showEmojiPicker && (
+                            <View style={styles.emojiPicker}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    {['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '👏', '🙏', '❤️', '🔥', '✨', '🎉', '💯', '👌', '✅'].map(emoji => (
+                                        <TouchableOpacity
+                                            key={emoji}
+                                            style={styles.emojiButton}
+                                            onPress={() => {
+                                                setInputText(prev => prev + emoji);
+                                                setShowEmojiPicker(false);
+                                            }}
+                                        >
+                                            <Text style={styles.emojiText}>{emoji}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+
+
+
+                        <View>
+                            {/* Moved Attachment Preview Here - Above Input Row completely */}
+                            {attachments.length > 0 && (
+                                <View style={{ paddingHorizontal: 10, paddingBottom: 5 }}>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 90 }}>
+                                        {attachments.map((att, i) => (
+                                            <View key={i} style={{ marginRight: 10, position: 'relative' }}>
+                                                <View style={{ width: 70, height: 70, borderRadius: 10, overflow: 'hidden', backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                                                    {att.type === 'image' || att.type === 'video' ? (
+                                                        <Image source={{ uri: att.uri }} style={{ width: '100%', height: '100%' }} />
+                                                    ) : (
+                                                        <Ionicons name="document-text" size={30} color="#6B7280" />
+                                                    )}
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => removeAttachment(i)}
+                                                    style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#FFF', borderRadius: 12, elevation: 2 }}
+                                                >
+                                                    <Ionicons name="close-circle" size={24} color="#EF4444" />
+                                                </TouchableOpacity>
+                                            </View>
                                         ))}
                                     </ScrollView>
                                 </View>
                             )}
 
-
-
-                            <View>
-                                {/* Moved Attachment Preview Here - Above Input Row completely */}
-                                {attachments.length > 0 && (
-                                    <View style={{ paddingHorizontal: 10, paddingBottom: 5 }}>
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 90 }}>
-                                            {attachments.map((att, i) => (
-                                                <View key={i} style={{ marginRight: 10, position: 'relative' }}>
-                                                    <View style={{ width: 70, height: 70, borderRadius: 10, overflow: 'hidden', backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}>
-                                                        {att.type === 'image' || att.type === 'video' ? (
-                                                            <Image source={{ uri: att.uri }} style={{ width: '100%', height: '100%' }} />
-                                                        ) : (
-                                                            <Ionicons name="document-text" size={30} color="#6B7280" />
-                                                        )}
-                                                    </View>
-                                                    <TouchableOpacity
-                                                        onPress={() => removeAttachment(i)}
-                                                        style={{ position: 'absolute', top: -8, right: -8, backgroundColor: '#FFF', borderRadius: 12, elevation: 2 }}
-                                                    >
-                                                        <Ionicons name="close-circle" size={24} color="#EF4444" />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-
-                                <View style={styles.inputContainer}>
-                                    <TouchableOpacity
-                                        style={styles.attachButton}
-                                        onPress={() => {
-                                            Keyboard.dismiss();
-                                            setShowAttachMenu(!showAttachMenu);
-                                            setShowEmojiPicker(false);
-                                        }}
-                                    >
-                                        <Ionicons name={showAttachMenu ? "close" : "add"} size={26} color="#0A66C2" />
-                                    </TouchableOpacity>
+                            <View style={styles.inputContainer}>
+                                <TouchableOpacity
+                                    style={styles.attachButton}
+                                    onPress={() => {
+                                        Keyboard.dismiss();
+                                        setShowAttachMenu(!showAttachMenu);
+                                        setShowEmojiPicker(false);
+                                    }}
+                                >
+                                    <Ionicons name={showAttachMenu ? "close" : "add"} size={26} color="#0A66C2" />
+                                </TouchableOpacity>
 
 
 
-                                    <View style={styles.inputFieldContainer}>
+                                <View style={styles.inputFieldContainer}>
 
-                                        {isRecording ? (
-                                            <View style={styles.recordingOverlay}>
-                                                <Animatable.View animation="pulse" iterationCount="infinite" style={styles.recordingDot} />
-                                                <Text style={styles.recordingTime}>{formatDuration(recordingDuration)}</Text>
-                                                <TouchableOpacity onPress={() => stopRecording(false)} style={styles.cancelRecord}>
-                                                    <Text style={styles.cancelText}>Cancel</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        ) : (
-                                            <TextInput
-                                                ref={inputRef}
-                                                style={styles.input}
-                                                placeholder="Message..."
-                                                value={inputText}
-                                                onChangeText={handleInputTyping}
-                                                onFocus={() => {
-                                                    setShowEmojiPicker(false);
-                                                    setShowAttachMenu(false);
-                                                }}
-                                                multiline
-                                                placeholderTextColor="#9CA3AF"
-                                            />
-                                        )}
-
-                                        <View style={styles.inputActions}>
-                                            {!isRecording && (
-                                                <>
-                                                    <TouchableOpacity
-                                                        style={[styles.quickActionBtn, mentionEta && styles.quickActionActive]}
-                                                        onPress={() => {
-                                                            if (!inputText.includes('@Eta')) {
-                                                                setInputText('@Eta ' + inputText);
-                                                                setMentionEta(true);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Text style={[styles.etaText, mentionEta && { color: '#0A66C2' }]}>@Eta</Text>
-                                                    </TouchableOpacity>
-
-                                                    <TouchableOpacity
-                                                        style={styles.quickActionBtn}
-                                                        onPress={() => {
-                                                            Keyboard.dismiss();
-                                                            setShowEmojiPicker(!showEmojiPicker);
-                                                            setShowAttachMenu(false);
-                                                        }}
-                                                    >
-                                                        <Ionicons name="happy-outline" size={22} color="#6B7280" />
-                                                    </TouchableOpacity>
-                                                </>
-                                            )}
+                                    {isRecording ? (
+                                        <View style={styles.recordingOverlay}>
+                                            <Animatable.View animation="pulse" iterationCount="infinite" style={styles.recordingDot} />
+                                            <Text style={styles.recordingTime}>{formatDuration(recordingDuration)}</Text>
+                                            <TouchableOpacity onPress={() => stopRecording(false)} style={styles.cancelRecord}>
+                                                <Text style={styles.cancelText}>Cancel</Text>
+                                            </TouchableOpacity>
                                         </View>
-                                    </View>
-
-                                    {inputText.length > 0 || attachments.length > 0 || isRecording ? (
-                                        <TouchableOpacity
-                                            style={styles.sendButton}
-                                            onPress={() => isRecording ? stopRecording(true) : sendMessage()}
-                                        >
-                                            <Ionicons name={isRecording ? "checkmark" : "send"} size={20} color="#FFF" />
-                                        </TouchableOpacity>
                                     ) : (
-                                        <TouchableOpacity
-                                            style={styles.micButton}
-                                            onLongPress={startRecording}
-                                            onPress={startRecording} // Start on simple tap too for ease
-                                        >
-                                            <Ionicons name="mic" size={24} color="#0A66C2" />
-                                        </TouchableOpacity>
+                                        <TextInput
+                                            ref={inputRef}
+                                            style={styles.input}
+                                            placeholder="Message..."
+                                            value={inputText}
+                                            onChangeText={handleInputTyping}
+                                            onFocus={() => {
+                                                setShowEmojiPicker(false);
+                                                setShowAttachMenu(false);
+                                            }}
+                                            multiline
+                                            placeholderTextColor="#9CA3AF"
+                                        />
                                     )}
+
+                                    <View style={styles.inputActions}>
+                                        {!isRecording && (
+                                            <>
+                                                <TouchableOpacity
+                                                    style={[styles.quickActionBtn, mentionEta && styles.quickActionActive]}
+                                                    onPress={() => {
+                                                        if (!inputText.includes('@Eta')) {
+                                                            setInputText('@Eta ' + inputText);
+                                                            setMentionEta(true);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Text style={[styles.etaText, mentionEta && { color: '#0A66C2' }]}>@Eta</Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    style={styles.quickActionBtn}
+                                                    onPress={() => {
+                                                        Keyboard.dismiss();
+                                                        setShowEmojiPicker(!showEmojiPicker);
+                                                        setShowAttachMenu(false);
+                                                    }}
+                                                >
+                                                    <Ionicons name="happy-outline" size={22} color="#6B7280" />
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
+                                    </View>
                                 </View>
+
+                                {inputText.length > 0 || attachments.length > 0 || isRecording ? (
+                                    <TouchableOpacity
+                                        style={styles.sendButton}
+                                        onPress={() => isRecording ? stopRecording(true) : sendMessage()}
+                                    >
+                                        <Ionicons name={isRecording ? "checkmark" : "send"} size={20} color="#FFF" />
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={styles.micButton}
+                                        onLongPress={startRecording}
+                                        onPress={startRecording} // Start on simple tap too for ease
+                                    >
+                                        <Ionicons name="mic" size={24} color="#0A66C2" />
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         </View>
                     </View>
@@ -1711,7 +1786,9 @@ const ChatScreen = ({ route, navigation }) => {
                             <FlatList
                                 data={localGroupData?.members || []}
                                 keyExtractor={item => item.userId?._id || item._id}
-                                style={{ width: '100%', marginBottom: 20 }}
+                                style={{ width: '100%', marginBottom: 20, maxHeight: 400 }}
+                                nestedScrollEnabled={true}
+                                scrollEnabled={true}
                                 renderItem={({ item }) => (
                                     <View style={styles.memberListItem}>
                                         <Image
@@ -1885,9 +1962,9 @@ const ChatScreen = ({ route, navigation }) => {
                         </View>
                     </TouchableOpacity>
                 </Modal>
-            </View>
+            </View >
             {/* Reaction Picker Modal */}
-            <Modal
+            < Modal
                 visible={showReactionPicker}
                 transparent={true}
                 animationType="slide"
@@ -1918,10 +1995,10 @@ const ChatScreen = ({ route, navigation }) => {
                         </ScrollView>
                     </View>
                 </TouchableOpacity>
-            </Modal>
+            </Modal >
 
             {/* Media Viewer Modal */}
-            <Modal
+            < Modal
                 visible={showMediaViewer}
                 transparent={true}
                 animationType="fade"
@@ -1988,10 +2065,10 @@ const ChatScreen = ({ route, navigation }) => {
                         </View>
                     )}
                 </View>
-            </Modal>
+            </Modal >
 
             {/* Reaction Details Modal */}
-            <Modal
+            < Modal
                 visible={showReactionDetails}
                 animationType="fade"
                 transparent={true}
@@ -2044,7 +2121,13 @@ const ChatScreen = ({ route, navigation }) => {
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
-            </Modal>
+            </Modal >
+            <MediaUploadModal
+                visible={showGroupIconModalChoice}
+                onClose={() => setShowGroupIconModalChoice(false)}
+                onNativePick={handleNativeGroupIconPick}
+                onWebUpload={handleGroupIconWebUpload}
+            />
         </GestureHandlerRootView >
     );
 };

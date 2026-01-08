@@ -137,7 +137,7 @@ export const authAPI = {
     logout: () => api.post('/auth/logout'),
     getMe: () => api.get('/auth/me'),
     updateProfile: (data) => api.put('/auth/update-profile', data),
-    uploadProfilePicture: (formData) => api.post('/auth/upload-profile-picture', formData),
+    uploadProfilePicture: (data) => api.post('/auth/upload-profile-picture', data),
     changePassword: (data) => api.put('/auth/change-password', data),
     updateFCMToken: (fcmToken) => api.put('/auth/fcm-token', { fcmToken }),
     getDashboard: () => api.get('/auth/dashboard'),
@@ -223,8 +223,13 @@ export const messagesAPI = {
             formData.append('file', file);
             return api.post('/messages', formData);
         }
+        // Support for web-uploaded files
+        if (data.fileUrl) {
+            return api.post('/messages', data);
+        }
         return api.post('/messages', data);
     },
+
     markAsRead: (userId) => api.put(`/messages/${userId}/read`),
     addReaction: (messageId, data) => api.post(`/messages/${messageId}/reaction`, data),
     deleteMessage: (messageId, type) => api.delete(`/messages/${messageId}`, { params: { type } }),
@@ -232,18 +237,26 @@ export const messagesAPI = {
 
 // Snaps API
 export const snapsAPI = {
-    upload: (formData, onProgress) => {
-        // Log keys to verify field name from the screen
-        // console.log('[API] Snap upload keys:', Array.from(formData.keys()));
-        return api.post('/snaps', formData, {
-            onUploadProgress: (progressEvent) => {
-                if (onProgress) {
-                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                    onProgress(percentCompleted);
+    upload: (data, onProgress) => {
+        // If data is FormData, proceed as usual
+        if (data instanceof FormData) {
+            return api.post('/snaps', data, {
+                onUploadProgress: (progressEvent) => {
+                    if (onProgress) {
+                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                        onProgress(percentCompleted);
+                    }
                 }
-            }
-        });
+            });
+        }
+        // If data is plain object (web upload result), send as JSON
+        return api.post('/snaps', data);
     },
+    uploadBase64: (data) => api.post('/snaps/upload-base64', data, {
+        timeout: 600000,
+        headers: { 'Content-Type': 'application/json' }
+    }),
+
     getClubSnaps: (clubId) => api.get(`/snaps/club/${clubId}`),
     getMySnaps: () => api.get('/snaps/my-clubs'),
     view: (snapId) => api.post(`/snaps/${snapId}/view`),
@@ -256,11 +269,19 @@ export const snapsAPI = {
 export const galleryAPI = {
     getImages: (params) => api.get('/gallery', { params }),
     upload: (formData, onProgress) => api.post('/gallery', formData, {
+        timeout: 600000, // 10 minutes for large uploads on mobile
         onUploadProgress: (progressEvent) => {
             if (onProgress) {
                 const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                 onProgress(percentCompleted);
+                console.log(`Upload progress: ${percentCompleted}%`);
             }
+        }
+    }),
+    uploadBase64: (data) => api.post('/gallery/upload-base64', data, {
+        timeout: 600000, // 10 minutes for large uploads
+        headers: {
+            'Content-Type': 'application/json',
         }
     }),
     updateStatus: (id, status) => api.put(`/gallery/${id}/status`, { status }),
@@ -298,8 +319,13 @@ export const groupChatAPI = {
             formData.append('file', file);
             return api.post(`/group-chat/${clubId}/messages`, formData);
         }
+        // Support for web-uploaded files
+        if (data.fileUrl) {
+            return api.post(`/group-chat/${clubId}/messages`, data);
+        }
         return api.post(`/group-chat/${clubId}/messages`, data);
     },
+
     markAsRead: (clubId) => api.put(`/group-chat/${clubId}/read`),
     deleteMessage: (clubId, messageId, type) => api.delete(`/group-chat/${clubId}/messages/${messageId}`, { params: { type } }),
     addReaction: (clubId, messageId, data) => api.post(`/group-chat/${clubId}/messages/${messageId}/reaction`, data),

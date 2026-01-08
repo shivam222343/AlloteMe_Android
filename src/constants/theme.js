@@ -279,7 +279,7 @@ export const NotificationTypes = {
 
 // API Configuration
 // For local debugging on Android: Update LOCAL_IP with your machine's IP (e.g. 192.168.1.13)
-const LOCAL_IP = '192.168.1.13';
+const LOCAL_IP = '192.168.0.105';
 const IS_LOCAL = false; // Set to true to use local backend
 
 export const API_CONFIG = {

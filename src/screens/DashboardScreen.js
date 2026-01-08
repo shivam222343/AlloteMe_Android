@@ -11,6 +11,7 @@ import {
     Image,
     Animated,
     Modal,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -215,6 +216,46 @@ const DashboardScreen = ({ navigation }) => {
         };
     }, [socket, fetchDashboardData]);
 
+    // Shimmer animation for skeletons
+    const shimmerAnim = React.useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        if (loading) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(shimmerAnim, {
+                        toValue: 1,
+                        duration: 1500,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(shimmerAnim, {
+                        toValue: 0,
+                        duration: 1500,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        }
+    }, [loading]);
+
+    const shimmerTranslate = shimmerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-300, 300],
+    });
+
+    const ShimmerSkeleton = ({ width, height, borderRadius = 8, style }) => (
+        <View style={[styles.skeleton, { width, height, borderRadius, overflow: 'hidden' }, style]}>
+            <Animated.View
+                style={[
+                    styles.shimmer,
+                    {
+                        transform: [{ translateX: shimmerTranslate }],
+                    },
+                ]}
+            />
+        </View>
+    );
+
     if (loading) {
         return (
             <MainLayout navigation={navigation} currentRoute="Dashboard" title="Dashboard">
@@ -225,41 +266,41 @@ const DashboardScreen = ({ navigation }) => {
                         <Text style={styles.nameText}>{user?.displayName || 'Maverick'}</Text>
                     </View>
 
-                    {/* Skeleton Carousel - Loading */}
+                    {/* Skeleton Carousel - Loading with Shimmer */}
                     <View style={styles.carouselSection}>
                         <View style={styles.carouselHeader}>
                             <Text style={styles.carouselTitle}>Recent Gallery</Text>
                             <Text style={styles.viewAll}>View all</Text>
                         </View>
-                        <View style={[styles.skeleton, { width: width - 48, height: 200, borderRadius: 16 }]} />
+                        <ShimmerSkeleton width={width - 48} height={200} borderRadius={20} />
                         <View style={styles.pagination}>
                             {[1, 2, 3, 4].map((_, i) => (
-                                <View key={i} style={[styles.skeleton, { width: 6, height: 6, borderRadius: 3 }]} />
+                                <ShimmerSkeleton key={i} width={8} height={8} borderRadius={4} />
                             ))}
                         </View>
                     </View>
 
-                    {/* Skeleton Filter - Loading */}
+                    {/* Skeleton Filter - Loading with Shimmer */}
                     <View style={styles.filterContainer}>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             {[1, 2, 3].map((_, i) => (
-                                <View key={i} style={[styles.skeleton, { width: 80, height: 32, borderRadius: 20 }]} />
+                                <ShimmerSkeleton key={i} width={80} height={36} borderRadius={24} />
                             ))}
                         </View>
                     </View>
 
-                    {/* Skeleton Stats Grid - Loading */}
+                    {/* Skeleton Stats Grid - Loading with Shimmer */}
                     <View style={styles.statsGrid}>
                         {[1, 2, 3, 4].map((_, i) => (
                             <View key={i} style={styles.statCard}>
-                                <View style={[styles.skeleton, { width: 36, height: 36, borderRadius: 10, marginBottom: 12 }]} />
-                                <View style={[styles.skeleton, { width: 50, height: 24, marginBottom: 4 }]} />
-                                <View style={[styles.skeleton, { width: 70, height: 14 }]} />
+                                <ShimmerSkeleton width={44} height={44} borderRadius={12} style={{ marginBottom: 16 }} />
+                                <ShimmerSkeleton width={60} height={28} borderRadius={6} style={{ marginBottom: 8 }} />
+                                <ShimmerSkeleton width={80} height={16} borderRadius={4} />
                             </View>
                         ))}
                     </View>
 
-                    {/* Skeleton Meetings - Loading */}
+                    {/* Skeleton Meetings - Loading with Shimmer */}
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Recent Meetings</Text>
@@ -267,10 +308,10 @@ const DashboardScreen = ({ navigation }) => {
                         </View>
                         {[1, 2, 3].map((_, i) => (
                             <View key={i} style={styles.meetingItem}>
-                                <View style={[styles.skeleton, { width: 48, height: 48, borderRadius: 12, marginRight: 16 }]} />
+                                <ShimmerSkeleton width={56} height={56} borderRadius={14} style={{ marginRight: 16 }} />
                                 <View style={{ flex: 1 }}>
-                                    <View style={[styles.skeleton, { width: '80%', height: 16, marginBottom: 6 }]} />
-                                    <View style={[styles.skeleton, { width: '60%', height: 12 }]} />
+                                    <ShimmerSkeleton width="80%" height={18} borderRadius={4} style={{ marginBottom: 8 }} />
+                                    <ShimmerSkeleton width="60%" height={14} borderRadius={4} />
                                 </View>
                             </View>
                         ))}
@@ -458,9 +499,13 @@ const DashboardScreen = ({ navigation }) => {
                 <View style={styles.statsGrid}>
                     {stats.map((stat, index) => (
                         <View key={index} style={styles.statCard}>
-                            <View style={[styles.iconBox, { backgroundColor: stat.color + '10' }]}>
-                                <Ionicons name={stat.icon} size={20} color={stat.color} />
-                            </View>
+                            {Platform.OS === 'web' ? (
+                                <View style={[styles.iconBox, { backgroundColor: stat.color + '10' }]}>
+                                    <Ionicons name={stat.icon} size={20} color={stat.color} />
+                                </View>
+                            ) : (
+                                <Ionicons name={stat.icon} size={28} color={stat.color} style={{ marginBottom: 12 }} />
+                            )}
                             <Text style={styles.statValue}>{stat.value}</Text>
                             <Text style={styles.statLabel}>{stat.label}</Text>
                         </View>
@@ -747,30 +792,41 @@ const styles = StyleSheet.create({
         color: '#1E293B',
     },
     carousel: {
-        marginBottom: 12,
+        marginBottom: 16,
     },
     carouselItem: {
-        borderRadius: 16,
+        borderRadius: 20,
         overflow: 'hidden',
+        backgroundColor: '#FFFFFF',
+        elevation: 8,
+        shadowColor: '#0A66C2',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
     },
     carouselImage: {
         width: '100%',
         height: '100%',
+        backgroundColor: '#F1F5F9',
     },
     pagination: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
+        marginTop: 4,
     },
     paginationDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: '#CBD5E1',
+        transition: 'all 0.3s ease',
     },
     paginationDotActive: {
-        width: 20,
+        width: 24,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: '#0A66C2',
     },
     filterContainer: {
@@ -781,24 +837,33 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     filterChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderRadius: 24,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
         borderColor: '#E2E8F0',
+        elevation: 2,
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
     },
     filterChipActive: {
         backgroundColor: '#0A66C2',
         borderColor: '#0A66C2',
+        elevation: 4,
+        shadowColor: '#0A66C2',
+        shadowOpacity: 0.2,
     },
     filterChipText: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
-        color: '#64748B',
+        color: '#475569',
     },
     filterChipTextActive: {
         color: '#FFFFFF',
+        fontWeight: '700',
     },
     statsGrid: {
         flexDirection: 'row',
@@ -808,31 +873,41 @@ const styles = StyleSheet.create({
     },
     statCard: {
         width: '48%',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 16,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
         padding: 20,
         marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#F1F5F9',
+        borderColor: '#E2E8F0',
+        elevation: 4,
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
     },
     iconBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 16,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
     },
     statValue: {
-        fontSize: 20,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '800',
         color: '#1E293B',
+        marginBottom: 4,
     },
     statLabel: {
-        fontSize: 12,
-        color: '#94A3B8',
-        fontWeight: '500',
-        marginTop: 2,
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '600',
     },
 
     // Modal Styles
@@ -933,31 +1008,45 @@ const styles = StyleSheet.create({
     meetingItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 0,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        marginBottom: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+        shadowColor: '#64748B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
     },
     meetingIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
+        width: 56,
+        height: 56,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
+        elevation: 2,
+        shadowColor: '#0A66C2',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     dateChip: {
         alignItems: 'center',
     },
     dateChipDay: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 18,
+        fontWeight: '800',
         color: '#0A66C2',
     },
     dateChipMonth: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '800',
         color: '#64748B',
+        marginTop: 2,
     },
     meetingInfo: {
         flex: 1,
@@ -1038,9 +1127,17 @@ const styles = StyleSheet.create({
         color: '#0A66C2',
     },
     skeleton: {
-        backgroundColor: '#E2E8F0',
-        borderRadius: 8,
-        opacity: 0.6,
+        backgroundColor: '#E8EDF2',
+        position: 'relative',
+    },
+    shimmer: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        transform: [{ skewX: '-20deg' }],
     },
 });
 

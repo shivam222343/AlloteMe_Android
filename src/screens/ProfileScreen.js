@@ -4,6 +4,7 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
+    Pressable,
     ScrollView,
     Image,
     ActivityIndicator,
@@ -23,10 +24,15 @@ import ConfirmModal from '../components/ConfirmModal';
 import EditProfileModal from '../components/EditProfileModal';
 import { useAuth } from '../contexts/AuthContext';
 import { prepareFile } from '../services/cloudinaryService';
+import MediaUploadModal from '../components/MediaUploadModal';
+import { useWebUpload } from '../hooks/useWebUpload';
+
 
 const ProfileScreen = ({ navigation }) => {
-    const { user, logout, uploadProfilePicture, updateProfile, loading } = useAuth();
+    const { user, logout, uploadProfilePicture, updateProfile, loading, refreshUser } = useAuth();
+    const { startWebUpload } = useWebUpload();
     const shineAnim = useRef(new Animated.Value(-150)).current;
+
 
     useEffect(() => {
         Animated.loop(
@@ -47,7 +53,9 @@ const ProfileScreen = ({ navigation }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [showAvatarModal, setShowAvatarModal] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState(null);
+    const [showUploadModal, setShowUploadModal] = useState(false);
     const [generatedAvatars, setGeneratedAvatars] = useState([]);
+
 
     const [selectedStyle, setSelectedStyle] = useState('mixed');
 
@@ -147,7 +155,8 @@ const ProfileScreen = ({ navigation }) => {
             mediaTypes: 'images',
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.5,
+            quality: 0.3,
+            base64: true, // Enable base64 for Android
         });
 
         if (!result.canceled) {
@@ -155,6 +164,26 @@ const ProfileScreen = ({ navigation }) => {
             setShowImageModal(true);
         }
     };
+
+    const handleWebUploadFlow = async () => {
+        const result = await startWebUpload({ type: 'profile' });
+        if (result.success && result.url) {
+            // Update profile with the URL received from web upload
+            const updateResult = await updateProfile({
+                profilePictureUrl: result.url
+                // Backend will handle saving this to profilePicture and history
+            });
+
+            if (updateResult.success) {
+                await refreshUser();
+            } else {
+                alert(updateResult.message || 'Failed to update profile picture');
+            }
+        } else if (result.message && result.message !== 'Upload cancelled or failed' && result.message !== 'Upload cancelled') {
+            alert(result.message);
+        }
+    };
+
 
     const confirmAvatarSelection = async (url) => {
         try {
@@ -184,17 +213,15 @@ const ProfileScreen = ({ navigation }) => {
         try {
             setUploading(true);
 
-            // Create form data
-            const formData = new FormData();
+            // Use base64 for Android compatibility
+            const base64Img = asset.base64
+                ? `data:image/jpeg;base64,${asset.base64}`
+                : asset.uri;
 
-            // Prepare file using centralized service
+            console.log('Uploading profile picture with base64');
 
-            // Prepare file using centralized service
-            const file = await prepareFile(asset.uri);
-            formData.append('image', file);
-
-            // Upload via useAuth hook
-            const result = await uploadProfilePicture(formData);
+            // Upload via useAuth hook with base64
+            const result = await uploadProfilePicture({ image: base64Img });
 
             if (!result.success) {
                 alert(result.message || 'Failed to upload image');
@@ -236,7 +263,6 @@ const ProfileScreen = ({ navigation }) => {
     return (
         <MainLayout navigation={navigation} currentRoute="Profile" title="Profile" transparentNavbar={false}>
             <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-                {/* Header Section */}
                 {/* Header Section */}
                 <View style={styles.header}>
                     {user?.preferences?.sidebarBanner ? (
@@ -286,9 +312,12 @@ const ProfileScreen = ({ navigation }) => {
                         </TouchableOpacity>
 
                         {/* Gallery Upload Button - Positioned Right */}
-                        <TouchableOpacity
-                            style={styles.cameraButton}
-                            onPress={pickImage}
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.cameraButton,
+                                { transform: [{ scale: pressed ? 0.9 : 1 }], opacity: pressed ? 0.9 : 1 }
+                            ]}
+                            onPress={() => setShowUploadModal(true)}
                             disabled={uploading}
                         >
                             {uploading ? (
@@ -296,7 +325,7 @@ const ProfileScreen = ({ navigation }) => {
                             ) : (
                                 <Ionicons name="camera" size={20} color="#0A66C2" />
                             )}
-                        </TouchableOpacity>
+                        </Pressable>
                     </View>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -307,40 +336,7 @@ const ProfileScreen = ({ navigation }) => {
                     </View>
                     <Text style={styles.userEmail}>{user?.email || 'email@example.com'}</Text>
 
-                    {user?.maverickId && (
-                        <View style={styles.idBadgeContainer}>
-                            <LinearGradient
-                                colors={['#94A3B8', '#F8FAFC', '#94A3B8', '#CBD5E1']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.idBadge}
-                            >
-                                <Ionicons name="shield-checkmark" size={14} color="#0A66C2" style={{ marginRight: 6 }} />
-                                <Text style={styles.idText}>{user.maverickId}</Text>
-
-                                <Animated.View
-                                    style={[
-                                        styles.shineEffect,
-                                        {
-                                            transform: [
-                                                { translateX: shineAnim },
-                                                { skewX: '-20deg' }
-                                            ]
-                                        }
-                                    ]}
-                                >
-                                    <LinearGradient
-                                        colors={['transparent', 'rgba(255, 255, 255, 0.8)', 'transparent']}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={StyleSheet.absoluteFill}
-                                    />
-                                </Animated.View>
-                            </LinearGradient>
-                        </View>
-                    )}
-
-                    {/* Banner Edit Button */} // Positioned relative to header
+                    {/* Banner Edit Button */}
                     <TouchableOpacity
                         style={styles.bannerEditButton}
                         onPress={() => navigation.navigate('Settings', { openBannerModal: true })}
@@ -350,10 +346,53 @@ const ProfileScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
 
+                {/* Maverick ID Badge - Outside Header */}
+                {user?.maverickId && (
+                    <View style={styles.idBadgeContainer}>
+                        <LinearGradient
+                            colors={['#0EA5E9', '#0284C7', '#0369A1', '#075985']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.idBadge}
+                        >
+                            <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                            <Text style={styles.idText}>{user.maverickId}</Text>
+
+                            <Animated.View
+                                style={[
+                                    styles.shineEffect,
+                                    {
+                                        transform: [
+                                            { translateX: shineAnim },
+                                            { skewX: '-20deg' }
+                                        ]
+                                    }
+                                ]}
+                            >
+                                <LinearGradient
+                                    colors={['transparent', 'rgba(255, 255, 255, 0.9)', 'transparent']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                            </Animated.View>
+                        </LinearGradient>
+                    </View>
+                )}
+
                 <View style={styles.body}>
                     {/* Personal Info Card */}
                     <View style={styles.card}>
-                        <Text style={styles.cardTitle}>Personal Information</Text>
+                        <View style={styles.cardHeader}>
+                            <Text style={styles.cardTitle}>Personal Information</Text>
+                            <TouchableOpacity
+                                style={styles.editButton}
+                                onPress={() => setShowEditModal(true)}
+                            >
+                                <Ionicons name="create-outline" size={20} color="#0A66C2" />
+                                <Text style={styles.editButtonText}>Edit</Text>
+                            </TouchableOpacity>
+                        </View>
 
                         <View style={styles.infoRow}>
                             <View style={styles.iconContainer}>
@@ -521,6 +560,15 @@ const ProfileScreen = ({ navigation }) => {
                     onClose={() => setShowEditModal(false)}
                 />
 
+                <MediaUploadModal
+                    visible={showUploadModal}
+                    onClose={() => setShowUploadModal(false)}
+                    onNativePick={pickImage}
+                    onWebUpload={handleWebUploadFlow}
+                    title="Update Profile Photo"
+                />
+
+
                 {/* Profile Image Confirmation Modal */}
                 <ConfirmModal
                     visible={showImageModal}
@@ -634,12 +682,9 @@ const styles = StyleSheet.create({
     header: {
         alignItems: 'center',
         paddingTop: 40,
-        paddingBottom: 60,
+        paddingBottom: 24,
         backgroundColor: '#0A66C2', // Fallback
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
         overflow: 'hidden',
-        minHeight: 220, // Ensure banner is always substantial
     },
     headerOverlay: {
         ...StyleSheet.absoluteFillObject,
@@ -689,41 +734,43 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     idBadgeContainer: {
-        borderRadius: 20,
+        borderRadius: 24,
         overflow: 'hidden',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        marginBottom: 16,
+        elevation: 8,
+        shadowColor: '#0284C7',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        marginTop: -16,
+        marginBottom: 24,
+        alignSelf: 'center',
     },
     idBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#CBD5E1', // Silver border
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 24,
+        borderWidth: 2,
+        borderColor: '#BAE6FD',
         position: 'relative',
         overflow: 'hidden',
     },
     idText: {
-        color: '#1E293B',
-        fontWeight: '800',
-        fontSize: 14,
-        letterSpacing: 1,
-        textShadowColor: 'rgba(255, 255, 255, 0.4)',
+        color: '#FFFFFF',
+        fontWeight: '900',
+        fontSize: 15,
+        letterSpacing: 1.5,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
         textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 1,
+        textShadowRadius: 2,
     },
     shineEffect: {
         position: 'absolute',
         top: 0,
         bottom: 0,
         left: 0,
-        width: 80,
+        width: 100,
     },
     bannerEditButton: {
         position: 'absolute',
@@ -746,7 +793,7 @@ const styles = StyleSheet.create({
     },
     body: {
         paddingHorizontal: 20,
-        marginTop: -40,
+        marginTop: 0,
     },
     card: {
         backgroundColor: '#FFFFFF',
@@ -759,11 +806,30 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 3,
     },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
     cardTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#1F2937',
-        marginBottom: 20,
+    },
+    editButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 4,
+    },
+    editButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0A66C2',
     },
     infoRow: {
         flexDirection: 'row',
