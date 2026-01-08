@@ -127,7 +127,7 @@ const MeetingsScreen = ({ navigation }) => {
                 setStatusModal({ visible: true, title: 'Error', message: res.message || 'Failed', type: 'error' });
             }
         } catch (error) {
-            const msg = error.response?.data?.message || 'Failed';
+            const msg = error.message || error.response?.data?.message || 'Failed';
             setStatusModal({ visible: true, title: 'Error', message: msg, type: 'error' });
         }
     };
@@ -241,12 +241,71 @@ const MeetingsScreen = ({ navigation }) => {
         socket.on('meeting_updated', handleRealTimeUpdate);
         socket.on('meeting_status_updated', handleRealTimeUpdate);
         socket.on('attendance_marked', (data) => {
-            if (selectedClub && (managingMeeting && managingMeeting._id === data.meetingId)) {
+            // 1. Update managingMeeting state if it is currently open
+            if (managingMeeting && managingMeeting._id === data.meetingId) {
+                setManagingMeeting(prev => {
+                    if (!prev) return prev;
+                    // Check if already in attendees list to avoid duplicates
+                    const isAlreadyThere = prev.attendees.some(a => (a.userId?._id || a.userId) === data.userId);
+                    if (isAlreadyThere) return prev;
+
+                    return {
+                        ...prev,
+                        attendees: [
+                            ...prev.attendees,
+                            {
+                                userId: {
+                                    _id: data.userId,
+                                    displayName: data.displayName,
+                                    maverickId: data.maverickId,
+                                    profilePicture: data.profilePicture
+                                },
+                                status: data.status,
+                                markedAt: data.markedAt
+                            }
+                        ]
+                    };
+                });
+            }
+            // 2. Also refresh the background lists
+            if (selectedClub && (data.clubId === selectedClub._id || !data.clubId)) {
                 loadMeetings(selectedClub._id);
             }
         });
         socket.on('attendance_started', handleRealTimeUpdate);
-        socket.on('attendance_updated_manual', handleRealTimeUpdate);
+        socket.on('attendance_updated_manual', (data) => {
+            // 1. Update managingMeeting state if it is currently open
+            if (managingMeeting && managingMeeting._id === data.meetingId) {
+                setManagingMeeting(prev => {
+                    if (!prev) return prev;
+                    const updatedAttendees = [...prev.attendees];
+
+                    data.userIds.forEach(uid => {
+                        const index = updatedAttendees.findIndex(a => (a.userId?._id || a.userId) === uid);
+                        if (index > -1) {
+                            updatedAttendees[index].status = data.status;
+                        } else {
+                            // If not in list, find user from members list to get details
+                            const memberInfo = members.find(m => m._id === uid);
+                            updatedAttendees.push({
+                                userId: memberInfo ? {
+                                    _id: uid,
+                                    displayName: memberInfo.displayName,
+                                    maverickId: memberInfo.maverickId,
+                                    profilePicture: memberInfo.profilePicture
+                                } : { _id: uid },
+                                status: data.status,
+                                markedAt: new Date()
+                            });
+                        }
+                    });
+
+                    return { ...prev, attendees: updatedAttendees };
+                });
+            }
+            // 2. Refresh background lists
+            handleRealTimeUpdate(data);
+        });
 
         return () => {
             socket.off('meeting_created');

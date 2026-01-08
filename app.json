@@ -39,6 +39,10 @@
       "notification": {
         "icon": "./assets/AS.png",
         "color": "#0A66C2"
+      },
+      "statusBar": {
+        "barStyle": "light-content",
+        "backgroundColor": "#0A66C2"
       }
     },
     "web": {

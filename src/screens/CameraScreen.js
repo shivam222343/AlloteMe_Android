@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
     View,
     Text,
@@ -175,58 +176,63 @@ const CameraScreen = ({ navigation, route }) => {
     };
 
     const startRecording = async () => {
-        if (cameraRef.current) {
+        if (cameraRef.current && !isRecording) {
             try {
-                // Determine mode if needed, but 'picture' mode often fails to record.
-                // Switching mode is async, so we might need to handle this.
-                // For now, we assume CameraView might be in 'video' mode or we switch.
-                // Since switching is slow, we might just try to record.
-                // If it fails, we know we need to switch mode.
-
-                // However, let's try setting mode to 'video' based on a state wrapper
-                setMode('video');
-                // Give a tiny delay for mode switch?
-                await new Promise(r => setTimeout(r, 200));
+                // Determine if we need to switch mode first
+                if (mode !== 'video') {
+                    setMode('video');
+                    // Give extra time for hardware to switch from photo to video mode
+                    await new Promise(r => setTimeout(r, 500));
+                }
 
                 setIsRecording(true);
-                const videoData = await cameraRef.current.recordAsync({ maxDuration: 30 });
-                // recordAsync returns promise that resolves when recording stops
-                setCapturedMedia({ uri: videoData.uri, type: 'video' });
-                setPreviewVisible(true);
-
-                // Cleanup after recording
-                setMode('picture');
-                setIsRecording(false);
                 setDuration(0);
+
+                // Start visual timer
+                let startTime = Date.now();
+                recordingTimer.current = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    setDuration(elapsed);
+                }, 100);
+
+                const videoData = await cameraRef.current.recordAsync({
+                    maxDuration: 30,
+                    quality: '480p' // Lower quality for faster uploads/optimization
+                });
+
+                // This code runs AFTER stopRecording() or maxDuration
+                if (videoData) {
+                    setCapturedMedia({ uri: videoData.uri, type: 'video' });
+                    setPreviewVisible(true);
+                }
+
                 clearInterval(recordingTimer.current);
+                setIsRecording(false);
+                setMode('picture'); // Reset to default mode
             } catch (error) {
                 console.error("Failed to record video", error);
-                setIsRecording(false); // Reset on error
+                setIsRecording(false);
                 setMode('picture');
+                clearInterval(recordingTimer.current);
+                Alert.alert("Recording Error", "Could not start video recording. Please try again.");
             }
         }
     };
 
-    const stopRecording = () => {
+    const stopRecording = async () => {
         if (cameraRef.current && isRecording) {
-            cameraRef.current.stopRecording();
-            // isRecording will be set false in startRecording's await continuation
+            try {
+                await cameraRef.current.stopRecording();
+            } catch (err) {
+                console.error("Error stopping recording:", err);
+            }
         }
     };
 
     const handleLongPress = () => {
-        // Start recording
-        startRecording();
-
-        // Timer for max duration (30s)
-        let startTime = Date.now();
-        recordingTimer.current = setInterval(() => {
-            const elapsed = (Date.now() - startTime) / 1000;
-            setDuration(elapsed);
-            if (elapsed >= 30) {
-                stopRecording();
-            }
-        }, 100);
+        if (mode === 'picture') {
+            startRecording();
+        }
     };
 
     const handlePressOut = () => {
@@ -245,9 +251,16 @@ const CameraScreen = ({ navigation, route }) => {
             setUploading(true);
 
             // Use base64 for all uploads (Android compatibility)
-            const base64Data = capturedMedia.base64
-                ? `data:image/jpeg;base64,${capturedMedia.base64}`
-                : capturedMedia.uri;
+            let base64Data = '';
+            if (capturedMedia.base64) {
+                base64Data = `data:${capturedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg'};base64,${capturedMedia.base64}`;
+            } else {
+                // Read as base64 from URI (required for videos)
+                const base64 = await FileSystem.readAsStringAsync(capturedMedia.uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+                base64Data = `data:${capturedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg'};base64,${base64}`;
+            }
 
             const snapData = {
                 clubId: selectedClubId,

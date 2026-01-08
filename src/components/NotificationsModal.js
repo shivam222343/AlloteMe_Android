@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { notificationsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { SkeletonNotification } from './SkeletonLoader';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -21,6 +22,9 @@ const NotificationsModal = ({ visible, onClose }) => {
     const { refreshUnreadCount } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
 
     useEffect(() => {
         if (visible) {
@@ -28,17 +32,32 @@ const NotificationsModal = ({ visible, onClose }) => {
         }
     }, [visible]);
 
-    const fetchNotifications = async () => {
-        setLoading(true);
+    const fetchNotifications = async (pageNum = 1, append = false) => {
+        if (pageNum === 1) setLoading(true);
+        else setLoadingMore(true);
+
         try {
-            const res = await notificationsAPI.getAll();
+            const res = await notificationsAPI.getAll({ page: pageNum, limit: 20 });
             if (res.success) {
-                setNotifications(res.data);
+                if (append) {
+                    setNotifications(prev => [...prev, ...res.data]);
+                } else {
+                    setNotifications(res.data);
+                }
+                setHasMore(res.pagination.hasMore);
+                setPage(res.pagination.page);
             }
         } catch (error) {
             console.error('Fetch notifications error:', error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+
+    const handleLoadMore = () => {
+        if (hasMore && !loadingMore) {
+            fetchNotifications(page + 1, true);
         }
     };
 
@@ -189,8 +208,13 @@ const NotificationsModal = ({ visible, onClose }) => {
                     </View>
 
                     {loading ? (
-                        <View style={styles.center}>
-                            <ActivityIndicator size="large" color="#0A66C2" />
+                        <View style={{ flex: 1 }}>
+                            <FlatList
+                                data={[1, 2, 3, 4, 5, 6, 7, 8]}
+                                keyExtractor={(item) => item.toString()}
+                                renderItem={() => <SkeletonNotification />}
+                                scrollEnabled={false}
+                            />
                         </View>
                     ) : notifications.length > 0 ? (
                         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -200,6 +224,23 @@ const NotificationsModal = ({ visible, onClose }) => {
                                 renderItem={renderItem}
                                 contentContainerStyle={{ paddingBottom: 40 }}
                                 showsVerticalScrollIndicator={false}
+                                ListFooterComponent={() => (
+                                    hasMore && (
+                                        <View style={styles.loadMoreContainer}>
+                                            <TouchableOpacity
+                                                style={styles.loadMoreBtn}
+                                                onPress={handleLoadMore}
+                                                disabled={loadingMore}
+                                            >
+                                                {loadingMore ? (
+                                                    <ActivityIndicator size="small" color="#0A66C2" />
+                                                ) : (
+                                                    <Text style={styles.loadMoreText}>Load More</Text>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
+                                    )
+                                )}
                             />
                         </GestureHandlerRootView>
                     ) : (
@@ -340,7 +381,24 @@ const styles = StyleSheet.create({
     },
     deleteIcon: {
         padding: 20,
-    }
+    },
+    loadMoreContainer: {
+        paddingVertical: 20,
+        alignItems: 'center',
+    },
+    loadMoreBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 24,
+        borderRadius: 20,
+        backgroundColor: '#F3F4F6',
+        minWidth: 120,
+        alignItems: 'center',
+    },
+    loadMoreText: {
+        fontSize: 14,
+        color: '#0A66C2',
+        fontWeight: '600',
+    },
 });
 
 export default NotificationsModal;

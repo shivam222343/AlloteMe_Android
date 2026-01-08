@@ -14,7 +14,8 @@ import {
     Platform,
     Alert,
     TouchableWithoutFeedback,
-    ActivityIndicator, // Added ActivityIndicator
+    ActivityIndicator,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +23,7 @@ import MainLayout from '../components/MainLayout';
 import GroupChatCard from '../components/GroupChatCard';
 import { useAuth } from '../contexts/AuthContext';
 import { messagesAPI, clubsAPI, membersAPI, snapsAPI, groupChatAPI } from '../services/api';
+import { Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
@@ -45,7 +47,7 @@ const MessagesScreen = ({ navigation }) => {
     const [editCaptionModalVisible, setEditCaptionModalVisible] = useState(false);
     const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
     const [snapToDelete, setSnapToDelete] = useState(null);
-
+    const [snapMediaLoading, setSnapMediaLoading] = useState(false);
     // Listen for new snaps
     useEffect(() => {
         if (socket) {
@@ -167,6 +169,7 @@ const MessagesScreen = ({ navigation }) => {
     const handleViewSnaps = (snapGroup) => {
         setViewingSnaps({ ...snapGroup, index: 0 });
         setIsCaptionExpanded(false);
+        setSnapMediaLoading(true);
         setSnapModalVisible(true);
         // Mark first snap as viewed
         if (snapGroup.snaps[0]) {
@@ -178,6 +181,7 @@ const MessagesScreen = ({ navigation }) => {
         if (!viewingSnaps) return;
         if (viewingSnaps.index < viewingSnaps.snaps.length - 1) {
             const nextIdx = viewingSnaps.index + 1;
+            setSnapMediaLoading(true);
             setViewingSnaps({ ...viewingSnaps, index: nextIdx });
             setIsCaptionExpanded(false);
             snapsAPI.view(viewingSnaps.snaps[nextIdx]._id);
@@ -613,135 +617,174 @@ const MessagesScreen = ({ navigation }) => {
                 animationType="slide"
                 onRequestClose={() => setSnapModalVisible(false)}
             >
-                {viewingSnaps && viewingSnaps.snaps[viewingSnaps.index] && (
-                    <TouchableOpacity
-                        style={styles.fullSnapContainer}
-                        activeOpacity={1}
-                        onPress={nextSnap}
-                    >
-                        <Image
-                            source={{ uri: viewingSnaps.snaps[viewingSnaps.index].mediaUrl.url }}
-                            style={styles.fullSnapImage}
-                            resizeMode="cover"
-                        />
-                        <View style={styles.snapOverlay}>
-                            <View style={styles.snapHeader}>
-                                <View style={styles.snapUserInfo}>
-                                    {viewingSnaps.user.profilePicture?.url ? (
-                                        <Image source={{ uri: viewingSnaps.user.profilePicture.url }} style={styles.snapUserAvatar} />
-                                    ) : (
-                                        <View style={styles.snapUserPlaceholder}>
-                                            <Text style={styles.snapUserPlaceholderText}>{viewingSnaps.user.displayName.charAt(0)}</Text>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={{ flex: 1 }}
+                >
+                    {viewingSnaps && viewingSnaps.snaps[viewingSnaps.index] && (
+                        <TouchableOpacity
+                            style={styles.fullSnapContainer}
+                            activeOpacity={1}
+                            onPress={nextSnap}
+                        >
+                            <View style={styles.fullSnapContainer}>
+                                {/* Backdrop Placeholder while loading */}
+                                {snapMediaLoading && (
+                                    <View style={styles.snapBackdrop}>
+                                        <Image
+                                            source={viewingSnaps.user.profilePicture?.url ? { uri: viewingSnaps.user.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + viewingSnaps.user.displayName }}
+                                            style={styles.backdropBlur}
+                                            blurRadius={20}
+                                        />
+                                        <View style={styles.loadingOverlay}>
+                                            <ActivityIndicator size="large" color="#FFF" />
+                                            <Text style={styles.loadingText}>Loading Snap...</Text>
                                         </View>
-                                    )}
-                                    <View>
-                                        <Text style={styles.snapUserName}>{viewingSnaps.user.displayName}</Text>
-                                        <Text style={styles.snapTime}>
-                                            {new Date(viewingSnaps.snaps[viewingSnaps.index].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </Text>
+                                    </View>
+                                )}
+                                {viewingSnaps.snaps[viewingSnaps.index].type === 'video' ? (
+                                    <Video
+                                        source={{ uri: viewingSnaps.snaps[viewingSnaps.index].mediaUrl.url }}
+                                        style={styles.fullSnapImage}
+                                        resizeMode="cover"
+                                        shouldPlay
+                                        isLooping
+                                        onLoadStart={() => setSnapMediaLoading(true)}
+                                        onLoad={() => setSnapMediaLoading(false)}
+                                        onError={(e) => {
+                                            console.error('Video error:', e);
+                                            setSnapMediaLoading(false);
+                                        }}
+                                    />
+                                ) : (
+                                    <Image
+                                        source={{ uri: viewingSnaps.snaps[viewingSnaps.index].mediaUrl.url }}
+                                        style={styles.fullSnapImage}
+                                        resizeMode="cover"
+                                        onLoadStart={() => setSnapMediaLoading(true)}
+                                        onLoadEnd={() => setSnapMediaLoading(false)}
+                                    />
+                                )}
+                            </View>
+                            <View style={styles.snapOverlay}>
+                                <View style={styles.snapHeader}>
+                                    <View style={styles.snapUserInfo}>
+                                        {viewingSnaps.user.profilePicture?.url ? (
+                                            <Image source={{ uri: viewingSnaps.user.profilePicture.url }} style={styles.snapUserAvatar} />
+                                        ) : (
+                                            <View style={styles.snapUserPlaceholder}>
+                                                <Text style={styles.snapUserPlaceholderText}>{viewingSnaps.user.displayName.charAt(0)}</Text>
+                                            </View>
+                                        )}
+                                        <View>
+                                            <Text style={styles.snapUserName}>{viewingSnaps.user.displayName}</Text>
+                                            <Text style={styles.snapTime}>
+                                                {new Date(viewingSnaps.snaps[viewingSnaps.index].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.snapActions}>
+                                        {viewingSnaps.user._id.toString() === user._id.toString() && (
+                                            <>
+                                                <TouchableOpacity
+                                                    style={styles.snapActionBtn}
+                                                    onPress={() => fetchViewersList(viewingSnaps.snaps[viewingSnaps.index]._id)}
+                                                >
+                                                    <Ionicons name="eye" size={24} color="#FFF" />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.snapActionBtn}
+                                                    onPress={() => {
+                                                        setEditingSnapId(viewingSnaps.snaps[viewingSnaps.index]._id);
+                                                        setNewCaption(viewingSnaps.snaps[viewingSnaps.index].caption || '');
+                                                        setEditCaptionModalVisible(true);
+                                                    }}
+                                                >
+                                                    <Ionicons name="create" size={24} color="#FFF" />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.snapActionBtn}
+                                                    onPress={() => handleDeleteSnap(viewingSnaps.snaps[viewingSnaps.index]._id)}
+                                                >
+                                                    <Ionicons name="trash" size={24} color="#FFF" />
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
+                                        <TouchableOpacity onPress={() => setSnapModalVisible(false)}>
+                                            <Ionicons name="close" size={32} color="#FFF" />
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
-                                <View style={styles.snapActions}>
-                                    {viewingSnaps.user._id.toString() === user._id.toString() && (
-                                        <>
-                                            <TouchableOpacity
-                                                style={styles.snapActionBtn}
-                                                onPress={() => fetchViewersList(viewingSnaps.snaps[viewingSnaps.index]._id)}
-                                            >
-                                                <Ionicons name="eye" size={24} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={styles.snapActionBtn}
-                                                onPress={() => {
-                                                    setEditingSnapId(viewingSnaps.snaps[viewingSnaps.index]._id);
-                                                    setNewCaption(viewingSnaps.snaps[viewingSnaps.index].caption || '');
-                                                    setEditCaptionModalVisible(true);
-                                                }}
-                                            >
-                                                <Ionicons name="create" size={24} color="#FFF" />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={styles.snapActionBtn}
-                                                onPress={() => handleDeleteSnap(viewingSnaps.snaps[viewingSnaps.index]._id)}
-                                            >
-                                                <Ionicons name="trash" size={24} color="#FFF" />
-                                            </TouchableOpacity>
-                                        </>
-                                    )}
-                                    <TouchableOpacity onPress={() => setSnapModalVisible(false)}>
-                                        <Ionicons name="close" size={32} color="#FFF" />
-                                    </TouchableOpacity>
+
+                                {/* Snap Progress */}
+                                <View style={styles.progressContainer}>
+                                    {viewingSnaps.snaps.map((_, i) => (
+                                        <View
+                                            key={i}
+                                            style={[
+                                                styles.progressBar,
+                                                { flex: 1, backgroundColor: i <= viewingSnaps.index ? '#FFF' : 'rgba(255,255,255,0.3)' }
+                                            ]}
+                                        />
+                                    ))}
                                 </View>
-                            </View>
 
-                            {/* Snap Progress */}
-                            <View style={styles.progressContainer}>
-                                {viewingSnaps.snaps.map((_, i) => (
-                                    <View
-                                        key={i}
-                                        style={[
-                                            styles.progressBar,
-                                            { flex: 1, backgroundColor: i <= viewingSnaps.index ? '#FFF' : 'rgba(255,255,255,0.3)' }
-                                        ]}
-                                    />
-                                ))}
-                            </View>
+                                {/* Center Content for dismissal */}
+                                <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={nextSnap} />
 
-                            {/* Center Content for dismissal */}
-                            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={nextSnap} />
-
-                            {/* Bottom Content Area */}
-                            <TouchableWithoutFeedback onPress={(e) => { }}>
-                                <View style={styles.snapBottomArea}>
-                                    {/* Caption Overlay */}
-                                    {viewingSnaps.snaps[viewingSnaps.index].caption ? (
-                                        <View style={styles.snapCaptionContainer}>
-                                            <Text
-                                                style={styles.snapCaptionText}
-                                                numberOfLines={isCaptionExpanded ? undefined : 3}
-                                            >
-                                                {viewingSnaps.snaps[viewingSnaps.index].caption}
-                                            </Text>
-                                            {viewingSnaps.snaps[viewingSnaps.index].caption.length > 100 && (
-                                                <TouchableOpacity onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}>
-                                                    <Text style={styles.viewMoreText}>
-                                                        {isCaptionExpanded ? 'View less' : 'View more...'}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    ) : null}
-
-                                    {/* Reply Input Area - Always show if not own snap */}
-                                    {viewingSnaps.user._id.toString() !== user._id.toString() && (
-                                        <View style={styles.snapReplyContainer}>
-                                            <TextInput
-                                                style={styles.snapReplyInput}
-                                                placeholder="Reply via chat..."
-                                                placeholderTextColor="rgba(255,255,255,0.6)"
-                                                value={replyText}
-                                                onChangeText={setReplyText}
-                                            />
-                                            {replyText.length > 0 && (
-                                                <TouchableOpacity
-                                                    style={[styles.snapReplySendBtn, replySuccess && { backgroundColor: '#10B981' }]}
-                                                    onPress={handleSendReply}
-                                                    disabled={sendingReply}
+                                {/* Bottom Content Area */}
+                                <TouchableWithoutFeedback onPress={(e) => { }}>
+                                    <View style={styles.snapBottomArea}>
+                                        {/* Caption Overlay */}
+                                        {viewingSnaps.snaps[viewingSnaps.index].caption ? (
+                                            <View style={styles.snapCaptionContainer}>
+                                                <Text
+                                                    style={styles.snapCaptionText}
+                                                    numberOfLines={isCaptionExpanded ? undefined : 3}
                                                 >
-                                                    <Ionicons
-                                                        name={replySuccess ? "checkmark" : "send"}
-                                                        size={20}
-                                                        color={replySuccess ? "#FFF" : "#0A66C2"}
-                                                    />
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    )}
-                                </View>
-                            </TouchableWithoutFeedback>
-                        </View>
-                    </TouchableOpacity>
-                )}
+                                                    {viewingSnaps.snaps[viewingSnaps.index].caption}
+                                                </Text>
+                                                {viewingSnaps.snaps[viewingSnaps.index].caption.length > 100 && (
+                                                    <TouchableOpacity onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}>
+                                                        <Text style={styles.viewMoreText}>
+                                                            {isCaptionExpanded ? 'View less' : 'View more...'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
+                                        ) : null}
+
+                                        {/* Reply Input Area - Always show if not own snap */}
+                                        {viewingSnaps.user._id.toString() !== user._id.toString() && (
+                                            <View style={styles.snapReplyContainer}>
+                                                <TextInput
+                                                    style={styles.snapReplyInput}
+                                                    placeholder="Reply via chat..."
+                                                    placeholderTextColor="rgba(255,255,255,0.6)"
+                                                    value={replyText}
+                                                    onChangeText={setReplyText}
+                                                />
+                                                {replyText.length > 0 && (
+                                                    <TouchableOpacity
+                                                        style={[styles.snapReplySendBtn, replySuccess && { backgroundColor: '#10B981' }]}
+                                                        onPress={handleSendReply}
+                                                        disabled={sendingReply}
+                                                    >
+                                                        <Ionicons
+                                                            name={replySuccess ? "checkmark" : "send"}
+                                                            size={20}
+                                                            color={replySuccess ? "#FFF" : "#0A66C2"}
+                                                        />
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
+                                        )}
+                                    </View>
+                                </TouchableWithoutFeedback>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+                </KeyboardAvoidingView>
             </Modal>
 
             {/* Viewers Modal */}
@@ -1442,6 +1485,29 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    snapBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    backdropBlur: {
+        ...StyleSheet.absoluteFillObject,
+        opacity: 0.4,
+    },
+    loadingOverlay: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        color: '#FFF',
+        marginTop: 15,
+        fontSize: 14,
+        fontWeight: '600',
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
 });
 

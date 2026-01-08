@@ -72,6 +72,7 @@ const AdminScreen = ({ navigation }) => {
     const [statusModal, setStatusModal] = useState({ visible: false, title: '', message: '', type: 'success' });
     const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', onConfirm: () => { } });
     const [exportModalVisible, setExportModalVisible] = useState(false);
+    const [fullImageModal, setFullImageModal] = useState({ visible: false, imageUrl: '' });
 
     const loadData = async () => {
         setLoading(true);
@@ -609,7 +610,7 @@ const AdminScreen = ({ navigation }) => {
                                 <Text style={styles.approvalDesc} numberOfLines={2}>{img.description || 'No description'}</Text>
                                 <Text style={styles.approvalCategory}>Category: {img.category}</Text>
                             </View>
-                            <TouchableOpacity onPress={() => {/* Show full image maybe? */ }}>
+                            <TouchableOpacity onPress={() => setFullImageModal({ visible: true, imageUrl: img.imageUrl })}>
                                 <View style={styles.approvalImageWrapper}>
                                     <View style={styles.imageOverlay}>
                                         <Ionicons name="expand-outline" size={20} color="#FFF" />
@@ -1212,8 +1213,30 @@ const AdminScreen = ({ navigation }) => {
                 >
                     <Ionicons name="download" size={24} color="#FFF" />
                 </TouchableOpacity>
+
+                {/* Full Image Viewer Modal */}
+                <Modal
+                    visible={fullImageModal.visible}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setFullImageModal({ visible: false, imageUrl: '' })}
+                >
+                    <View style={styles.fullImageOverlay}>
+                        <TouchableOpacity
+                            style={styles.closeFullImage}
+                            onPress={() => setFullImageModal({ visible: false, imageUrl: '' })}
+                        >
+                            <Ionicons name="close" size={32} color="#FFF" />
+                        </TouchableOpacity>
+                        <Image
+                            source={{ uri: fullImageModal.imageUrl }}
+                            style={styles.fullScreenImage}
+                            resizeMode="contain"
+                        />
+                    </View>
+                </Modal>
             </View>
-        </MainLayout>
+        </MainLayout >
     );
 };
 
@@ -1761,6 +1784,25 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: '800',
         color: '#EF4444',
+    },
+    fullImageOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullScreenImage: {
+        width: '95%',
+        height: '85%',
+    },
+    closeFullImage: {
+        position: 'absolute',
+        top: 50,
+        right: 25,
+        zIndex: 10,
+        padding: 10,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 25,
     },
 });
 

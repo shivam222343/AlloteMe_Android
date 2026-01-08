@@ -149,6 +149,10 @@ export const clubsAPI = {
     getById: (id) => api.get(`/clubs/${id}`),
     create: (data) => api.post('/clubs', data),
     update: (id, data) => api.put(`/clubs/${id}`, data),
+    updateLogoBase64: (id, data) => api.put(`/clubs/${id}/logo-base64`, data, {
+        timeout: 600000,
+        headers: { 'Content-Type': 'application/json' }
+    }),
     delete: (id, superKey) => api.delete(`/clubs/${id}`, { data: { superKey } }),
     join: (accessKey) => api.post('/clubs/join', { accessKey }),
     addMember: (clubId, maverickId) => api.post('/clubs/add-member', { clubId, maverickId }),
@@ -200,7 +204,7 @@ export const analyticsAPI = {
 
 // Notifications API
 export const notificationsAPI = {
-    getAll: () => api.get('/notifications'),
+    getAll: (params) => api.get('/notifications', { params }),
     markAsRead: (id) => api.put(`/notifications/${id}/read`),
     markAllAsRead: () => api.put('/notifications/read-all'),
     delete: (id) => api.delete(`/notifications/${id}`),
@@ -229,6 +233,10 @@ export const messagesAPI = {
         }
         return api.post('/messages', data);
     },
+    sendBase64: (data) => api.post('/messages/upload-base64', data, {
+        timeout: 600000,
+        headers: { 'Content-Type': 'application/json' }
+    }),
 
     markAsRead: (userId) => api.put(`/messages/${userId}/read`),
     addReaction: (messageId, data) => api.post(`/messages/${messageId}/reaction`, data),
@@ -325,11 +333,27 @@ export const groupChatAPI = {
         }
         return api.post(`/group-chat/${clubId}/messages`, data);
     },
+    sendBase64Message: (clubId, data) => api.post(`/group-chat/${clubId}/messages-base64`, data, {
+        timeout: 600000,
+        headers: { 'Content-Type': 'application/json' }
+    }),
 
     markAsRead: (clubId) => api.put(`/group-chat/${clubId}/read`),
     deleteMessage: (clubId, messageId, type) => api.delete(`/group-chat/${clubId}/messages/${messageId}`, { params: { type } }),
     addReaction: (clubId, messageId, data) => api.post(`/group-chat/${clubId}/messages/${messageId}/reaction`, data),
     getUnreadCount: (clubId) => api.get(`/group-chat/${clubId}/unread-count`),
+};
+
+// Media/Generic Upload API
+export const mediaAPI = {
+    upload: (formData) => api.post('/web-upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 600000
+    }),
+    uploadBase64: (data) => api.post('/web-upload/base64', data, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 600000
+    })
 };
 
 export default api;

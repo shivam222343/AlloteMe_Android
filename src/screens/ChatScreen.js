@@ -25,7 +25,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
-import { messagesAPI, groupChatAPI, snapsAPI, clubsAPI } from '../services/api';
+import { messagesAPI, groupChatAPI, snapsAPI, clubsAPI, mediaAPI } from '../services/api';
 import { API_CONFIG } from '../constants/theme';
 import { prepareFile } from '../services/cloudinaryService';
 import * as Animatable from 'react-native-animatable';
@@ -616,6 +616,12 @@ const ChatScreen = ({ route, navigation }) => {
     const sendMessage = async () => {
         if (!inputText.trim() && attachments.length === 0) return;
 
+        // Check if all attachments are uploaded
+        if (attachments.some(att => att.uploading)) {
+            alert('Please wait for media to finish uploading...');
+            return;
+        }
+
         const tempText = inputText;
         const tempAttachments = [...attachments];
         const tempReply = replyingTo;
@@ -628,33 +634,44 @@ const ChatScreen = ({ route, navigation }) => {
 
         try {
             const sendSingle = async (text, attachmentItem) => {
-                let file = null;
-                if (attachmentItem && !attachmentItem.isWebUpload) {
-                    file = await prepareFile(attachmentItem.uri);
-                }
-
                 const messageData = {
                     content: text,
                     type: attachmentItem ? 'media' : 'text',
                     replyTo: tempReply?._id
                 };
 
-                if (attachmentItem && attachmentItem.isWebUpload) {
+                // Use pre-uploaded Cloudinary URL if available
+                if (attachmentItem && attachmentItem.uploaded) {
                     messageData.fileUrl = attachmentItem.uri;
                     messageData.publicId = attachmentItem.publicId || '';
                     messageData.fileName = attachmentItem.name || 'Attachment';
+                } else if (attachmentItem && attachmentItem.isWebUpload) {
+                    messageData.fileUrl = attachmentItem.uri;
+                    messageData.publicId = attachmentItem.publicId || '';
+                    messageData.fileName = attachmentItem.name || 'Attachment';
+                } else if (attachmentItem && attachmentItem.base64) {
+                    // Fallback for non-instant uploads if any
+                    messageData.image = attachmentItem.base64;
+                    messageData.fileName = attachmentItem.name || 'Attachment';
                 }
 
-
                 if (!messageData.content && attachmentItem) {
-                    messageData.content = ''; // No default text for secondary attachments
+                    messageData.content = '';
                 }
 
                 if (isGroupChat) {
                     if (text && /@Eta/i.test(text)) {
                         setAiProcessing(true);
                     }
-                    const res = await groupChatAPI.sendMessage(clubId, messageData, file);
+
+                    let res;
+                    // If we have a fileUrl, we don't need sendBase64Message
+                    if (messageData.image && !messageData.fileUrl) {
+                        res = await groupChatAPI.sendBase64Message(clubId, messageData);
+                    } else {
+                        res = await groupChatAPI.sendMessage(clubId, messageData);
+                    }
+
                     if (res.success && res.data) {
                         setLastSentMessageId(res.data._id);
                         setMessages(prev => {
@@ -668,7 +685,14 @@ const ChatScreen = ({ route, navigation }) => {
                         messageData.mentionAI = true;
                         setAiProcessing(true);
                     }
-                    const res = await messagesAPI.send(messageData, file);
+
+                    let res;
+                    if (messageData.image && !messageData.fileUrl) {
+                        res = await messagesAPI.sendBase64(messageData);
+                    } else {
+                        res = await messagesAPI.send(messageData);
+                    }
+
                     if (res.success && res.data) {
                         setLastSentMessageId(res.data._id);
                         setMessages(prev => {
@@ -706,24 +730,84 @@ const ChatScreen = ({ route, navigation }) => {
         }
     };
 
-    // ... (rest of simple functions)
+    const uploadAttachment = async (attachment, tempId) => {
+        try {
+            let res;
+            if (attachment.base64) {
+                res = await mediaAPI.uploadBase64({
+                    image: attachment.base64,
+                    type: 'chat'
+                });
+            } else {
+                const file = await prepareFile(attachment.uri);
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('type', 'chat');
+                res = await mediaAPI.upload(formData);
+            }
+
+            if (res.success) {
+                setAttachments(prev => {
+                    return prev.map(att => {
+                        if (att.tempId === tempId) {
+                            return {
+                                ...att,
+                                uri: res.data.url,
+                                publicId: res.data.publicId,
+                                uploading: false,
+                                uploaded: true
+                            };
+                        }
+                        return att;
+                    });
+                });
+            } else {
+                throw new Error(res.message || 'Upload failed');
+            }
+        } catch (error) {
+            console.error('Instant upload error:', error);
+            setAttachments(prev => {
+                return prev.map(att => {
+                    if (att.tempId === tempId) {
+                        return { ...att, uploading: false, error: true };
+                    }
+                    return att;
+                });
+            });
+        }
+    };
 
     const handlePickImage = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.All,
-                quality: 0.5,
+                quality: 0.3,
+                base64: true,
                 allowsMultipleSelection: true,
                 selectionLimit: 5
             });
 
             if (!result.canceled) {
-                const newAttachments = result.assets.map(asset => ({
-                    uri: asset.uri,
-                    type: asset.type === 'video' ? 'video' : 'image',
-                    name: asset.fileName || 'Media'
-                }));
-                setAttachments(prev => [...prev, ...newAttachments]);
+                const newItems = result.assets.map((asset) => {
+                    const tempId = Math.random().toString(36).substring(7);
+                    const item = {
+                        tempId,
+                        uri: asset.uri,
+                        type: asset.type === 'video' ? 'video' : 'image',
+                        name: asset.fileName || (asset.type === 'video' ? 'Video.mp4' : 'Image.jpg'),
+                        base64: asset.base64 ? `data:${asset.type === 'video' ? 'video/mp4' : 'image/jpeg'};base64,${asset.base64}` : null,
+                        uploading: true,
+                        uploaded: false
+                    };
+                    return item;
+                });
+
+                setAttachments(prev => [...prev, ...newItems]);
+
+                // Start uploads
+                newItems.forEach(item => {
+                    uploadAttachment(item, item.tempId);
+                });
             }
         } catch (error) {
             console.error('Error picking image:', error);
@@ -732,20 +816,30 @@ const ChatScreen = ({ route, navigation }) => {
     };
 
     const handlePickCamera = async () => {
-        // ... (keep camera logic, but append to attachments)
         try {
             const { status } = await ImagePicker.requestCameraPermissionsAsync();
             if (status !== 'granted') {
                 alert('Permission needed to access camera');
                 return;
             }
-            const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+            const result = await ImagePicker.launchCameraAsync({
+                quality: 0.3,
+                base64: true
+            });
             if (!result.canceled) {
-                setAttachments(prev => [...prev, {
-                    uri: result.assets[0].uri,
+                const tempId = Math.random().toString(36).substring(7);
+                const asset = result.assets[0];
+                const newItem = {
+                    tempId,
+                    uri: asset.uri,
+                    base64: asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : null,
                     type: 'image',
-                    name: 'CameraCapture.jpg'
-                }]);
+                    name: 'CameraCapture.jpg',
+                    uploading: true,
+                    uploaded: false
+                };
+                setAttachments(prev => [...prev, newItem]);
+                uploadAttachment(newItem, tempId);
             }
         } catch (err) { console.log(err); }
         setShowAttachMenu(false);
@@ -760,12 +854,21 @@ const ChatScreen = ({ route, navigation }) => {
             });
 
             if (result.assets) {
-                const newAttachments = result.assets.map(asset => ({
-                    uri: asset.uri,
-                    type: 'document',
-                    name: asset.name
-                }));
-                setAttachments(prev => [...prev, ...newAttachments]);
+                const newItems = result.assets.map(asset => {
+                    const tempId = Math.random().toString(36).substring(7);
+                    return {
+                        tempId,
+                        uri: asset.uri,
+                        type: 'document',
+                        name: asset.name,
+                        uploading: true,
+                        uploaded: false
+                    };
+                });
+                setAttachments(prev => [...prev, ...newItems]);
+                newItems.forEach(item => {
+                    uploadAttachment(item, item.tempId);
+                });
             }
         } catch (err) { console.log(err); }
         setShowAttachMenu(false);
@@ -779,12 +882,21 @@ const ChatScreen = ({ route, navigation }) => {
                 multiple: true
             });
             if (result.assets) {
-                const newAttachments = result.assets.map(asset => ({
-                    uri: asset.uri,
-                    type: 'document', // Backend handles as file
-                    name: asset.name
-                }));
-                setAttachments(prev => [...prev, ...newAttachments]);
+                const newItems = result.assets.map(asset => {
+                    const tempId = Math.random().toString(36).substring(7);
+                    return {
+                        tempId,
+                        uri: asset.uri,
+                        type: 'document', // Backend handles as file
+                        name: asset.name,
+                        uploading: true,
+                        uploaded: false
+                    };
+                });
+                setAttachments(prev => [...prev, ...newItems]);
+                newItems.forEach(item => {
+                    uploadAttachment(item, item.tempId);
+                });
             }
         } catch (err) { console.log(err); }
         setShowAttachMenu(false);
@@ -855,6 +967,11 @@ const ChatScreen = ({ route, navigation }) => {
                 socket.on('group:message', handleReceiveMessage);
                 socket.on('group:message:delete', handleDeleteSync);
                 socket.on('group:message:reaction', handleReactionSync);
+                socket.on('club:members:update', (data) => {
+                    if (data.clubId === clubId.toString()) {
+                        fetchMessages();
+                    }
+                });
             } else {
                 // Individual chat socket listeners
                 socket.on('message:receive', handleReceiveMessage);
@@ -870,6 +987,7 @@ const ChatScreen = ({ route, navigation }) => {
                     socket.off('group:message', handleReceiveMessage);
                     socket.off('group:message:delete', handleDeleteSync);
                     socket.off('group:message:reaction', handleReactionSync);
+                    socket.off('club:members:update');
                 } else {
                     socket.off('message:receive', handleReceiveMessage);
                     socket.off('message:typing', handleTypingStatus);
@@ -1026,19 +1144,18 @@ const ChatScreen = ({ route, navigation }) => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.8,
+                quality: 0.3,
+                base64: true, // Enable base64 for Android
                 allowsEditing: true,
                 aspect: [1, 1],
             });
 
             if (!result.canceled) {
                 setUploadingMedia(true);
-                const file = await prepareFile(result.assets[0].uri);
+                const asset = result.assets[0];
+                const base64Img = `data:image/jpeg;base64,${asset.base64}`;
 
-                const formData = new FormData();
-                formData.append('logo', file);
-
-                const res = await clubsAPI.update(clubId, formData);
+                const res = await clubsAPI.updateLogoBase64(clubId, { logo: base64Img });
 
                 if (res.success) {
                     alert('Group icon updated!');
@@ -1459,6 +1576,16 @@ const ChatScreen = ({ route, navigation }) => {
                                                         <Image source={{ uri: att.uri }} style={{ width: '100%', height: '100%' }} />
                                                     ) : (
                                                         <Ionicons name="document-text" size={30} color="#6B7280" />
+                                                    )}
+                                                    {att.uploading && (
+                                                        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.6)', justifyContent: 'center', alignItems: 'center' }}>
+                                                            <ActivityIndicator size="small" color="#0A66C2" />
+                                                        </View>
+                                                    )}
+                                                    {att.uploaded && (
+                                                        <View style={{ position: 'absolute', bottom: 2, right: 2, backgroundColor: '#10B981', borderRadius: 8, padding: 1 }}>
+                                                            <Ionicons name="checkmark-circle" size={12} color="#FFF" />
+                                                        </View>
                                                     )}
                                                 </View>
                                                 <TouchableOpacity

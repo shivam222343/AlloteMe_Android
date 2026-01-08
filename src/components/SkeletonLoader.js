@@ -1,11 +1,52 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
-export const SkeletonBox = ({ width: w, height: h, style, borderRadius = 8 }) => (
-    <View style={[styles.skeleton, { width: w, height: h, borderRadius }, style]} />
-);
+export const SkeletonBox = ({ width: w, height: h, style, borderRadius = 8 }) => {
+    const animatedValue = React.useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        const animation = Animated.loop(
+            Animated.sequence([
+                Animated.timing(animatedValue, {
+                    toValue: 1,
+                    duration: 1000,
+                    easing: Easing.linear,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(animatedValue, {
+                    toValue: 0,
+                    duration: 1000,
+                    easing: Easing.linear,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+        animation.start();
+        return () => animation.stop();
+    }, []);
+
+    const translateX = animatedValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-width, width],
+    });
+
+    return (
+        <View style={[styles.skeleton, { width: w, height: h, borderRadius, overflow: 'hidden' }, style]}>
+            <Animated.View
+                style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                        transform: [{ translateX }],
+                    }
+                ]}
+            >
+                <View style={styles.shimmerGradient} />
+            </Animated.View>
+        </View>
+    );
+};
 
 export const SkeletonCard = ({ children, style }) => (
     <View style={[styles.card, style]}>
@@ -177,7 +218,11 @@ export const SkeletonNotification = () => (
 const styles = StyleSheet.create({
     skeleton: {
         backgroundColor: '#E2E8F0',
-        opacity: 0.6,
+    },
+    shimmerGradient: {
+        flex: 1,
+        width: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.4)',
     },
     card: {
         backgroundColor: '#F8FAFC',

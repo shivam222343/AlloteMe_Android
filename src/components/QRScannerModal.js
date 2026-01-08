@@ -70,7 +70,7 @@ const QRScannerModal = ({ visible, onClose }) => {
             }
         } catch (error) {
             setLoading(false);
-            const msg = error.response?.data?.message || 'Attendance marking failed';
+            const msg = error.message || error.response?.data?.message || 'Attendance marking failed';
             setStatusModal({
                 visible: true,
                 title: 'Error',

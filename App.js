@@ -10,9 +10,11 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { handleNotificationResponse, setupNotificationListeners } from './src/services/NotificationService';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ProfileCompletionModal from './src/components/ProfileCompletionModal';
 import { authAPI } from './src/services/api';
 
+import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 
 Notifications.setNotificationHandler({
@@ -134,7 +136,8 @@ const AppContent = () => {
   }
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="light" backgroundColor="#0A66C2" translucent={false} />
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           screenOptions={{
@@ -183,7 +186,7 @@ const AppContent = () => {
           }}
         />
       )}
-    </>
+    </GestureHandlerRootView>
   );
 };
 
