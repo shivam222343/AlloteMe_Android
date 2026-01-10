@@ -13,8 +13,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ProfileCompletionModal from './src/components/ProfileCompletionModal';
 import { authAPI } from './src/services/api';
-import { CallProvider } from './src/contexts/CallContext';
-import CallManager from './src/components/CallManager';
 
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -202,10 +200,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <CallProvider>
-          <AppContent />
-          <CallManager />
-        </CallProvider>
+        <AppContent />
       </AuthProvider>
     </SafeAreaProvider>
   );

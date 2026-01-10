@@ -25,7 +25,6 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
-import { useCall } from '../contexts/CallContext';
 import { messagesAPI, groupChatAPI, snapsAPI, clubsAPI, mediaAPI } from '../services/api';
 import { API_CONFIG } from '../constants/theme';
 import { prepareFile } from '../services/cloudinaryService';
@@ -588,22 +587,6 @@ const ChatScreen = ({ route, navigation }) => {
     const [showViewedByModal, setShowViewedByModal] = useState(false);
     const [viewedByMessageId, setViewedByMessageId] = useState(null);
     const isSelectionMode = selectedMessages.length > 0;
-
-    // Call Context
-    const { startCall } = useCall();
-
-    const handleCallPress = (type) => {
-        let recipients = [];
-        if (isGroupChat) {
-            recipients = localGroupData?.members
-                ?.map(m => m.userId)
-                .filter(u => (u._id || u) !== user._id) || [];
-        } else {
-            recipients = [otherUser];
-        }
-
-        startCall(recipients, type, isGroupChat, isGroupChat ? currentClubName : '');
-    };
 
     useEffect(() => {
         if (isGroupChat && localGroupData) {
@@ -1668,16 +1651,10 @@ const ChatScreen = ({ route, navigation }) => {
                                 </View>
                             </TouchableOpacity>
                             <View style={styles.headerActions}>
-                                <TouchableOpacity
-                                    style={styles.headerActionBtn}
-                                    onPress={() => handleCallPress('audio')}
-                                >
+                                <TouchableOpacity style={styles.headerActionBtn}>
                                     <Ionicons name="call-outline" size={22} color="#0A66C2" />
                                 </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.headerActionBtn}
-                                    onPress={() => handleCallPress('video')}
-                                >
+                                <TouchableOpacity style={styles.headerActionBtn}>
                                     <Ionicons name="videocam-outline" size={24} color="#0A66C2" />
                                 </TouchableOpacity>
                             </View>
@@ -2174,33 +2151,15 @@ const ChatScreen = ({ route, navigation }) => {
                             </View>
 
                             <View style={styles.profileActions}>
-                                <TouchableOpacity
-                                    style={styles.actionBtn}
-                                    onPress={() => {
-                                        setShowProfileModal(false);
-                                        // Already in chat
-                                    }}
-                                >
+                                <TouchableOpacity style={styles.actionBtn}>
                                     <Ionicons name="chatbubble-ellipses" size={24} color="#0A66C2" />
                                     <Text style={styles.actionText}>Message</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.actionBtn}
-                                    onPress={() => {
-                                        setShowProfileModal(false);
-                                        handleCallPress('audio');
-                                    }}
-                                >
+                                <TouchableOpacity style={styles.actionBtn}>
                                     <Ionicons name="call" size={24} color="#0A66C2" />
                                     <Text style={styles.actionText}>Call</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.actionBtn}
-                                    onPress={() => {
-                                        setShowProfileModal(false);
-                                        handleCallPress('video');
-                                    }}
-                                >
+                                <TouchableOpacity style={styles.actionBtn}>
                                     <Ionicons name="videocam" size={24} color="#0A66C2" />
                                     <Text style={styles.actionText}>Video</Text>
                                 </TouchableOpacity>
