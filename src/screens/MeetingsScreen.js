@@ -11,8 +11,10 @@ import {
     TextInput,
     ActivityIndicator,
     Alert,
-    FlatList
+    FlatList,
+    Dimensions,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import MainLayout from '../components/MainLayout';
@@ -183,6 +185,46 @@ const MeetingsScreen = ({ navigation }) => {
         }
     };
 
+    const handleClubSwipe = (direction) => {
+        if (!myClubs || myClubs.length <= 1) return;
+        const currentIndex = myClubs.findIndex(c => (c._id?.toString() || c._id) === (selectedClub?._id?.toString() || selectedClub?._id));
+        if (currentIndex === -1) return;
+
+        if (direction === 'next') {
+            if (currentIndex < myClubs.length - 1) {
+                setSelectedClub(myClubs[currentIndex + 1]);
+            }
+        } else {
+            if (currentIndex > 0) {
+                setSelectedClub(myClubs[currentIndex - 1]);
+            }
+        }
+    };
+
+    const onSwipeGestureEvent = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            const { translationX, velocityX } = event.nativeEvent;
+            if (Math.abs(translationX) > 60 && Math.abs(velocityX) > 300) {
+                if (translationX < 0) {
+                    handleClubSwipe('next');
+                } else {
+                    handleClubSwipe('prev');
+                }
+            }
+        }
+    };
+
+    const handleScreenPress = (event) => {
+        const x = event.nativeEvent.pageX;
+        const { width: screenWidth } = Dimensions.get('window');
+
+        if (x < screenWidth / 4) {
+            if (activeTab !== 'upcoming') setActiveTab('upcoming');
+        } else if (x > (screenWidth * 3) / 4) {
+            if (activeTab !== 'past') setActiveTab('past');
+        }
+    };
+
     const isAdmin = () => {
         if (!user) return false;
         if (user.role === 'admin') return true;
@@ -346,124 +388,137 @@ const MeetingsScreen = ({ navigation }) => {
         <MainLayout navigation={navigation} currentRoute="Meetings" title="Meetings">
             <View style={styles.container}>
                 {/* Club Selector - Always Visible */}
-                {myClubs.length > 0 ? (
-                    <View style={styles.clubSelector}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {loading ? (
-                                <SkeletonFilterChips count={3} />
+                <PanGestureHandler
+                    onHandlerStateChange={onSwipeGestureEvent}
+                    activeOffsetX={[-20, 20]}
+                    failOffsetY={[-20, 20]}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={{ flex: 1 }}
+                        onPress={handleScreenPress}
+                    >
+                        {/* Club Selector - Always Visible */}
+                        {myClubs.length > 0 ? (
+                            <View style={styles.clubSelector}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    {loading ? (
+                                        <SkeletonFilterChips count={3} />
+                                    ) : (
+                                        myClubs.map(club => (
+                                            <TouchableOpacity
+                                                key={club._id}
+                                                style={[styles.chip, selectedClub?._id === club._id && styles.chipActive]}
+                                                onPress={() => setSelectedClub(club)}
+                                            >
+                                                <Text style={[styles.chipText, selectedClub?._id === club._id && styles.chipTextActive]}>
+                                                    {club.name}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))
+                                    )}
+                                </ScrollView>
+                            </View>
+                        ) : !loading && (
+                            <View style={styles.noClubs}>
+                                <Text style={styles.noClubsText}>Join a club first!</Text>
+                            </View>
+                        )}
+
+                        {selectedClub && (
+                            <View style={styles.tabs}>
+                                <TouchableOpacity style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]} onPress={() => setActiveTab('upcoming')}>
+                                    <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>Upcoming</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.tab, activeTab === 'past' && styles.tabActive]} onPress={() => setActiveTab('past')}>
+                                    <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>Past / History</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        <ScrollView
+                            style={styles.content}
+                            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                            contentContainerStyle={{ paddingBottom: 100 }}
+                        >
+                            {!selectedClub ? (
+                                <View style={styles.emptyState}>
+                                    <Ionicons name="alert-circle-outline" size={64} color="#E5E7EB" />
+                                    <Text style={styles.emptyText}>You haven't joined any clubs yet.</Text>
+                                </View>
+                            ) : loadingMeetings ? (
+                                /* Show skeleton while loading meetings */
+                                <>
+                                    <SkeletonMeetingCard />
+                                    <SkeletonMeetingCard />
+                                    <SkeletonMeetingCard />
+                                </>
                             ) : (
-                                myClubs.map(club => (
-                                    <TouchableOpacity
-                                        key={club._id}
-                                        style={[styles.chip, selectedClub?._id === club._id && styles.chipActive]}
-                                        onPress={() => setSelectedClub(club)}
-                                    >
-                                        <Text style={[styles.chipText, selectedClub?._id === club._id && styles.chipTextActive]}>
-                                            {club.name}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))
+                                (activeTab === 'upcoming' ? meetings.upcoming : meetings.past).length === 0 ? (
+                                    <View style={styles.emptyState}>
+                                        <Text style={styles.emptyText}>No {activeTab} meetings found.</Text>
+                                    </View>
+                                ) : (
+                                    (activeTab === 'upcoming' ? meetings.upcoming : meetings.past).map(meeting => {
+                                        const status = getMeetingStatus(meeting);
+                                        // Check if attendance active
+                                        const canMark = meeting.isAttendanceActive && !meeting.attendees.find(a => (a.userId?._id || a.userId) === user._id);
+
+                                        return (
+                                            <View key={meeting._id} style={styles.card}>
+                                                <View style={styles.cardHeader}>
+                                                    <View style={{ flex: 1 }}>
+                                                        {activeTab === 'upcoming' && !isAdmin() && (
+                                                            <View style={styles.upcomingTag}>
+                                                                <Text style={styles.upcomingTagText}>UPCOMING</Text>
+                                                            </View>
+                                                        )}
+                                                        <Text style={styles.cardTitle}>{meeting.name}</Text>
+                                                        <Text style={styles.cardDate}>{new Date(meeting.date).toDateString()} | {meeting.time}</Text>
+                                                    </View>
+                                                    <View style={[styles.badge, { backgroundColor: status.bg }]}>
+                                                        <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+                                                    </View>
+                                                </View>
+
+                                                <View style={styles.cardBody}>
+                                                    <View style={styles.row}>
+                                                        <Ionicons name={meeting.mode === 'Online' ? "videocam-outline" : "location-outline"} size={16} color="#6B7280" />
+                                                        <Text style={styles.rowText}>
+                                                            {meeting.mode === 'Online'
+                                                                ? meeting.platform
+                                                                : `${meeting.locationCategory}${meeting.classroomNumber ? ` - ${meeting.classroomNumber}` : meeting.otherLocationName ? ` - ${meeting.otherLocationName}` : ''}`}
+                                                        </Text>
+                                                    </View>
+                                                    {meeting.description && <Text style={styles.desc}>{meeting.description}</Text>}
+                                                </View>
+
+                                                <View style={styles.cardFooter}>
+                                                    {canMark && (
+                                                        <TouchableOpacity
+                                                            style={styles.actionBtn}
+                                                            onPress={() => { setSelectedMeetingForAttendance(meeting); setAttendanceModalVisible(true); }}
+                                                        >
+                                                            <Text style={styles.actionBtnText}>Mark Attendance</Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                    {isAdmin() && (
+                                                        <TouchableOpacity
+                                                            style={styles.adminLink}
+                                                            onPress={() => { setManagingMeeting(meeting); setManageModalVisible(true); }}
+                                                        >
+                                                            <Text style={styles.adminLinkText}>Manage Details</Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        );
+                                    })
+                                )
                             )}
                         </ScrollView>
-                    </View>
-                ) : !loading && (
-                    <View style={styles.noClubs}>
-                        <Text style={styles.noClubsText}>Join a club first!</Text>
-                    </View>
-                )}
-
-                {selectedClub && (
-                    <View style={styles.tabs}>
-                        <TouchableOpacity style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]} onPress={() => setActiveTab('upcoming')}>
-                            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>Upcoming</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.tab, activeTab === 'past' && styles.tabActive]} onPress={() => setActiveTab('past')}>
-                            <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>Past / History</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                <ScrollView
-                    style={styles.content}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                    contentContainerStyle={{ paddingBottom: 100 }}
-                >
-                    {!selectedClub ? (
-                        <View style={styles.emptyState}>
-                            <Ionicons name="alert-circle-outline" size={64} color="#E5E7EB" />
-                            <Text style={styles.emptyText}>You haven't joined any clubs yet.</Text>
-                        </View>
-                    ) : loadingMeetings ? (
-                        /* Show skeleton while loading meetings */
-                        <>
-                            <SkeletonMeetingCard />
-                            <SkeletonMeetingCard />
-                            <SkeletonMeetingCard />
-                        </>
-                    ) : (
-                        (activeTab === 'upcoming' ? meetings.upcoming : meetings.past).length === 0 ? (
-                            <View style={styles.emptyState}>
-                                <Text style={styles.emptyText}>No {activeTab} meetings found.</Text>
-                            </View>
-                        ) : (
-                            (activeTab === 'upcoming' ? meetings.upcoming : meetings.past).map(meeting => {
-                                const status = getMeetingStatus(meeting);
-                                // Check if attendance active
-                                const canMark = meeting.isAttendanceActive && !meeting.attendees.find(a => (a.userId?._id || a.userId) === user._id);
-
-                                return (
-                                    <View key={meeting._id} style={styles.card}>
-                                        <View style={styles.cardHeader}>
-                                            <View style={{ flex: 1 }}>
-                                                {activeTab === 'upcoming' && !isAdmin() && (
-                                                    <View style={styles.upcomingTag}>
-                                                        <Text style={styles.upcomingTagText}>UPCOMING</Text>
-                                                    </View>
-                                                )}
-                                                <Text style={styles.cardTitle}>{meeting.name}</Text>
-                                                <Text style={styles.cardDate}>{new Date(meeting.date).toDateString()} | {meeting.time}</Text>
-                                            </View>
-                                            <View style={[styles.badge, { backgroundColor: status.bg }]}>
-                                                <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
-                                            </View>
-                                        </View>
-
-                                        <View style={styles.cardBody}>
-                                            <View style={styles.row}>
-                                                <Ionicons name={meeting.mode === 'Online' ? "videocam-outline" : "location-outline"} size={16} color="#6B7280" />
-                                                <Text style={styles.rowText}>
-                                                    {meeting.mode === 'Online'
-                                                        ? meeting.platform
-                                                        : `${meeting.locationCategory}${meeting.classroomNumber ? ` - ${meeting.classroomNumber}` : meeting.otherLocationName ? ` - ${meeting.otherLocationName}` : ''}`}
-                                                </Text>
-                                            </View>
-                                            {meeting.description && <Text style={styles.desc}>{meeting.description}</Text>}
-                                        </View>
-
-                                        <View style={styles.cardFooter}>
-                                            {canMark && (
-                                                <TouchableOpacity
-                                                    style={styles.actionBtn}
-                                                    onPress={() => { setSelectedMeetingForAttendance(meeting); setAttendanceModalVisible(true); }}
-                                                >
-                                                    <Text style={styles.actionBtnText}>Mark Attendance</Text>
-                                                </TouchableOpacity>
-                                            )}
-                                            {isAdmin() && (
-                                                <TouchableOpacity
-                                                    style={styles.adminLink}
-                                                    onPress={() => { setManagingMeeting(meeting); setManageModalVisible(true); }}
-                                                >
-                                                    <Text style={styles.adminLinkText}>Manage Details</Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    </View>
-                                );
-                            })
-                        )
-                    )}
-                </ScrollView>
+                    </TouchableOpacity>
+                </PanGestureHandler>
 
                 {/* Modals */}
                 <Modal visible={attendanceModalVisible} transparent animationType="fade" onRequestClose={() => setAttendanceModalVisible(false)}>

@@ -5,7 +5,7 @@ import {
     Text,
     StyleSheet,
     Pressable,
-    TouchableWithoutFeedback,
+    TouchableOpacity,
     Platform,
     Dimensions
 } from 'react-native';
@@ -13,10 +13,41 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Animated, PanResponder } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
 const MediaUploadModal = ({ visible, onClose, onNativePick, onWebUpload, title = "Upload Media" }) => {
+    const panY = React.useRef(new Animated.Value(0)).current;
+
+    const panResponder = React.useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderMove: (e, gs) => {
+                if (gs.dy > 0) {
+                    panY.setValue(gs.dy);
+                }
+            },
+            onPanResponderRelease: (e, gs) => {
+                if (gs.dy > 150 || gs.vy > 0.5) {
+                    onClose();
+                } else {
+                    Animated.spring(panY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    React.useEffect(() => {
+        if (visible) {
+            panY.setValue(0);
+        }
+    }, [visible]);
+
     return (
         <Modal
             visible={visible}
@@ -24,106 +55,70 @@ const MediaUploadModal = ({ visible, onClose, onNativePick, onWebUpload, title =
             animationType="fade"
             onRequestClose={onClose}
         >
-            <TouchableWithoutFeedback onPress={onClose}>
-                <View style={styles.overlay}>
-                    <TouchableWithoutFeedback>
-                        <Animatable.View
-                            animation="slideInUp"
-                            duration={400}
-                            style={styles.container}
-                        >
-                            <LinearGradient
-                                colors={['#FFFFFF', '#F8FAFC']}
-                                style={styles.gradientBg}
+            <View style={styles.overlay}>
+                <TouchableOpacity
+                    style={StyleSheet.absoluteFill}
+                    activeOpacity={1}
+                    onPress={onClose}
+                />
+                <Animated.View
+                    style={[
+                        styles.container,
+                        { transform: [{ translateY: panY }] }
+                    ]}
+                >
+                    <LinearGradient
+                        colors={['#FFFFFF', '#F8FAFC']}
+                        style={styles.gradientBg}
+                    >
+                        <View {...panResponder.panHandlers}>
+                            <View style={styles.indicator} />
+                        </View>
+
+                        <View style={styles.header}>
+                            <View>
+                                <Text style={styles.title}>{title}</Text>
+                                <Text style={styles.subtitle}>Supercharge your media sharing</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.options}>
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.optionCard,
+                                    pressed && styles.optionPressed
+                                ]}
+                                onPress={() => {
+                                    onClose();
+                                    onNativePick();
+                                }}
                             >
-                                <View style={styles.indicator} />
-
-                                <View style={styles.header}>
-                                    <View>
-                                        <Text style={styles.title}>{title}</Text>
-                                        <Text style={styles.subtitle}>Supercharge your media sharing</Text>
-                                    </View>
-                                    <Pressable
-                                        onPress={onClose}
-                                        style={({ pressed }) => [
-                                            styles.closeButton,
-                                            { backgroundColor: pressed ? '#F1F5F9' : '#F8FAFC' }
-                                        ]}
-                                    >
-                                        <Ionicons name="close" size={20} color="#64748B" />
-                                    </Pressable>
+                                <LinearGradient
+                                    colors={['#3B82F6', '#2563EB']}
+                                    style={styles.iconWrapper}
+                                >
+                                    <Ionicons name="phone-portrait" size={24} color="#FFF" />
+                                </LinearGradient>
+                                <View style={styles.optionContent}>
+                                    <Text style={styles.optionTitle}>App Gallery</Text>
+                                    <Text style={styles.optionDesc}>Swift & Native experience</Text>
                                 </View>
-
-                                <View style={styles.options}>
-                                    <Pressable
-                                        style={({ pressed }) => [
-                                            styles.optionCard,
-                                            pressed && styles.optionPressed
-                                        ]}
-                                        onPress={() => {
-                                            onClose();
-                                            onNativePick();
-                                        }}
-                                    >
-                                        <LinearGradient
-                                            colors={['#3B82F6', '#2563EB']}
-                                            style={styles.iconWrapper}
-                                        >
-                                            <Ionicons name="phone-portrait" size={24} color="#FFF" />
-                                        </LinearGradient>
-                                        <View style={styles.optionContent}>
-                                            <Text style={styles.optionTitle}>App Gallery</Text>
-                                            <Text style={styles.optionDesc}>Swift & Native experience</Text>
-                                        </View>
-                                        <View style={styles.arrowBg}>
-                                            <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
-                                        </View>
-                                    </Pressable>
-
-                                    <Pressable
-                                        style={({ pressed }) => [
-                                            styles.optionCard,
-                                            { borderColor: '#10B98133' },
-                                            pressed && styles.optionPressed
-                                        ]}
-                                        onPress={() => {
-                                            onClose();
-                                            onWebUpload();
-                                        }}
-                                    >
-                                        <LinearGradient
-                                            colors={['#10B981', '#059669']}
-                                            style={styles.iconWrapper}
-                                        >
-                                            <Ionicons name="globe" size={24} color="#FFF" />
-                                        </LinearGradient>
-                                        <View style={styles.optionContent}>
-                                            <Text style={styles.optionTitle}>Web Browser</Text>
-                                            <Text style={styles.optionDesc}>Reliable fallback solution</Text>
-                                        </View>
-                                        <View style={[styles.arrowBg, { backgroundColor: '#F0FDF4' }]}>
-                                            <Ionicons name="chevron-forward" size={16} color="#10B981" />
-                                        </View>
-                                    </Pressable>
+                                <View style={styles.arrowBg}>
+                                    <Ionicons name="chevron-forward" size={16} color="#3B82F6" />
                                 </View>
+                            </Pressable>
 
-                                {Platform.OS === 'android' && (
-                                    <Animatable.View
-                                        animation="fadeIn"
-                                        delay={500}
-                                        style={styles.tipContainer}
-                                    >
-                                        <Ionicons name="sparkles" size={16} color="#F59E0B" />
-                                        <Text style={styles.tipText}>
-                                            Pro tip: Browser upload solves network issues instantly.
-                                        </Text>
-                                    </Animatable.View>
-                                )}
-                            </LinearGradient>
-                        </Animatable.View>
-                    </TouchableWithoutFeedback>
-                </View>
-            </TouchableWithoutFeedback>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.bottomCloseBtn}
+                            onPress={onClose}
+                        >
+                            <Text style={styles.bottomCloseText}>Close</Text>
+                        </TouchableOpacity>
+                    </LinearGradient>
+                </Animated.View>
+            </View>
         </Modal>
     );
 };
@@ -244,6 +239,18 @@ const styles = StyleSheet.create({
         color: '#92400E',
         fontWeight: '600',
         lineHeight: 18,
+    },
+    bottomCloseBtn: {
+        marginTop: 24,
+        backgroundColor: '#F1F5F9',
+        paddingVertical: 14,
+        borderRadius: 16,
+        alignItems: 'center',
+    },
+    bottomCloseText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#64748B',
     }
 });
 

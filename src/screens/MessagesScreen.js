@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -16,7 +16,10 @@ import {
     TouchableWithoutFeedback,
     ActivityIndicator,
     KeyboardAvoidingView,
+    Animated,
+    Vibration,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
@@ -25,19 +28,77 @@ import { useAuth } from '../contexts/AuthContext';
 import { messagesAPI, clubsAPI, membersAPI, snapsAPI, groupChatAPI } from '../services/api';
 import { Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
+import {
+    SkeletonBox,
+    SkeletonListItem,
+    SkeletonSnaps,
+    SkeletonGroupChat,
+    SkeletonFilterChips
+} from '../components/SkeletonLoader';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+const AnimatedHeart = ({ data }) => {
+    const animation = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(animation, {
+            toValue: 1,
+            duration: data.duration,
+            delay: data.delay,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
+    const translateY = animation.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -height * 0.8],
+    });
+
+    const opacity = animation.interpolate({
+        inputRange: [0, 0.7, 1],
+        outputRange: [1, 1, 0],
+    });
+
+    const scale = animation.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.5, 1.5],
+    });
+
+    const rotate = animation.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', (Math.random() > 0.5 ? '45deg' : '-45deg')],
+    });
+
+    return (
+        <Animated.View
+            style={[
+                styles.floatingHeart,
+                {
+                    left: data.x,
+                    top: data.y,
+                    transform: [{ translateY }, { scale }, { rotate }],
+                    opacity,
+                },
+            ]}
+        >
+            <Ionicons name="heart" size={data.size} color="#EF4444" />
+        </Animated.View>
+    );
+};
 
 const MessagesScreen = ({ navigation }) => {
     const { user, socket, selectedClubId, updateSelectedClub } = useAuth();
     const [conversations, setConversations] = useState([]);
     const [clubs, setClubs] = useState([]);
     const [groupChats, setGroupChats] = useState([]); // Group chat state
-    // Initialize with global state to prevent flickering
     const [selectedClub, setSelectedClub] = useState(selectedClubId || null);
     const [clubMembers, setClubMembers] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
+    const [loadingMembers, setLoadingMembers] = useState(false);
+    const [loadingSnaps, setLoadingSnaps] = useState(false);
+    const [loadingGroupChats, setLoadingGroupChats] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [snaps, setSnaps] = useState([]);
     const [viewingSnaps, setViewingSnaps] = useState(null); // Stores { user, snaps, index }
@@ -47,6 +108,25 @@ const MessagesScreen = ({ navigation }) => {
     const [editCaptionModalVisible, setEditCaptionModalVisible] = useState(false);
     const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
     const [snapToDelete, setSnapToDelete] = useState(null);
+
+    const clubScrollRef = useRef(null);
+    const clubLayouts = useRef({});
+    const initialLoadRef = useRef(true);
+    const snapTranslateY = useRef(new Animated.Value(0)).current;
+    const heartAnim = useRef(new Animated.Value(0)).current;
+    const [multipleHearts, setMultipleHearts] = useState([]);
+    const lastSnapPress = useRef(0);
+
+    useEffect(() => {
+        const currentClubId = selectedClub?.toString();
+        if (currentClubId && clubScrollRef.current && clubLayouts.current[currentClubId]) {
+            const { x, width: tabWidth } = clubLayouts.current[currentClubId];
+            clubScrollRef.current.scrollTo({
+                x: x - (Dimensions.get('window').width / 2 - tabWidth / 2),
+                animated: true
+            });
+        }
+    }, [selectedClub]);
     const [snapMediaLoading, setSnapMediaLoading] = useState(false);
     // Listen for new snaps
     useEffect(() => {
@@ -54,8 +134,25 @@ const MessagesScreen = ({ navigation }) => {
             socket.on('snap:new', () => {
                 fetchData(); // Refresh to show new snap
             });
+            socket.on('snap:like', (data) => {
+                const { snapId, likes } = data;
+                setViewingSnaps(prev => {
+                    if (!prev) return prev;
+                    const updatedSnaps = prev.snaps.map(s =>
+                        s._id === snapId ? { ...s, likes } : s
+                    );
+                    return { ...prev, snaps: updatedSnaps };
+                });
+                setSnaps(prev => prev.map(group => ({
+                    ...group,
+                    snaps: group.snaps.map(s =>
+                        s._id === snapId ? { ...s, likes } : s
+                    )
+                })));
+            });
             return () => {
                 socket.off('snap:new');
+                socket.off('snap:like');
             };
         }
     }, [socket]);
@@ -73,7 +170,10 @@ const MessagesScreen = ({ navigation }) => {
 
     const fetchData = async () => {
         try {
-            setLoading(true);
+            // Only show global loading on the first fetch
+            if (initialLoadRef.current) {
+                setLoading(true);
+            }
 
             // Fetch conversations and clubs
             const [conversationsRes, clubsRes] = await Promise.all([
@@ -96,7 +196,7 @@ const MessagesScreen = ({ navigation }) => {
                 const groupChatPromises = joinedClubs.map(async (club) => {
                     try {
                         const clubId = club._id?.toString() || club._id;
-                        const res = await groupChatAPI.getGroupChat(clubId);
+                        const res = await groupChatAPI.getGroupChat(clubId, { limit: 1 });
                         if (res && res.success) {
                             return {
                                 ...res.data,
@@ -139,7 +239,27 @@ const MessagesScreen = ({ navigation }) => {
             try {
                 if (selectedClub) {
                     const snapsRes = await snapsAPI.getClubSnaps(selectedClub);
-                    if (snapsRes.success) setSnaps(snapsRes.data);
+                    if (snapsRes.success) {
+                        const sortedData = [...snapsRes.data].sort((a, b) => {
+                            // 1. My snaps first
+                            const isAMe = (a.user?._id || a.user) === user._id;
+                            const isBMe = (b.user?._id || b.user) === user._id;
+                            if (isAMe && !isBMe) return -1;
+                            if (!isAMe && isBMe) return 1;
+
+                            // 2. Unviewed others next
+                            const hasAUnviewed = a.snaps.some(s => !s.viewedBy.some(v => (v.userId?._id || v.userId) === user._id));
+                            const hasBUnviewed = b.snaps.some(s => !s.viewedBy.some(v => (v.userId?._id || v.userId) === user._id));
+                            if (hasAUnviewed && !hasBUnviewed) return -1;
+                            if (!hasAUnviewed && hasBUnviewed) return 1;
+
+                            // 3. Most recent first
+                            const lastA = Math.max(...a.snaps.map(s => new Date(s.createdAt).getTime()));
+                            const lastB = Math.max(...b.snaps.map(s => new Date(s.createdAt).getTime()));
+                            return lastB - lastA;
+                        });
+                        setSnaps(sortedData);
+                    }
                 } else {
                     setSnaps([]);
                 }
@@ -152,6 +272,7 @@ const MessagesScreen = ({ navigation }) => {
         } finally {
             setLoading(false);
             setRefreshing(false);
+            initialLoadRef.current = false;
         }
     };
 
@@ -186,8 +307,111 @@ const MessagesScreen = ({ navigation }) => {
             setIsCaptionExpanded(false);
             snapsAPI.view(viewingSnaps.snaps[nextIdx]._id);
         } else {
-            setSnapModalVisible(false);
+            // End of this user's snaps, go to next user if available
+            const currentGroupIdx = snaps.findIndex(group =>
+                (group.user._id?.toString() || group.user._id) === (viewingSnaps.user._id?.toString() || viewingSnaps.user._id)
+            );
+            if (currentGroupIdx !== -1 && currentGroupIdx < snaps.length - 1) {
+                handleViewSnaps(snaps[currentGroupIdx + 1]);
+            } else {
+                setSnapModalVisible(false);
+                setIsCaptionExpanded(false);
+            }
+        }
+    };
+
+    const prevSnap = () => {
+        if (!viewingSnaps) return;
+        if (viewingSnaps.index > 0) {
+            const prevIdx = viewingSnaps.index - 1;
+            setSnapMediaLoading(true);
+            setViewingSnaps({ ...viewingSnaps, index: prevIdx });
             setIsCaptionExpanded(false);
+        } else {
+            // Start of this user's snaps, go to previous user if available
+            const currentGroupIdx = snaps.findIndex(group =>
+                (group.user._id?.toString() || group.user._id) === (viewingSnaps.user._id?.toString() || viewingSnaps.user._id)
+            );
+            if (currentGroupIdx > 0) {
+                const prevGroup = snaps[currentGroupIdx - 1];
+                setViewingSnaps({ ...prevGroup, index: prevGroup.snaps.length - 1 });
+                setSnapMediaLoading(true);
+                setIsCaptionExpanded(false);
+            }
+        }
+    };
+
+    const handleSnapPress = (event) => {
+        const now = Date.now();
+        const DOUBLE_PRESS_DELAY = 300;
+        if (lastSnapPress.current && (now - lastSnapPress.current) < DOUBLE_PRESS_DELAY) {
+            // Double Tap Detected
+            const currentSnapId = viewingSnaps.snaps[viewingSnaps.index]._id;
+            toggleSnapLike(currentSnapId);
+            lastSnapPress.current = 0;
+            return;
+        }
+        lastSnapPress.current = now;
+
+        const x = event.nativeEvent.pageX;
+        const screenWidth = Dimensions.get('window').width;
+        if (x < screenWidth / 2) {
+            prevSnap();
+        } else {
+            nextSnap();
+        }
+    };
+
+    const onSnapSwipeEvent = (event) => {
+        const { translationX, translationY, velocityX, velocityY, state } = event.nativeEvent;
+
+        if (state === State.ACTIVE) {
+            // Only follow finger for downward drag
+            if (translationY > 0) {
+                snapTranslateY.setValue(translationY);
+            }
+        }
+
+        if (state === State.END) {
+            // Vertical swipe down to close
+            if (translationY > 100 && velocityY > 300) {
+                setSnapModalVisible(false);
+                setIsCaptionExpanded(false);
+                // Reset for next time (after modal potential animation)
+                setTimeout(() => snapTranslateY.setValue(0), 300);
+                return;
+            } else {
+                // Spring back if not closing
+                Animated.spring(snapTranslateY, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                    tension: 50,
+                    friction: 7
+                }).start();
+            }
+
+            // Horizontal navigation
+            if (Math.abs(translationX) > 60 && Math.abs(velocityX) > 300) {
+                if (translationX < 0) {
+                    // Swipe left -> Next User
+                    const currentGroupIdx = snaps.findIndex(group =>
+                        (group.user._id?.toString() || group.user._id) === (viewingSnaps.user._id?.toString() || viewingSnaps.user._id)
+                    );
+                    if (currentGroupIdx !== -1 && currentGroupIdx < snaps.length - 1) {
+                        handleViewSnaps(snaps[currentGroupIdx + 1]);
+                    } else {
+                        setSnapModalVisible(false);
+                    }
+                } else {
+                    // Swipe right -> Previous User
+                    const currentGroupIdx = snaps.findIndex(group =>
+                        (group.user._id?.toString() || group.user._id) === (viewingSnaps.user._id?.toString() || viewingSnaps.user._id)
+                    );
+                    if (currentGroupIdx > 0) {
+                        handleViewSnaps(snaps[currentGroupIdx - 1]);
+                    }
+                }
+            }
         }
     };
 
@@ -196,6 +420,94 @@ const MessagesScreen = ({ navigation }) => {
     const handleDeleteSnap = async (snapId) => {
         setSnapToDelete(snapId);
         setDeleteConfirmModalVisible(true);
+    };
+
+    const toggleSnapLike = async (snapId) => {
+        try {
+            const res = await snapsAPI.toggleLike(snapId);
+            if (res.success) {
+                // Update local state immediately
+                setViewingSnaps(prev => {
+                    if (!prev) return prev;
+                    const updatedSnaps = prev.snaps.map(s =>
+                        s._id === snapId ? { ...s, likes: res.likes } : s
+                    );
+                    return { ...prev, snaps: updatedSnaps };
+                });
+
+                setSnaps(prev => prev.map(group => ({
+                    ...group,
+                    snaps: group.snaps.map(s =>
+                        s._id === snapId ? { ...s, likes: res.likes } : s
+                    )
+                })));
+
+                if (res.liked) {
+                    Vibration.vibrate(50);
+                    showHeartAnimation();
+                    triggerHeartExplosion();
+                }
+                return res.liked;
+            }
+        } catch (error) {
+            console.error('Error toggling snap like:', error);
+        }
+        return false;
+    };
+
+    const showHeartAnimation = () => {
+        Animated.sequence([
+            Animated.spring(heartAnim, { toValue: 1, useNativeDriver: true, tension: 40, friction: 3 }),
+            Animated.delay(500),
+            Animated.spring(heartAnim, { toValue: 0, useNativeDriver: true })
+        ]).start();
+    };
+
+    const triggerHeartExplosion = () => {
+        const explosion = Array.from({ length: 15 }).map((_, i) => ({
+            id: Math.random(),
+            x: Math.random() * width,
+            y: Dimensions.get('window').height * 0.7 + (Math.random() * 100),
+            size: 20 + Math.random() * 40,
+            delay: Math.random() * 500,
+            duration: 1500 + Math.random() * 1000
+        }));
+        setMultipleHearts(explosion);
+        setTimeout(() => setMultipleHearts([]), 3000);
+    };
+
+    const handleClubSwipe = (direction) => {
+        if (!clubs || clubs.length <= 1) return;
+
+        const currentIndex = clubs.findIndex(c => (c._id?.toString() || c._id) === (selectedClub?.toString() || selectedClub));
+        if (currentIndex === -1) return;
+
+        let nextIndex;
+        if (direction === 'left') { // finger moves right to left -> next club
+            nextIndex = (currentIndex + 1) % clubs.length;
+        } else { // finger moves left to right -> previous club
+            nextIndex = (currentIndex - 1 + clubs.length) % clubs.length;
+        }
+
+        const nextClub = clubs[nextIndex];
+        const nextId = nextClub._id?.toString() || nextClub._id;
+        setSelectedClub(nextId);
+        updateSelectedClub(nextId);
+    };
+
+    const onSwipeGestureEvent = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            const { translationX, velocityX } = event.nativeEvent;
+
+            // Require both enough translation and enough velocity to prevent accidental swipes
+            if (Math.abs(translationX) > 80 && Math.abs(velocityX) > 500) {
+                if (translationX > 0) {
+                    handleClubSwipe('right');
+                } else {
+                    handleClubSwipe('left');
+                }
+            }
+        }
     };
 
     const confirmDeleteSnap = async () => {
@@ -277,14 +589,33 @@ const MessagesScreen = ({ navigation }) => {
             setClubMembers([]);
             return;
         }
+        // Only show loading if we don't have members yet or it's a new club
+        if (clubMembers.length === 0) {
+            setLoadingMembers(true);
+        }
         try {
             const res = await membersAPI.getAll(clubId);
             if (res.success) {
                 // Filter out current user
-                setClubMembers(res.data.filter(m => m._id.toString() !== user._id.toString()));
+                let filteredMembers = res.data.filter(m => m._id.toString() !== user._id.toString());
+
+                if (clubId === 'all') {
+                    // Get IDs of clubs the user has joined
+                    const joinedClubIds = user.clubsJoined.map(c => (c.clubId?._id || c.clubId).toString());
+
+                    // Only show members who belong to at least one of the user's joined clubs
+                    filteredMembers = filteredMembers.filter(member => {
+                        const memberClubIds = (member.clubsJoined || []).map(c => (c.clubId?._id || c.clubId || '').toString());
+                        return memberClubIds.some(id => joinedClubIds.includes(id));
+                    });
+                }
+
+                setClubMembers(filteredMembers);
             }
         } catch (error) {
             console.error('Error fetching club members:', error);
+        } finally {
+            setLoadingMembers(false);
         }
     };
 
@@ -298,6 +629,10 @@ const MessagesScreen = ({ navigation }) => {
         fetchClubMembers(selectedClub);
         // Also refresh snaps when club changes
         if (selectedClub && selectedClub !== 'all') {
+            // Only show loading if we don't have snaps yet
+            if (snaps.length === 0) {
+                setLoadingSnaps(true);
+            }
             snapsAPI.getClubSnaps(selectedClub)
                 .then(res => {
                     if (res.success) setSnaps(res.data);
@@ -305,7 +640,8 @@ const MessagesScreen = ({ navigation }) => {
                 .catch(err => {
                     console.error('Error fetching snaps:', err);
                     setSnaps([]);
-                });
+                })
+                .finally(() => setLoadingSnaps(false));
         } else {
             setSnaps([]);
         }
@@ -333,6 +669,27 @@ const MessagesScreen = ({ navigation }) => {
             fetchData();
         });
 
+        socket.on('user:status', (data) => {
+            const { userId, isOnline, lastSeen } = data;
+            setConversations(prev => prev.map(conv => {
+                if (conv.otherUser?._id === userId) {
+                    return { ...conv, otherUser: { ...conv.otherUser, isOnline, lastSeen } };
+                }
+                return conv;
+            }));
+
+            // Also update group members status if needed (though usually we just refresh group chat data)
+            setGroupChats(prev => prev.map(gc => {
+                const updatedMembers = gc.members?.map(m => {
+                    if ((m.userId?._id || m.userId) === userId) {
+                        return { ...m, userId: typeof m.userId === 'object' ? { ...m.userId, isOnline, lastSeen } : m.userId };
+                    }
+                    return m;
+                });
+                return { ...gc, members: updatedMembers };
+            }));
+        });
+
         return () => {
             socket.off('message:receive', handleNewMessage);
             socket.off('message:delete', handleNewMessage);
@@ -340,6 +697,7 @@ const MessagesScreen = ({ navigation }) => {
             socket.off('group:message:delete', handleNewMessage);
             socket.off('snap:new');
             socket.off('snap:delete');
+            socket.off('user:status');
         };
     }, [socket]);
 
@@ -391,6 +749,9 @@ const MessagesScreen = ({ navigation }) => {
                 onPress={() => {
                     setSelectedClub(club._id);
                     updateSelectedClub(club._id);
+                }}
+                onLayout={(event) => {
+                    clubLayouts.current[club._id.toString()] = event.nativeEvent.layout;
                 }}
             >
                 <Text style={[styles.clubChipText, isSelected && styles.clubChipTextActive]}>
@@ -462,8 +823,52 @@ const MessagesScreen = ({ navigation }) => {
     return (
         <MainLayout navigation={navigation} title="Messages" currentRoute="Messages">
             <View style={styles.container}>
-                {/* Check if user has joined any clubs */}
-                {clubs.length === 0 ? (
+                {/* Loading State Skeleton */}
+                {loading ? (
+                    <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                        {/* Club Chips Skeleton */}
+                        <View style={[styles.sectionHeader, { marginTop: 10 }]}>
+                            <SkeletonBox width={100} height={20} />
+                        </View>
+                        <View style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 20 }}>
+                            {[1, 2, 3].map(i => (
+                                <SkeletonBox key={i} width={80} height={36} borderRadius={18} style={{ marginRight: 10 }} />
+                            ))}
+                        </View>
+
+                        {/* Snaps Skeleton */}
+                        <View style={styles.sectionHeader}>
+                            <SkeletonBox width={120} height={20} />
+                        </View>
+                        <View style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 25, marginTop: 10 }}>
+                            {[1, 2, 3, 4].map(i => (
+                                <SkeletonBox key={i} width={64} height={64} borderRadius={32} style={{ marginRight: 15 }} />
+                            ))}
+                        </View>
+
+                        {/* Group Chats Skeleton */}
+                        <View style={styles.sectionHeader}>
+                            <SkeletonBox width={140} height={20} />
+                        </View>
+                        <View style={{ paddingHorizontal: 20, marginBottom: 25 }}>
+                            <SkeletonBox width="100%" height={100} borderRadius={16} />
+                        </View>
+
+                        {/* Conversations Skeleton */}
+                        <View style={styles.sectionHeader}>
+                            <SkeletonBox width={130} height={20} />
+                        </View>
+                        {[1, 2, 3, 4].map(i => (
+                            <View key={i} style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 20, alignItems: 'center' }}>
+                                <SkeletonBox width={50} height={50} borderRadius={12} style={{ marginRight: 15 }} />
+                                <View style={{ flex: 1 }}>
+                                    <SkeletonBox width="60%" height={16} style={{ marginBottom: 8 }} />
+                                    <SkeletonBox width="40%" height={12} />
+                                </View>
+                            </View>
+                        ))}
+                    </ScrollView>
+                ) : !loading && clubs.length === 0 ? (
                     <View style={styles.noClubsContainer}>
                         <Ionicons name="people-outline" size={80} color="#D1D5DB" />
                         <Text style={styles.noClubsTitle}>Join a Club to Start Chatting</Text>
@@ -500,21 +905,34 @@ const MessagesScreen = ({ navigation }) => {
                             <View style={styles.sectionHeader}>
                                 <Text style={styles.sectionTitle}>Clubs</Text>
                             </View>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.clubScroll}>
+                            <ScrollView
+                                ref={clubScrollRef}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.clubScroll}
+                            >
                                 {clubs.map(renderClubChip)}
                             </ScrollView>
 
                             {/* Member List Overlay (if club selected) */}
-                            {clubMembers.length > 0 && (
+                            {(clubMembers.length > 0 || loadingMembers) && (
                                 <View style={styles.membersContainer}>
-                                    <FlatList
-                                        data={clubMembers}
-                                        renderItem={renderMemberListItem}
-                                        keyExtractor={item => item._id}
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        contentContainerStyle={styles.memberList}
-                                    />
+                                    {loadingMembers ? (
+                                        <View style={{ flexDirection: 'row', paddingHorizontal: 15 }}>
+                                            {[1, 2, 3, 4, 5].map(i => (
+                                                <SkeletonBox key={i} width={60} height={60} borderRadius={30} style={{ marginRight: 15 }} />
+                                            ))}
+                                        </View>
+                                    ) : (
+                                        <FlatList
+                                            data={clubMembers}
+                                            renderItem={renderMemberListItem}
+                                            keyExtractor={item => item._id}
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            contentContainerStyle={styles.memberList}
+                                        />
+                                    )}
                                 </View>
                             )}
 
@@ -525,86 +943,102 @@ const MessagesScreen = ({ navigation }) => {
                                     <Ionicons name="camera" size={24} color="#0A66C2" />
                                 </TouchableOpacity>
                             </View>
-                            <FlatList
-                                data={snaps}
-                                renderItem={renderSnapItem}
-                                keyExtractor={(item, index) => {
-                                    const id = item.user?._id || item.user || index;
-                                    return typeof id === 'object' ? id.toString() : id.toString();
-                                }}
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.snapList}
-                                scrollEnabled={false}
-                                ListEmptyComponent={() => (
-                                    <TouchableOpacity style={styles.addSnapItem} onPress={() => navigation.navigate('Camera', { type: 'snap' })}>
-                                        <View style={styles.addSnapCircle}>
-                                            <Ionicons name="add" size={30} color="#0A66C2" />
-                                        </View>
-                                        <Text style={styles.snapName}>Add Snap</Text>
-                                    </TouchableOpacity>
-                                )}
-                            />
+                            {loadingSnaps ? (
+                                <SkeletonSnaps count={4} />
+                            ) : (
+                                <FlatList
+                                    data={snaps}
+                                    renderItem={renderSnapItem}
+                                    keyExtractor={(item, index) => {
+                                        const id = item.user?._id || item.user || index;
+                                        return typeof id === 'object' ? id.toString() : id.toString();
+                                    }}
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.snapList}
+                                    scrollEnabled={false}
+                                    ListEmptyComponent={() => (
+                                        <TouchableOpacity style={styles.addSnapItem} onPress={() => navigation.navigate('Camera', { type: 'snap' })}>
+                                            <View style={styles.addSnapCircle}>
+                                                <Ionicons name="add" size={30} color="#0A66C2" />
+                                            </View>
+                                            <Text style={styles.snapName}>Add Snap</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            )}
 
-                            {/* Group Chats Section */}
-                            {groupChats.filter(gc => {
-                                const gcClubId = gc.clubId?._id || gc.clubId;
-                                return !selectedClub || selectedClub === 'all' || gcClubId.toString() === selectedClub.toString();
-                            }).length > 0 && (
-                                    <>
-                                        <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-                                            <Text style={styles.sectionTitle}>Group Chats</Text>
-                                        </View>
-                                        {groupChats
-                                            .filter(gc => {
-                                                const gcClubId = gc.clubId?._id || gc.clubId;
-                                                return !selectedClub || selectedClub === 'all' || gcClubId.toString() === selectedClub.toString();
-                                            })
-                                            .map(groupChat => {
-                                                const unreadCount = groupChat.messages?.filter(msg =>
-                                                    !msg.deleted &&
-                                                    msg.senderId?._id !== user._id && // Exclude my own messages
-                                                    msg.senderId !== user._id &&
-                                                    !msg.readBy?.some(r => r.userId?.toString() === user._id.toString())
-                                                ).length || 0;
-                                                const lastMessage = groupChat.messages?.[groupChat.messages.length - 1];
+                            <PanGestureHandler
+                                onHandlerStateChange={onSwipeGestureEvent}
+                                activeOffsetX={[-20, 20]}
+                                failOffsetY={[-20, 20]}
+                            >
+                                <View>
+                                    {/* Group Chats Section */}
+                                    {(groupChats.filter(gc => {
+                                        const gcClubId = gc.clubId?._id || gc.clubId;
+                                        return !selectedClub || selectedClub === 'all' || gcClubId.toString() === selectedClub.toString();
+                                    }).length > 0 || loadingGroupChats) && (
+                                            <>
+                                                <View style={[styles.sectionHeader, { marginTop: 10 }]}>
+                                                    <Text style={styles.sectionTitle}>Group Chats</Text>
+                                                </View>
+                                                {loadingGroupChats ? (
+                                                    <SkeletonGroupChat />
+                                                ) : (
+                                                    groupChats
+                                                        .filter(gc => {
+                                                            const gcClubId = gc.clubId?._id || gc.clubId;
+                                                            return !selectedClub || selectedClub === 'all' || gcClubId.toString() === selectedClub.toString();
+                                                        })
+                                                        .map(groupChat => {
+                                                            const unreadCount = groupChat.unreadCount !== undefined ? groupChat.unreadCount : (groupChat.messages?.filter(msg =>
+                                                                !msg.deleted &&
+                                                                msg.senderId?._id !== user._id && // Exclude my own messages
+                                                                msg.senderId !== user._id &&
+                                                                !msg.readBy?.some(r => r.userId?.toString() === user._id.toString())
+                                                            ).length || 0);
+                                                            const lastMessage = groupChat.messages?.[groupChat.messages.length - 1];
 
-                                                return (
-                                                    <GroupChatCard
-                                                        key={groupChat.clubId}
-                                                        club={groupChat.club}
-                                                        unreadCount={unreadCount}
-                                                        lastMessage={lastMessage}
-                                                        onPress={() => navigation.navigate('Chat', {
-                                                            isGroupChat: true,
-                                                            clubId: groupChat.clubId,
-                                                            clubName: groupChat.club.name,
-                                                            groupChatData: groupChat
-                                                        })}
-                                                    />
-                                                );
-                                            })}
-                                    </>
-                                )}
+                                                            return (
+                                                                <GroupChatCard
+                                                                    key={groupChat.clubId}
+                                                                    club={groupChat.club}
+                                                                    unreadCount={unreadCount}
+                                                                    lastMessage={lastMessage}
+                                                                    onPress={() => navigation.navigate('Chat', {
+                                                                        isGroupChat: true,
+                                                                        clubId: groupChat.clubId,
+                                                                        clubName: groupChat.club.name,
+                                                                        groupChatData: groupChat
+                                                                    })}
+                                                                />
+                                                            );
+                                                        })
+                                                )}
+                                            </>
+                                        )}
 
-                            {/* Conversations List */}
-                            <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-                                <Text style={styles.sectionTitle}>Recent Chats</Text>
-                            </View>
-                            <FlatList
-                                data={filteredConversations}
-                                renderItem={renderConversationItem}
-                                keyExtractor={item => `conv-${item.otherUser?._id || Math.random()}`}
-                                scrollEnabled={false}
-                                contentContainerStyle={styles.convList}
-                                ListEmptyComponent={() => (
-                                    <View style={styles.emptyContainer}>
-                                        <Ionicons name="chatbubbles-outline" size={64} color="#D1D5DB" />
-                                        <Text style={styles.emptyText}>No conversations yet</Text>
-                                        <Text style={styles.emptySubtext}>Select a member from a club to start chatting</Text>
+                                    {/* Conversations List */}
+                                    <View style={[styles.sectionHeader, { marginTop: 10 }]}>
+                                        <Text style={styles.sectionTitle}>Recent Chats</Text>
                                     </View>
-                                )}
-                            />
+                                    <FlatList
+                                        data={filteredConversations}
+                                        renderItem={renderConversationItem}
+                                        keyExtractor={item => `conv-${item.otherUser?._id || Math.random()}`}
+                                        scrollEnabled={false}
+                                        contentContainerStyle={styles.convList}
+                                        ListEmptyComponent={() => (
+                                            <View style={styles.emptyContainer}>
+                                                <Ionicons name="chatbubbles-outline" size={64} color="#D1D5DB" />
+                                                <Text style={styles.emptyText}>No conversations yet</Text>
+                                                <Text style={styles.emptySubtext}>Select a member from a club to start chatting</Text>
+                                            </View>
+                                        )}
+                                    />
+                                </View>
+                            </PanGestureHandler>
                         </ScrollView>
                     </>
                 )}
@@ -621,169 +1055,197 @@ const MessagesScreen = ({ navigation }) => {
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
                 >
-                    {viewingSnaps && viewingSnaps.snaps[viewingSnaps.index] && (
-                        <TouchableOpacity
-                            style={styles.fullSnapContainer}
-                            activeOpacity={1}
-                            onPress={nextSnap}
+                    {viewingSnaps && viewingSnaps.snaps[viewingSnaps.index] &&
+                        <PanGestureHandler
+                            onGestureEvent={onSnapSwipeEvent}
+                            onHandlerStateChange={onSnapSwipeEvent}
+                            activeOffsetX={[-20, 20]} // Capture horizontal swipe
+                            activeOffsetY={[-1000, 50]} // Capture downward swipe
                         >
-                            <View style={styles.fullSnapContainer}>
-                                {/* Backdrop Placeholder while loading */}
-                                {snapMediaLoading && (
-                                    <View style={styles.snapBackdrop}>
-                                        <Image
-                                            source={viewingSnaps.user.profilePicture?.url ? { uri: viewingSnaps.user.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + viewingSnaps.user.displayName }}
-                                            style={styles.backdropBlur}
-                                            blurRadius={20}
-                                        />
-                                        <View style={styles.loadingOverlay}>
-                                            <ActivityIndicator size="large" color="#FFF" />
-                                            <Text style={styles.loadingText}>Loading Snap...</Text>
-                                        </View>
-                                    </View>
-                                )}
-                                {viewingSnaps.snaps[viewingSnaps.index].type === 'video' ? (
-                                    <Video
-                                        source={{ uri: viewingSnaps.snaps[viewingSnaps.index].mediaUrl.url }}
-                                        style={styles.fullSnapImage}
-                                        resizeMode="cover"
-                                        shouldPlay
-                                        isLooping
-                                        onLoadStart={() => setSnapMediaLoading(true)}
-                                        onLoad={() => setSnapMediaLoading(false)}
-                                        onError={(e) => {
-                                            console.error('Video error:', e);
-                                            setSnapMediaLoading(false);
-                                        }}
-                                    />
-                                ) : (
-                                    <Image
-                                        source={{ uri: viewingSnaps.snaps[viewingSnaps.index].mediaUrl.url }}
-                                        style={styles.fullSnapImage}
-                                        resizeMode="cover"
-                                        onLoadStart={() => setSnapMediaLoading(true)}
-                                        onLoadEnd={() => setSnapMediaLoading(false)}
-                                    />
-                                )}
-                            </View>
-                            <View style={styles.snapOverlay}>
-                                <View style={styles.snapHeader}>
-                                    <View style={styles.snapUserInfo}>
-                                        {viewingSnaps.user.profilePicture?.url ? (
-                                            <Image source={{ uri: viewingSnaps.user.profilePicture.url }} style={styles.snapUserAvatar} />
-                                        ) : (
-                                            <View style={styles.snapUserPlaceholder}>
-                                                <Text style={styles.snapUserPlaceholderText}>{viewingSnaps.user.displayName.charAt(0)}</Text>
-                                            </View>
-                                        )}
-                                        <View>
-                                            <Text style={styles.snapUserName}>{viewingSnaps.user.displayName}</Text>
-                                            <Text style={styles.snapTime}>
-                                                {new Date(viewingSnaps.snaps[viewingSnaps.index].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <View style={styles.snapActions}>
-                                        {viewingSnaps.user._id.toString() === user._id.toString() && (
-                                            <>
-                                                <TouchableOpacity
-                                                    style={styles.snapActionBtn}
-                                                    onPress={() => fetchViewersList(viewingSnaps.snaps[viewingSnaps.index]._id)}
-                                                >
-                                                    <Ionicons name="eye" size={24} color="#FFF" />
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={styles.snapActionBtn}
-                                                    onPress={() => {
-                                                        setEditingSnapId(viewingSnaps.snaps[viewingSnaps.index]._id);
-                                                        setNewCaption(viewingSnaps.snaps[viewingSnaps.index].caption || '');
-                                                        setEditCaptionModalVisible(true);
-                                                    }}
-                                                >
-                                                    <Ionicons name="create" size={24} color="#FFF" />
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={styles.snapActionBtn}
-                                                    onPress={() => handleDeleteSnap(viewingSnaps.snaps[viewingSnaps.index]._id)}
-                                                >
-                                                    <Ionicons name="trash" size={24} color="#FFF" />
-                                                </TouchableOpacity>
-                                            </>
-                                        )}
-                                        <TouchableOpacity onPress={() => setSnapModalVisible(false)}>
-                                            <Ionicons name="close" size={32} color="#FFF" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-
-                                {/* Snap Progress */}
-                                <View style={styles.progressContainer}>
-                                    {viewingSnaps.snaps.map((_, i) => (
-                                        <View
-                                            key={i}
-                                            style={[
-                                                styles.progressBar,
-                                                { flex: 1, backgroundColor: i <= viewingSnaps.index ? '#FFF' : 'rgba(255,255,255,0.3)' }
-                                            ]}
-                                        />
-                                    ))}
-                                </View>
-
-                                {/* Center Content for dismissal */}
-                                <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={nextSnap} />
-
-                                {/* Bottom Content Area */}
-                                <TouchableWithoutFeedback onPress={(e) => { }}>
-                                    <View style={styles.snapBottomArea}>
-                                        {/* Caption Overlay */}
-                                        {viewingSnaps.snaps[viewingSnaps.index].caption ? (
-                                            <View style={styles.snapCaptionContainer}>
-                                                <Text
-                                                    style={styles.snapCaptionText}
-                                                    numberOfLines={isCaptionExpanded ? undefined : 3}
-                                                >
-                                                    {viewingSnaps.snaps[viewingSnaps.index].caption}
-                                                </Text>
-                                                {viewingSnaps.snaps[viewingSnaps.index].caption.length > 100 && (
-                                                    <TouchableOpacity onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}>
-                                                        <Text style={styles.viewMoreText}>
-                                                            {isCaptionExpanded ? 'View less' : 'View more...'}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </View>
-                                        ) : null}
-
-                                        {/* Reply Input Area - Always show if not own snap */}
-                                        {viewingSnaps.user._id.toString() !== user._id.toString() && (
-                                            <View style={styles.snapReplyContainer}>
-                                                <TextInput
-                                                    style={styles.snapReplyInput}
-                                                    placeholder="Reply via chat..."
-                                                    placeholderTextColor="rgba(255,255,255,0.6)"
-                                                    value={replyText}
-                                                    onChangeText={setReplyText}
+                            <Animated.View style={{ flex: 1, transform: [{ translateY: snapTranslateY }] }}>
+                                <TouchableOpacity
+                                    style={styles.fullSnapContainer}
+                                    activeOpacity={1}
+                                    onPress={handleSnapPress}
+                                >
+                                    <View style={styles.fullSnapContainer}>
+                                        {/* Backdrop Placeholder while loading */}
+                                        {snapMediaLoading && (
+                                            <View style={styles.snapBackdrop}>
+                                                <Image
+                                                    source={viewingSnaps.user.profilePicture?.url ? { uri: viewingSnaps.user.profilePicture.url } : { uri: 'https://ui-avatars.com/api/?name=' + viewingSnaps.user.displayName }}
+                                                    style={styles.backdropBlur}
+                                                    blurRadius={20}
                                                 />
-                                                {replyText.length > 0 && (
+                                                <View style={styles.loadingOverlay}>
+                                                    <ActivityIndicator size="large" color="#FFF" />
+                                                    <Text style={styles.loadingText}>Loading Snap...</Text>
+                                                </View>
+                                            </View>
+                                        )}
+                                        {viewingSnaps.snaps[viewingSnaps.index].type === 'video' ? (
+                                            <Video
+                                                source={{ uri: viewingSnaps.snaps[viewingSnaps.index].mediaUrl.url }}
+                                                style={styles.fullSnapImage}
+                                                resizeMode="cover"
+                                                shouldPlay
+                                                isLooping
+                                                onLoadStart={() => setSnapMediaLoading(true)}
+                                                onLoad={() => setSnapMediaLoading(false)}
+                                                onError={(e) => {
+                                                    console.error('Video error:', e);
+                                                    setSnapMediaLoading(false);
+                                                }}
+                                            />
+                                        ) : (
+                                            <Image
+                                                source={{ uri: viewingSnaps.snaps[viewingSnaps.index].mediaUrl.url }}
+                                                style={styles.fullSnapImage}
+                                                resizeMode="cover"
+                                                onLoadStart={() => setSnapMediaLoading(true)}
+                                                onLoadEnd={() => setSnapMediaLoading(false)}
+                                            />
+                                        )}
+                                        <Animated.View style={[styles.largeHeart, {
+                                            opacity: heartAnim,
+                                            transform: [{
+                                                scale: heartAnim.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [0.5, 1.5]
+                                                })
+                                            }]
+                                        }]}>
+                                            <Ionicons name="heart" size={100} color="#EF4444" />
+                                        </Animated.View>
+                                    </View>
+                                    <View style={styles.snapOverlay}>
+                                        <View style={styles.snapHeader}>
+                                            <View style={styles.snapUserInfo}>
+                                                {viewingSnaps.user.profilePicture?.url ? (
+                                                    <Image source={{ uri: viewingSnaps.user.profilePicture.url }} style={styles.snapUserAvatar} />
+                                                ) : (
+                                                    <View style={styles.snapUserPlaceholder}>
+                                                        <Text style={styles.snapUserPlaceholderText}>{viewingSnaps.user.displayName.charAt(0)}</Text>
+                                                    </View>
+                                                )}
+                                                <View>
+                                                    <Text style={styles.snapUserName}>{viewingSnaps.user.displayName}</Text>
+                                                    <Text style={styles.snapTime}>
+                                                        {new Date(viewingSnaps.snaps[viewingSnaps.index].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <View style={styles.snapActions}>
+                                                {viewingSnaps.user._id.toString() === user._id.toString() && (
+                                                    <>
+                                                        <TouchableOpacity
+                                                            style={styles.snapActionBtn}
+                                                            onPress={() => fetchViewersList(viewingSnaps.snaps[viewingSnaps.index]._id)}
+                                                        >
+                                                            <Ionicons name="eye" size={24} color="#FFF" />
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity
+                                                            style={styles.snapActionBtn}
+                                                            onPress={() => {
+                                                                setEditingSnapId(viewingSnaps.snaps[viewingSnaps.index]._id);
+                                                                setNewCaption(viewingSnaps.snaps[viewingSnaps.index].caption || '');
+                                                                setEditCaptionModalVisible(true);
+                                                            }}
+                                                        >
+                                                            <Ionicons name="create" size={24} color="#FFF" />
+                                                        </TouchableOpacity>
+                                                        <TouchableOpacity
+                                                            style={styles.snapActionBtn}
+                                                            onPress={() => handleDeleteSnap(viewingSnaps.snaps[viewingSnaps.index]._id)}
+                                                        >
+                                                            <Ionicons name="trash" size={24} color="#FFF" />
+                                                        </TouchableOpacity>
+                                                    </>
+                                                )}
+                                                <TouchableOpacity onPress={() => setSnapModalVisible(false)}>
+                                                    <Ionicons name="close" size={32} color="#FFF" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                        {/* Snap Progress */}
+                                        <View style={styles.progressContainer}>
+                                            {viewingSnaps.snaps.map((_, i) => (
+                                                <View
+                                                    key={i}
+                                                    style={[
+                                                        styles.progressBar,
+                                                        { flex: 1, backgroundColor: i <= viewingSnaps.index ? '#FFF' : 'rgba(255,255,255,0.3)' }
+                                                    ]}
+                                                />
+                                            ))}
+                                        </View>
+
+                                        {/* Bottom Content Area */}
+                                        <View style={styles.snapBottomArea}>
+                                            {/* Caption Overlay */}
+                                            {viewingSnaps.snaps[viewingSnaps.index].caption ? (
+                                                <View style={styles.snapCaptionContainer}>
+                                                    <Text
+                                                        style={styles.snapCaptionText}
+                                                        numberOfLines={isCaptionExpanded ? undefined : 3}
+                                                    >
+                                                        {viewingSnaps.snaps[viewingSnaps.index].caption}
+                                                    </Text>
+                                                    {viewingSnaps.snaps[viewingSnaps.index].caption.length > 100 && (
+                                                        <TouchableOpacity onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}>
+                                                            <Text style={styles.viewMoreText}>
+                                                                {isCaptionExpanded ? 'View less' : 'View more...'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </View>
+                                            ) : null}
+
+                                            {/* Reply Input Area - Always show if not own snap */}
+                                            {viewingSnaps.user._id.toString() !== user._id.toString() && (
+                                                <View style={styles.snapReplyContainer}>
+                                                    <TextInput
+                                                        style={styles.snapReplyInput}
+                                                        placeholder="Reply via chat..."
+                                                        placeholderTextColor="rgba(255,255,255,0.6)"
+                                                        value={replyText}
+                                                        onChangeText={setReplyText}
+                                                    />
+                                                    {replyText.length > 0 && (
+                                                        <TouchableOpacity
+                                                            style={[styles.snapReplySendBtn, replySuccess && { backgroundColor: '#10B981' }]}
+                                                            onPress={handleSendReply}
+                                                            disabled={sendingReply}
+                                                        >
+                                                            <Ionicons
+                                                                name={replySuccess ? "checkmark" : "send"}
+                                                                size={20}
+                                                                color={replySuccess ? "#FFF" : "#0A66C2"}
+                                                            />
+                                                        </TouchableOpacity>
+                                                    )}
                                                     <TouchableOpacity
-                                                        style={[styles.snapReplySendBtn, replySuccess && { backgroundColor: '#10B981' }]}
-                                                        onPress={handleSendReply}
-                                                        disabled={sendingReply}
+                                                        style={styles.snapLikeBtn}
+                                                        onPress={() => toggleSnapLike(viewingSnaps.snaps[viewingSnaps.index]._id)}
                                                     >
                                                         <Ionicons
-                                                            name={replySuccess ? "checkmark" : "send"}
-                                                            size={20}
-                                                            color={replySuccess ? "#FFF" : "#0A66C2"}
+                                                            name={viewingSnaps.snaps[viewingSnaps.index].likes?.includes(user._id) ? "heart" : "heart-outline"}
+                                                            size={32}
+                                                            color={viewingSnaps.snaps[viewingSnaps.index].likes?.includes(user._id) ? "#EF4444" : "#FFF"}
                                                         />
                                                     </TouchableOpacity>
-                                                )}
-                                            </View>
-                                        )}
+                                                </View>
+                                            )}
+                                        </View>
+                                        {/* Heart Explosion */}
+                                        {multipleHearts.map(h => (
+                                            <AnimatedHeart key={h.id} data={h} />
+                                        ))}
                                     </View>
-                                </TouchableWithoutFeedback>
-                            </View>
-                        </TouchableOpacity>
-                    )}
+                                </TouchableOpacity>
+                            </Animated.View>
+                        </PanGestureHandler>
+                    }
                 </KeyboardAvoidingView>
             </Modal>
 
@@ -821,6 +1283,9 @@ const MessagesScreen = ({ navigation }) => {
                                             {new Date(item.viewedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </Text>
                                     </View>
+                                    {item.hasLiked && (
+                                        <Ionicons name="heart" size={24} color="#EF4444" style={{ marginLeft: 'auto' }} />
+                                    )}
                                 </View>
                             )}
                             ListEmptyComponent={() => (
@@ -905,7 +1370,7 @@ const MessagesScreen = ({ navigation }) => {
                     </View>
                 </TouchableOpacity>
             </Modal>
-        </MainLayout>
+        </MainLayout >
     );
 };
 
@@ -936,7 +1401,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.4)',
-        paddingVertical: 15,
+        paddingTop: Platform.OS === 'ios' ? 20 : 30,
+        paddingBottom: 15,
         paddingHorizontal: 15,
         marginHorizontal: -15, // Extend to edges
     },
@@ -977,7 +1443,11 @@ const styles = StyleSheet.create({
     },
     progressContainer: {
         flexDirection: 'row',
-        marginTop: 15,
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 40 : 10,
+        left: 10,
+        right: 10,
+        zIndex: 10,
         gap: 5,
     },
     progressBar: {
@@ -1310,7 +1780,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     snapBottomArea: {
-        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        paddingBottom: Platform.OS === 'ios' ? 70 : 50,
         paddingHorizontal: 15,
     },
     snapCaptionContainer: {
@@ -1508,6 +1978,29 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0,0,0,0.5)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
+    },
+    largeHeart: {
+        position: 'absolute',
+        top: '40%',
+        left: '50%',
+        marginLeft: -50,
+        zIndex: 10,
+        ...Platform.select({
+            web: { textShadow: '0px 2px 10px rgba(0,0,0,0.5)' },
+            default: {
+                textShadowColor: 'rgba(0,0,0,0.5)',
+                textShadowOffset: { width: 0, height: 2 },
+                textShadowRadius: 10,
+            }
+        })
+    },
+    floatingHeart: {
+        position: 'absolute',
+        zIndex: 100,
+    },
+    snapLikeBtn: {
+        marginLeft: 10,
+        padding: 5,
     },
 });
 

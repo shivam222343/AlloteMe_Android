@@ -14,6 +14,7 @@ import {
     Platform,
     Dimensions
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
@@ -97,6 +98,37 @@ const TasksScreen = ({ navigation }) => {
             setSelectedFilterClub(selectedClubId);
         }
     }, [selectedClubId]);
+
+    // Handle deep linking from notifications
+    useEffect(() => {
+        const routeState = navigation.getState();
+        const currentRoute = routeState?.routes[routeState.index];
+        const params = currentRoute?.params;
+
+        if (params?.focusTaskId && tasks.length > 0) {
+            const task = tasks.find(t => (t._id?.toString() || t._id) === params.focusTaskId);
+            if (task) {
+                // Determine which tab it belongs to
+                const myAssignment = task.assignedTo.find(a => (a.user?._id || a.user) === user?._id);
+                if (myAssignment) {
+                    setActiveTab(myAssignment.status === 'completed' ? 'completed' : 'pending');
+                } else {
+                    setActiveTab('all');
+                }
+
+                // Also ensure club filter doesn't hide it
+                if (selectedFilterClub !== 'all') {
+                    const taskClubId = task.clubId?._id || task.clubId;
+                    if (taskClubId !== selectedFilterClub) {
+                        setSelectedFilterClub('all');
+                    }
+                }
+
+                // Clear params to prevent persistent behavior
+                navigation.setParams({ focusTaskId: null });
+            }
+        }
+    }, [tasks, navigation, user?._id]);
 
     const handleClubSelect = async (clubId) => {
         setNewTask({ ...newTask, clubId, assignedTo: [], meetingId: '' });
@@ -240,6 +272,48 @@ const TasksScreen = ({ navigation }) => {
                 }
             ]
         );
+    };
+
+    const onSwipeGestureEvent = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            const { translationX, velocityX } = event.nativeEvent;
+            if (Math.abs(translationX) > 60 && Math.abs(velocityX) > 300) {
+                const clubList = [{ _id: 'all', name: 'All Clubs' }, ...clubs];
+                if (clubList.length <= 1) return;
+
+                const currentIndex = clubList.findIndex(c => (c._id?.toString() || c._id) === (selectedFilterClub?.toString() || selectedFilterClub));
+                if (currentIndex === -1) return;
+
+                if (translationX < 0) {
+                    // Swipe Left -> Next Club
+                    if (currentIndex < clubList.length - 1) {
+                        const nextId = clubList[currentIndex + 1]._id;
+                        setSelectedFilterClub(nextId);
+                        updateSelectedClub(nextId);
+                    }
+                } else {
+                    // Swipe Right -> Prev Club
+                    if (currentIndex > 0) {
+                        const prevId = clubList[currentIndex - 1]._id;
+                        setSelectedFilterClub(prevId);
+                        updateSelectedClub(prevId);
+                    }
+                }
+            }
+        }
+    };
+
+    const handleScreenPress = (event) => {
+        const x = event.nativeEvent.pageX;
+        const screenWidth = Dimensions.get('window').width;
+        const tabs = ['pending', 'completed', 'all'];
+        const currentIndex = tabs.indexOf(activeTab);
+
+        if (x < screenWidth / 4) {
+            if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+        } else if (x > (screenWidth * 3) / 4) {
+            if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
+        }
     };
 
     const renderTaskItem = ({ item }) => {
@@ -456,38 +530,50 @@ const TasksScreen = ({ navigation }) => {
                     ))}
                 </View>
 
-                {loading ? (
-                    <View style={{ flex: 1 }}>
-                        {/* Skeleton Task Cards - Loading */}
-                        <View style={styles.listContent}>
-                            {[1, 2, 3].map((_, i) => (
-                                <SkeletonCard key={i}>
-                                    <SkeletonBox width={60} height={20} borderRadius={6} style={{ marginBottom: 12 }} />
-                                    <SkeletonBox width="90%" height={18} style={{ marginBottom: 8 }} />
-                                    <SkeletonBox width="70%" height={14} style={{ marginBottom: 16 }} />
-                                    <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
-                                        <SkeletonBox width={80} height={12} />
-                                        <SkeletonBox width={80} height={12} />
-                                    </View>
-                                    <SkeletonBox width="100%" height={40} borderRadius={8} />
-                                </SkeletonCard>
-                            ))}
-                        </View>
-                    </View>
-                ) : (
-                    <FlatList
-                        data={filteredTasks}
-                        keyExtractor={item => item._id}
-                        renderItem={renderTaskItem}
-                        contentContainerStyle={styles.listContent}
-                        ListEmptyComponent={
-                            <View style={styles.emptyBox}>
-                                <Ionicons name="clipboard-outline" size={64} color="#D1D5DB" />
-                                <Text style={styles.emptyText}>No tasks found</Text>
+                <PanGestureHandler
+                    onHandlerStateChange={onSwipeGestureEvent}
+                    activeOffsetX={[-20, 20]}
+                    failOffsetY={[-20, 20]}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={{ flex: 1 }}
+                        onPress={handleScreenPress}
+                    >
+                        {loading ? (
+                            <View style={{ flex: 1 }}>
+                                {/* Skeleton Task Cards - Loading */}
+                                <View style={styles.listContent}>
+                                    {[1, 2, 3].map((_, i) => (
+                                        <SkeletonCard key={i}>
+                                            <SkeletonBox width={60} height={20} borderRadius={6} style={{ marginBottom: 12 }} />
+                                            <SkeletonBox width="90%" height={18} style={{ marginBottom: 8 }} />
+                                            <SkeletonBox width="70%" height={14} style={{ marginBottom: 16 }} />
+                                            <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
+                                                <SkeletonBox width={80} height={12} />
+                                                <SkeletonBox width={80} height={12} />
+                                            </View>
+                                            <SkeletonBox width="100%" height={40} borderRadius={8} />
+                                        </SkeletonCard>
+                                    ))}
+                                </View>
                             </View>
-                        }
-                    />
-                )}
+                        ) : (
+                            <FlatList
+                                data={filteredTasks}
+                                keyExtractor={item => item._id}
+                                renderItem={renderTaskItem}
+                                contentContainerStyle={styles.listContent}
+                                ListEmptyComponent={
+                                    <View style={styles.emptyBox}>
+                                        <Ionicons name="clipboard-outline" size={64} color="#D1D5DB" />
+                                        <Text style={styles.emptyText}>No tasks found</Text>
+                                    </View>
+                                }
+                            />
+                        )}
+                    </TouchableOpacity>
+                </PanGestureHandler>
 
                 {isAdmin && (
                     <TouchableOpacity style={styles.fab} onPress={() => setCreateModalVisible(true)}>

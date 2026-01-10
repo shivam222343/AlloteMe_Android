@@ -28,7 +28,7 @@ import MediaUploadModal from '../components/MediaUploadModal';
 import { useWebUpload } from '../hooks/useWebUpload';
 
 
-const ProfileScreen = ({ navigation }) => {
+const ProfileScreen = ({ navigation, route }) => {
     const { user, logout, uploadProfilePicture, updateProfile, loading, refreshUser } = useAuth();
     const { startWebUpload } = useWebUpload();
     const shineAnim = useRef(new Animated.Value(-150)).current;
@@ -57,21 +57,50 @@ const ProfileScreen = ({ navigation }) => {
     const [generatedAvatars, setGeneratedAvatars] = useState([]);
 
 
-    const [selectedStyle, setSelectedStyle] = useState('mixed');
+    const [selectedStyle, setSelectedStyle] = useState('trending');
+    const [selectedCategory, setSelectedCategory] = useState('all');
+
+    const AVATAR_CATEGORIES = [
+        { id: 'all', label: '✨ All', icon: 'apps' },
+        { id: 'trending', label: '🔥 Trending', icon: 'trending-up' },
+        { id: 'anime', label: '🎌 Anime', icon: 'game-controller' },
+        { id: 'cartoon', label: '🎨 Cartoon', icon: 'color-palette' },
+        { id: 'realistic', label: '👤 Realistic', icon: 'person' },
+        { id: 'fun', label: '🎭 Fun', icon: 'happy' },
+    ];
 
     const AVATAR_STYLES = [
-        { id: 'mixed', label: 'Mixed' },
-        { id: 'notionists', label: 'Sketch' },
-        { id: 'adventurer', label: 'Adventurer' },
-        { id: 'bottts', label: 'Robots' },
-        { id: 'avataaars', label: 'Toon' },
-        { id: 'lorelei', label: 'Artistic' },
-        { id: 'fun-emoji', label: 'Emoji' },
-        { id: 'micah', label: 'Minimalist' },
-        { id: 'miniavs', label: 'Mini' },
-        { id: 'open-peeps', label: 'Peeps' },
-        { id: 'personas', label: 'Persona' }
+        // Trending & Popular
+        { id: 'trending', label: '✨ Trending Mix', category: 'trending', description: 'Hot right now!' },
+        { id: 'notionists', label: '🎨 Notion Style', category: 'trending', description: 'Clean & modern' },
+        { id: 'lorelei', label: '💫 Artistic', category: 'trending', description: 'Unique art style' },
+
+        // Anime & Manga
+        { id: 'big-smile', label: '😊 Anime Smile', category: 'anime', description: 'Happy anime vibes' },
+        { id: 'adventurer', label: '⚔️ Adventurer', category: 'anime', description: 'RPG character' },
+        { id: 'pixel-art', label: '🎮 Pixel Art', category: 'anime', description: 'Retro gaming' },
+
+        // Cartoon & Toon
+        { id: 'avataaars', label: '🎭 Classic Toon', category: 'cartoon', description: 'Cartoon style' },
+        { id: 'bottts', label: '🤖 Robot', category: 'cartoon', description: 'Futuristic bots' },
+        { id: 'croodles', label: '🖍️ Doodle', category: 'cartoon', description: 'Hand-drawn fun' },
+        { id: 'fun-emoji', label: '😎 Emoji', category: 'cartoon', description: 'Expressive emojis' },
+
+        // Realistic & Professional
+        { id: 'personas', label: '👔 Professional', category: 'realistic', description: 'Business ready' },
+        { id: 'micah', label: '🎯 Minimalist', category: 'realistic', description: 'Clean & simple' },
+        { id: 'open-peeps', label: '👥 Peeps', category: 'realistic', description: 'Diverse people' },
+
+        // Fun & Creative
+        { id: 'miniavs', label: '🎪 Mini', category: 'fun', description: 'Cute & tiny' },
+        { id: 'thumbs', label: '👍 Thumbs', category: 'fun', description: 'Thumbs up style' },
+        { id: 'rings', label: '💍 Rings', category: 'fun', description: 'Abstract rings' },
+        { id: 'shapes', label: '🔷 Shapes', category: 'fun', description: 'Geometric art' },
     ];
+
+    const filteredStyles = selectedCategory === 'all'
+        ? AVATAR_STYLES
+        : AVATAR_STYLES.filter(style => style.category === selectedCategory);
 
     useEffect(() => {
         if (showAvatarModal) {
@@ -79,19 +108,30 @@ const ProfileScreen = ({ navigation }) => {
         }
     }, [showAvatarModal, selectedStyle]);
 
-    // Stable styles for Mixed mode to ensure fast loading and no errors
-    const SAFE_STYLES = ['notionists', 'adventurer', 'bottts', 'avataaars', 'lorelei', 'micah', 'open-peeps', 'personas'];
+    useEffect(() => {
+        if (route?.params?.editProfile) {
+            setShowEditModal(true);
+            navigation.setParams({ editProfile: undefined });
+        }
+    }, [route?.params]);
+
+    // Stable styles for Trending mode to ensure fast loading and no errors
+    const SAFE_STYLES = ['notionists', 'adventurer', 'bottts', 'avataaars', 'lorelei', 'micah', 'open-peeps', 'personas', 'big-smile', 'pixel-art', 'croodles'];
 
     const generateAvatars = (style) => {
         const newAvatars = Array(12).fill(0).map((_, i) => {
             const seed = Math.random().toString(36).substring(7);
             let currentStyle = style;
 
-            if (style === 'mixed') {
+            if (style === 'trending') {
                 currentStyle = SAFE_STYLES[Math.floor(Math.random() * SAFE_STYLES.length)];
             }
 
-            return `https://api.dicebear.com/9.x/${currentStyle}/png?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffdfbf`;
+            // Add variety with different background colors and options
+            const backgrounds = ['b6e3f4', 'c0aede', 'd1d4f9', 'ffdfbf', 'ffd5dc', 'c7ecee', 'ffeaa7', 'dfe6e9'];
+            const randomBg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+
+            return `https://api.dicebear.com/9.x/${currentStyle}/png?seed=${seed}&backgroundColor=${randomBg}&radius=50`;
         });
         setGeneratedAvatars(newAvatars);
     };
@@ -283,6 +323,12 @@ const ProfileScreen = ({ navigation }) => {
                                 resizeMode="cover"
                             />
                             <View style={styles.headerOverlay} />
+                            <LinearGradient
+                                colors={['transparent', 'rgba(0,0,0,0.7)']}
+                                style={StyleSheet.absoluteFill}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                            />
                         </>
                     ) : (
                         <LinearGradient
@@ -591,29 +637,52 @@ const ProfileScreen = ({ navigation }) => {
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Choose AI Avatar</Text>
+                                <Text style={styles.modalTitle}>🎨 AI Avatar Generator</Text>
                                 <TouchableOpacity onPress={() => setShowAvatarModal(false)}>
                                     <Ionicons name="close" size={24} color="#374151" />
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.modalSubtitle}>Pick a style to generate your unique avatar!</Text>
+                            <Text style={styles.modalSubtitle}>Create your unique avatar with trending AI styles!</Text>
 
-                            {/* Style Filters */}
+                            {/* Category Tabs */}
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.categoryScroll}
+                                contentContainerStyle={styles.categoryContainer}
+                            >
+                                {AVATAR_CATEGORIES.map((category) => (
+                                    <TouchableOpacity
+                                        key={category.id}
+                                        style={[styles.categoryTab, selectedCategory === category.id && styles.categoryTabActive]}
+                                        onPress={() => setSelectedCategory(category.id)}
+                                    >
+                                        <Text style={[styles.categoryTabText, selectedCategory === category.id && styles.categoryTabTextActive]}>
+                                            {category.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+
+                            {/* Style Cards */}
                             <ScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
                                 style={styles.filterScroll}
                                 contentContainerStyle={styles.filterContainer}
                             >
-                                {AVATAR_STYLES.map((style) => (
+                                {filteredStyles.map((style) => (
                                     <TouchableOpacity
                                         key={style.id}
-                                        style={[styles.filterChip, selectedStyle === style.id && styles.filterChipActive]}
+                                        style={[styles.styleCard, selectedStyle === style.id && styles.styleCardActive]}
                                         onPress={() => setSelectedStyle(style.id)}
                                     >
-                                        <Text style={[styles.filterChipText, selectedStyle === style.id && styles.filterChipTextActive]}>
+                                        <Text style={[styles.styleCardLabel, selectedStyle === style.id && styles.styleCardLabelActive]}>
                                             {style.label}
+                                        </Text>
+                                        <Text style={[styles.styleCardDesc, selectedStyle === style.id && styles.styleCardDescActive]}>
+                                            {style.description}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
@@ -628,6 +697,9 @@ const ProfileScreen = ({ navigation }) => {
                                             onPress={() => confirmAvatarSelection(url)}
                                         >
                                             <Image source={{ uri: url }} style={styles.avatarImage} />
+                                            <View style={styles.avatarOverlay}>
+                                                <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                                            </View>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
@@ -990,13 +1062,79 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     // Filter Styles
-    filterScroll: {
+    categoryScroll: {
         maxHeight: 50,
+        marginBottom: 12,
+    },
+    categoryContainer: {
+        paddingHorizontal: 4,
+        gap: 8,
+    },
+    categoryTab: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 25,
+        backgroundColor: '#F3F4F6',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+        marginRight: 8,
+    },
+    categoryTabActive: {
+        backgroundColor: '#7C3AED',
+        borderColor: '#7C3AED',
+    },
+    categoryTabText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#4B5563',
+    },
+    categoryTabTextActive: {
+        color: '#FFF',
+    },
+    filterScroll: {
+        maxHeight: 90,
         marginBottom: 16,
     },
     filterContainer: {
         paddingHorizontal: 4,
-        gap: 8,
+        gap: 10,
+    },
+    styleCard: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 16,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+        marginRight: 10,
+        minWidth: 140,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    styleCardActive: {
+        backgroundColor: '#EEF2FF',
+        borderColor: '#0A66C2',
+        shadowColor: '#0A66C2',
+        shadowOpacity: 0.2,
+    },
+    styleCardLabel: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    styleCardLabelActive: {
+        color: '#0A66C2',
+    },
+    styleCardDesc: {
+        fontSize: 11,
+        color: '#6B7280',
+    },
+    styleCardDescActive: {
+        color: '#3B82F6',
     },
     filterChip: {
         paddingHorizontal: 16,
@@ -1018,6 +1156,17 @@ const styles = StyleSheet.create({
     },
     filterChipTextActive: {
         color: '#FFF',
+    },
+    avatarOverlay: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        opacity: 0,
     },
     avatarScroll: {
         maxHeight: 300, // Limit height to allow scrolling within modal

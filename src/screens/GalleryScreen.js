@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -18,8 +18,10 @@ import {
     KeyboardAvoidingView,
     Animated,
     Vibration,
-    Keyboard
+    Keyboard,
+    BackHandler
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
@@ -37,6 +39,86 @@ import { useWebUpload } from '../hooks/useWebUpload';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 45) / 2;
+
+const FullScreenImageItem = ({ item, toggleLike, user, onClose }) => {
+    const translateY = useRef(new Animated.Value(0)).current;
+    const heartAnim = useRef(new Animated.Value(0)).current;
+
+    const onGestureEvent = Animated.event(
+        [{ nativeEvent: { translationY: translateY } }],
+        { useNativeDriver: true }
+    );
+
+    const onHandlerStateChange = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            if (event.nativeEvent.translationY > 100) {
+                onClose();
+            } else {
+                Animated.spring(translateY, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                    tension: 50,
+                    friction: 7
+                }).start();
+            }
+        }
+    };
+
+    let lastTap = null;
+    const handleDoubleTap = () => {
+        const now = Date.now();
+        const DOUBLE_PRESS_DELAY = 300;
+        if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
+            Vibration.vibrate(50);
+            toggleLike(item._id); // This toggles (likes or unlikes)
+
+            // Show heart animation only if we are liking (or maybe always? User said "double tab to Dislike" too?)
+            // Usually big heart animation is for LIKE.
+            // If we are unliking, maybe we shouldn't show the heart or show a broken heart?
+            // For now, let's just show the heart animation on double tap regardless, as feedback.
+            Animated.sequence([
+                Animated.spring(heartAnim, { toValue: 1, useNativeDriver: true }),
+                Animated.delay(500),
+                Animated.spring(heartAnim, { toValue: 0, useNativeDriver: true })
+            ]).start();
+            lastTap = null;
+        } else {
+            lastTap = now;
+        }
+    };
+
+    return (
+        <PanGestureHandler
+            onGestureEvent={onGestureEvent}
+            onHandlerStateChange={onHandlerStateChange}
+            activeOffsetX={[-1000, 1000]}
+            failOffsetX={[-20, 20]}
+            activeOffsetY={[-1000, 20]}
+        >
+            <Animated.View style={[styles.fullImgWrapper, { width: width, height: '100%', transform: [{ translateY }] }]}>
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={handleDoubleTap}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                >
+                    <Image source={{ uri: item.imageUrl }} style={styles.fullImage} resizeMode="contain" />
+
+                    <Animated.View style={[styles.largeHeart, {
+                        opacity: heartAnim,
+                        transform: [{
+                            scale: heartAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0.5, 1.5]
+                            })
+                        }]
+                    }]}>
+                        <Ionicons name="heart" size={80} color="#FFF" />
+                    </Animated.View>
+                </TouchableOpacity>
+            </Animated.View>
+        </PanGestureHandler>
+    );
+};
 
 const GalleryScreen = ({ navigation }) => {
     const { user, socket } = useAuth();
@@ -131,21 +213,47 @@ const GalleryScreen = ({ navigation }) => {
         });
     }, []);
 
+    const handleNewImage = useCallback((newImg) => {
+        setImages(prev => {
+            if (prev.find(img => img._id === newImg._id)) return prev;
+            // Check if matches current filters
+            if (selectedCategory !== 'all' && newImg.category !== selectedCategory) return prev;
+            if (selectedClub !== 'all' && newImg.clubId?._id !== selectedClub && newImg.clubId !== selectedClub) return prev;
+            return [newImg, ...prev];
+        });
+    }, [selectedCategory, selectedClub]);
+
     useEffect(() => {
         fetchData();
     }, []);
+
+    const categoryScrollRef = useRef(null);
+    const categoryLayouts = useRef({});
+
+    useEffect(() => {
+        if (categoryScrollRef.current && categoryLayouts.current[selectedCategory]) {
+            const { x, width: itemWidth } = categoryLayouts.current[selectedCategory];
+            const scrollViewWidth = width; // Assuming full width or close to it
+            categoryScrollRef.current.scrollTo({
+                x: x - (scrollViewWidth / 2 - itemWidth / 2),
+                animated: true
+            });
+        }
+    }, [selectedCategory]);
 
     useEffect(() => {
         if (socket) {
             socket.on('gallery:like', handleLikeUpdate);
             socket.on('gallery:comment', handleCommentUpdate);
+            socket.on('gallery:new', handleNewImage);
 
             return () => {
                 socket.off('gallery:like', handleLikeUpdate);
                 socket.off('gallery:comment', handleCommentUpdate);
+                socket.off('gallery:new', handleNewImage);
             };
         }
-    }, [socket, handleLikeUpdate, handleCommentUpdate]);
+    }, [socket, handleLikeUpdate, handleCommentUpdate, handleNewImage]);
 
     useFocusEffect(
         useCallback(() => {
@@ -153,11 +261,27 @@ const GalleryScreen = ({ navigation }) => {
         }, [fetchData])
     );
 
+    useEffect(() => {
+        const onBackPress = () => {
+            if (detailVisible) {
+                setDetailVisible(false);
+                return true; // Prevent default behavior (exit app/navigate back)
+            }
+            return false;
+        };
+
+        const subscription = BackHandler.addEventListener(
+            'hardwareBackPress',
+            onBackPress
+        );
+
+        return () => subscription.remove();
+    }, [detailVisible]);
+
     const handlePickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
-            aspect: [4, 3],
             quality: 0.3, // Lower quality for smaller file size on Android
             base64: true, // Enable base64 for Android compatibility
             exif: false,
@@ -226,7 +350,10 @@ const GalleryScreen = ({ navigation }) => {
                 uploadPayload.clubId = uploadData.clubId;
             }
 
-            const res = await galleryAPI.uploadBase64(uploadPayload);
+            const res = await galleryAPI.uploadBase64(uploadPayload, (progress) => {
+                setUploadProgress(progress);
+                console.log(`Gallery Upload Progress: ${progress}%`);
+            });
 
             if (res.success) {
                 setUploadModalVisible(false);
@@ -248,10 +375,18 @@ const GalleryScreen = ({ navigation }) => {
             Vibration.vibrate(50);
             const res = await galleryAPI.toggleLike(imageId);
             if (res.success) {
-                // Local update handled by socket primarily, but for faster UI:
+                // Update specific image in the list
                 setImages(prev => prev.map(img =>
                     img._id === imageId ? { ...img, likes: res.likes } : img
                 ));
+
+                // Also update activeImage if it matches, so the detail view updates immediately
+                setActiveImage(prev => {
+                    if (prev && prev._id === imageId) {
+                        return { ...prev, likes: res.likes };
+                    }
+                    return prev;
+                });
             }
         } catch (error) {
             console.error('Like error:', error);
@@ -318,11 +453,62 @@ const GalleryScreen = ({ navigation }) => {
         }
     };
 
-    // Pinterest Layout logic: distribute into 2 columns
-    const leftColumn = images.filter((_, i) => i % 2 === 0);
-    const rightColumn = images.filter((_, i) => i % 2 !== 0);
+    const handleCategorySwipe = (direction) => {
+        const currentIndex = categories.indexOf(selectedCategory);
+        if (currentIndex === -1) return;
 
-    const GalleryItem = ({ item }) => {
+        if (direction === 'next') {
+            if (currentIndex < categories.length - 1) {
+                setSelectedCategory(categories[currentIndex + 1]);
+            }
+        } else {
+            if (currentIndex > 0) {
+                setSelectedCategory(categories[currentIndex - 1]);
+            }
+        }
+    };
+
+    const onSwipeGestureEvent = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            const { translationX, velocityX } = event.nativeEvent;
+            if (Math.abs(translationX) > 60 && Math.abs(velocityX) > 300) {
+                if (translationX < 0) {
+                    handleCategorySwipe('next');
+                } else {
+                    handleCategorySwipe('prev');
+                }
+            }
+        }
+    };
+
+    const handleScreenPress = (event) => {
+        const x = event.nativeEvent.pageX;
+        const { width: screenWidth } = Dimensions.get('window');
+
+        const currentIndex = categories.indexOf(selectedCategory);
+        if (currentIndex === -1) return;
+
+        if (x < screenWidth / 4) {
+            // Move to previous category
+            if (currentIndex > 0) {
+                setSelectedCategory(categories[currentIndex - 1]);
+            }
+        } else if (x > (screenWidth * 3) / 4) {
+            // Move to next category
+            if (currentIndex < categories.length - 1) {
+                setSelectedCategory(categories[currentIndex + 1]);
+            }
+        }
+    };
+
+    // Pinterest Layout logic: distribute into 2 columns
+    const { leftColumn, rightColumn } = useMemo(() => {
+        const left = images.filter((_, i) => i % 2 === 0);
+        const right = images.filter((_, i) => i % 2 !== 0);
+        return { leftColumn: left, rightColumn: right };
+    }, [images]);
+
+    const GalleryItem = React.memo(({ item }) => {
         const heartAnim = useRef(new Animated.Value(0)).current;
 
         // Deterministic random height based on ID to prevent jumping
@@ -375,7 +561,7 @@ const GalleryScreen = ({ navigation }) => {
                                 <Text style={styles.authorName} numberOfLines={1}>{item.uploadedBy?.displayName}</Text>
                             </View>
                             <View style={styles.likesCount}>
-                                <Ionicons name="heart" size={12} color="#FFF" />
+                                <Ionicons name="heart" size={12} color={item.likes?.includes(user._id) ? "#FF4B2B" : "#FFF"} />
                                 <Text style={styles.likesText}>{item.likes?.length || 0}</Text>
                             </View>
                         </View>
@@ -395,79 +581,78 @@ const GalleryScreen = ({ navigation }) => {
                 </View>
             </TouchableOpacity>
         );
-    };
+    });
 
     return (
         <MainLayout navigation={navigation} title="Gallery" currentRoute="Gallery">
             <View style={styles.container}>
-                {/* Filters */}
-                <View style={styles.filterSection}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {categories.map(cat => (
-                            <TouchableOpacity
-                                key={cat}
-                                style={[styles.filterChip, selectedCategory === cat && styles.filterActive]}
-                                onPress={() => setSelectedCategory(cat)}
-                            >
-                                <Text style={[styles.filterText, selectedCategory === cat && styles.filterTextActive]}>
-                                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-                        <TouchableOpacity
-                            style={[styles.clubChip, selectedClub === 'all' && styles.clubActive]}
-                            onPress={() => setSelectedClub('all')}
-                        >
-                            <Text style={[styles.clubChipText, selectedClub === 'all' && styles.clubTextActive]}>All Clubs</Text>
-                        </TouchableOpacity>
-                        {clubs.map(club => (
-                            <TouchableOpacity
-                                key={club._id}
-                                style={[styles.clubChip, selectedClub === club._id && styles.clubActive]}
-                                onPress={() => setSelectedClub(club._id)}
-                            >
-                                <Text style={[styles.clubChipText, selectedClub === club._id && styles.clubTextActive]}>
-                                    {club.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
-
-                {/* Pinterest Grid */}
-                {loading && !refreshing ? (
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                        <SkeletonGalleryGrid items={8} />
-                    </ScrollView>
-                ) : (
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
-                            setRefreshing(true);
-                            fetchData();
-                        }} />}
+                <PanGestureHandler
+                    onHandlerStateChange={onSwipeGestureEvent}
+                    activeOffsetX={[-20, 20]}
+                    failOffsetY={[-20, 20]}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={{ flex: 1 }}
+                        onPress={handleScreenPress}
                     >
-                        <View style={styles.gridContainer}>
-                            <View style={styles.column}>
-                                {leftColumn.map(item => <GalleryItem key={item._id} item={item} />)}
-                            </View>
-                            <View style={styles.column}>
-                                {rightColumn.map(item => <GalleryItem key={item._id} item={item} />)}
-                            </View>
+                        {/* Filters */}
+                        <View style={styles.filterSection}>
+                            <ScrollView
+                                ref={categoryScrollRef}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                            >
+                                {categories.map(cat => (
+                                    <TouchableOpacity
+                                        key={cat}
+                                        style={[styles.filterChip, selectedCategory === cat && styles.filterActive]}
+                                        onPress={() => setSelectedCategory(cat)}
+                                        onLayout={(event) => {
+                                            categoryLayouts.current[cat] = event.nativeEvent.layout;
+                                        }}
+                                    >
+                                        <Text style={[styles.filterText, selectedCategory === cat && styles.filterTextActive]}>
+                                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
                         </View>
 
-                        {images.length === 0 && (
-                            <View style={styles.emptyBox}>
-                                <Ionicons name="images-outline" size={60} color="#D1D5DB" />
-                                <Text style={styles.emptyText}>No photos found in gallery</Text>
-                            </View>
+                        {/* Pinterest Grid */}
+                        {loading && !refreshing ? (
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                                <SkeletonGalleryGrid items={8} />
+                            </ScrollView>
+                        ) : (
+                            <ScrollView
+                                showsVerticalScrollIndicator={false}
+                                contentContainerStyle={styles.scrollContent}
+                                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+                                    setRefreshing(true);
+                                    fetchData();
+                                }} />}
+                            >
+                                <View style={styles.gridContainer}>
+                                    <View style={styles.column}>
+                                        {leftColumn.map(item => <GalleryItem key={item._id} item={item} />)}
+                                    </View>
+                                    <View style={styles.column}>
+                                        {rightColumn.map(item => <GalleryItem key={item._id} item={item} />)}
+                                    </View>
+                                </View>
+
+                                {images.length === 0 && (
+                                    <View style={styles.emptyBox}>
+                                        <Ionicons name="images-outline" size={60} color="#D1D5DB" />
+                                        <Text style={styles.emptyText}>No photos found in gallery</Text>
+                                    </View>
+                                )}
+                            </ScrollView>
                         )}
-                    </ScrollView>
-                )}
+                    </TouchableOpacity>
+                </PanGestureHandler>
 
                 {/* Floating Add Button */}
                 <Pressable
@@ -595,7 +780,12 @@ const GalleryScreen = ({ navigation }) => {
                 </Modal>
 
                 {/* Detail View Modal */}
-                <Modal visible={detailVisible} animationType="fade" transparent>
+                <Modal
+                    visible={detailVisible}
+                    animationType="fade"
+                    transparent
+                    onRequestClose={() => setDetailVisible(false)}
+                >
                     <View style={styles.detailContainer}>
                         {activeImage && (
                             <>
@@ -663,28 +853,7 @@ const GalleryScreen = ({ navigation }) => {
                                     }}
                                     keyExtractor={item => item._id.toString()}
                                     showsHorizontalScrollIndicator={false}
-                                    renderItem={({ item }) => {
-                                        let lastTap = null;
-                                        const handleDoubleTap = () => {
-                                            const now = Date.now();
-                                            const DOUBLE_PRESS_DELAY = 300;
-                                            if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
-                                                toggleLike(item._id);
-                                            } else {
-                                                lastTap = now;
-                                            }
-                                        };
-
-                                        return (
-                                            <TouchableOpacity
-                                                activeOpacity={1}
-                                                onPress={handleDoubleTap}
-                                                style={[styles.fullImgWrapper, { width: width, height: '100%' }]}
-                                            >
-                                                <Image source={{ uri: item.imageUrl }} style={styles.fullImage} resizeMode="contain" />
-                                            </TouchableOpacity>
-                                        );
-                                    }}
+                                    renderItem={({ item }) => <FullScreenImageItem item={item} toggleLike={toggleLike} user={user} onClose={() => setDetailVisible(false)} />}
                                 />
 
                                 <View style={styles.detailBottom}>

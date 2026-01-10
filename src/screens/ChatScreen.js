@@ -25,6 +25,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import { useCall } from '../contexts/CallContext';
 import { messagesAPI, groupChatAPI, snapsAPI, clubsAPI, mediaAPI } from '../services/api';
 import { API_CONFIG } from '../constants/theme';
 import { prepareFile } from '../services/cloudinaryService';
@@ -33,14 +34,48 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useWebUpload } from '../hooks/useWebUpload';
 import MediaUploadModal from '../components/MediaUploadModal';
+import PollModal from '../components/PollModal';
+import SpinnerModal from '../components/SpinnerModal';
+import VoterListModal from '../components/VoterListModal';
+import ViewedByModal from '../components/ViewedByModal';
 
 
 
 import * as MediaLibrary from 'expo-media-library';
 import * as Clipboard from 'expo-clipboard';
-import Voice from '@react-native-voice/voice';
 
 const { width } = Dimensions.get('window');
+
+// Utility function to format last seen time
+const formatLastSeen = (lastSeenDate) => {
+    if (!lastSeenDate) return 'last seen recently';
+
+    const now = new Date();
+    const lastSeen = new Date(lastSeenDate);
+    const diffMs = now - lastSeen;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+    // Within last 24 hours: show time with AM/PM
+    if (diffHours < 24) {
+        return `last seen at ${lastSeen.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        })}`;
+    }
+
+    // Yesterday
+    if (diffDays < 2 && lastSeen.getDate() === now.getDate() - 1) {
+        return 'last seen yesterday';
+    }
+
+    // Older: show date
+    return `last seen ${lastSeen.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+    })}`;
+};
 
 const isDifferentDay = (d1, d2) => {
     if (!d1 || !d2) return true;
@@ -69,7 +104,7 @@ const getDateLabel = (dateStr) => {
     }
 };
 
-const MessageItem = React.memo(({ item, index, user, otherUser, messages, setReplyingTo, setShowOptionsId, isSelected, toggleSelection, isSelectionMode, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails }) => {
+const MessageItem = React.memo(({ item, index, user, otherUser, messages, setReplyingTo, setShowOptionsId, isSelected, toggleSelection, isSelectionMode, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails, onVote, onSpin, clubId, onShowVoters }) => {
     // Filter out malformed messages (e.g. error objects)
     if (!item) return null;
 
@@ -107,6 +142,89 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                 friction: 7
             }).start();
         }
+    };
+
+    const renderPoll = () => {
+        if (item.type !== 'poll' || !item.pollData) return null;
+        const totalVotes = item.pollData.options.reduce((acc, opt) => acc + (opt.votes?.length || 0), 0);
+
+        return (
+            <View style={styles.pollContainer}>
+                <Text style={styles.pollQuestion}>{item.pollData.question}</Text>
+                {item.pollData.options.map((opt, idx) => {
+                    const voteCount = opt.votes?.length || 0;
+                    const percentage = totalVotes > 0 ? (voteCount / totalVotes) : 0;
+                    const hasVoted = opt.votes?.includes(user._id);
+
+                    return (
+                        <TouchableOpacity
+                            key={idx}
+                            style={styles.pollOption}
+                            onPress={() => onVote(item._id, idx)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.pollBar, { width: `${percentage * 100}%` }]} />
+                            <View style={styles.pollOptionContent}>
+                                <Text style={styles.pollOptionText}>{opt.text}</Text>
+                                <TouchableOpacity
+                                    style={styles.pollOptionRight}
+                                    onPress={() => onShowVoters && onShowVoters(item._id, idx, opt.text)}
+                                >
+                                    {hasVoted && <Ionicons name="checkmark-circle" size={16} color="#0A66C2" />}
+                                    <Text style={styles.pollVoteCount}>{voteCount}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })}
+                <Text style={styles.pollFooter}>{totalVotes} votes • {item.pollData.maxVotes === 1 ? 'Single choice' : `Multiple choice (max ${item.pollData.maxVotes})`}</Text>
+            </View>
+        );
+    };
+
+    const renderSpinner = () => {
+        if (item.type !== 'spinner' || !item.spinnerData) return null;
+
+        const isSpinning = item.spinnerData.status === 'spinning';
+        const isCompleted = item.spinnerData.status === 'completed';
+        const result = item.spinnerData.result;
+
+        return (
+            <View style={styles.spinnerContainer}>
+                <View style={styles.spinnerHeader}>
+                    <Text style={styles.spinnerIcon}>🎡</Text>
+                    <Text style={styles.spinnerTitle}>{item.pollData?.question || 'Random Choice'}</Text>
+                </View>
+
+                <View style={[styles.spinnerInner, isSpinning && styles.spinningActive]}>
+                    {isSpinning ? (
+                        <Animatable.Text
+                            animation="pulse"
+                            iterationCount="infinite"
+                            style={styles.spinningText}
+                        >
+                            Spinning...
+                        </Animatable.Text>
+                    ) : isCompleted ? (
+                        <Animatable.View animation="bounceIn" style={styles.winnerBox}>
+                            <Text style={styles.winnerText}>{result}</Text>
+                            <Text style={styles.winnerLabel}>WINNER!</Text>
+                        </Animatable.View>
+                    ) : (
+                        <Text style={styles.idleText}>Ready to spin</Text>
+                    )}
+                </View>
+
+                {isMine && !isSpinning && (
+                    <TouchableOpacity
+                        style={styles.spinBtn}
+                        onPress={() => onSpin(item._id, item.spinnerData.items, isCompleted)}
+                    >
+                        <Text style={styles.spinBtnText}>{isCompleted ? 'SPIN AGAIN' : 'SPIN'}</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        );
     };
 
     const renderMedia = () => {
@@ -299,7 +417,10 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                                             </Text>
                                         )}
 
-                                        {item.content ? (
+                                        {item.type === 'poll' && renderPoll()}
+                                        {item.type === 'spinner' && renderSpinner()}
+
+                                        {item.content && item.type !== 'poll' && item.type !== 'spinner' ? (
                                             <Text style={[styles.messageText, isMine ? styles.myText : styles.otherText]}>
                                                 {item.content}
                                             </Text>
@@ -310,12 +431,28 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                                                 {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </Text>
                                             {isMine && (
-                                                <Ionicons
-                                                    name={item.readBy?.length > 0 ? "checkmark-done" : "checkmark"}
-                                                    size={16}
-                                                    color={item.readBy?.length > 0 ? "#34B7F1" : "#9CA3AF"}
-                                                    style={{ marginLeft: 5 }}
-                                                />
+                                                <>
+                                                    <Ionicons
+                                                        name={(isGroupChat ? (item.readBy && item.readBy.length > 0) : item.read) ? "checkmark-done" : "checkmark"}
+                                                        size={16}
+                                                        color={(isGroupChat ? (item.readBy && item.readBy.length > 0) : item.read) ? "#34B7F1" : "#9CA3AF"}
+                                                        style={{ marginLeft: 5 }}
+                                                    />
+                                                    {/* Viewed By count - only for group chats and sender's messages */}
+                                                    {isGroupChat && item.readBy && item.readBy.length > 0 && (
+                                                        <TouchableOpacity
+                                                            onPress={() => {
+                                                                setViewedByMessageId(item._id);
+                                                                setShowViewedByModal(true);
+                                                            }}
+                                                            style={{ marginLeft: 3 }}
+                                                        >
+                                                            <Text style={{ fontSize: 10, color: '#0A66C2', fontWeight: '700' }}>
+                                                                {item.readBy.length}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </>
                                             )}
                                         </View>
                                     </>
@@ -448,7 +585,25 @@ const ChatScreen = ({ route, navigation }) => {
     const [isGroupAdmin, setIsGroupAdmin] = useState(false);
     const [isEditingName, setIsEditingName] = useState(false);
     const [newGroupName, setNewGroupName] = useState(currentClubName);
+    const [showViewedByModal, setShowViewedByModal] = useState(false);
+    const [viewedByMessageId, setViewedByMessageId] = useState(null);
     const isSelectionMode = selectedMessages.length > 0;
+
+    // Call Context
+    const { startCall } = useCall();
+
+    const handleCallPress = (type) => {
+        let recipients = [];
+        if (isGroupChat) {
+            recipients = localGroupData?.members
+                ?.map(m => m.userId)
+                .filter(u => (u._id || u) !== user._id) || [];
+        } else {
+            recipients = [otherUser];
+        }
+
+        startCall(recipients, type, isGroupChat, isGroupChat ? currentClubName : '');
+    };
 
     useEffect(() => {
         if (isGroupChat && localGroupData) {
@@ -463,7 +618,20 @@ const ChatScreen = ({ route, navigation }) => {
         setNewGroupName(currentClubName);
     }, [currentClubName]);
 
-    // Refresh group data when modal opens to show latest members
+    // Auto-scroll to bottom when new messages arrive, but not in selection mode
+    useEffect(() => {
+        if (messages.length > 0 && !isSelectionMode) {
+            const timer = setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+                // Ensure we scroll to the absolute bottom
+                setTimeout(() => {
+                    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+                }, 100);
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [messages.length, isSelectionMode]);
+
     useEffect(() => {
         if (showGroupInfoModal && isGroupChat) {
             fetchMessages();
@@ -479,111 +647,50 @@ const ChatScreen = ({ route, navigation }) => {
     const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
     const [showGroupIconModalChoice, setShowGroupIconModalChoice] = useState(false);
 
+    // Poll & Spinner states
+    const [showPollModal, setShowPollModal] = useState(false);
+    const [showSpinnerModal, setShowSpinnerModal] = useState(false);
+    const [clubMembers, setClubMembers] = useState([]);
+
     const [showReactionDetails, setShowReactionDetails] = useState(false);
     const [reactionDetailsData, setReactionDetailsData] = useState([]);
+
+    const [voterModal, setVoterModal] = useState({ visible: false, messageId: null, optionIndex: null, optionText: '' });
 
     const flatListRef = useRef();
     const inputRef = useRef();
 
-    const webSpeechRef = useRef(null);
+    // Simplified recording state - no voice recognition, just visual feedback
+    const recordingAnimValue = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-        // Platform specific initialization
-        if (Platform.OS === 'web') {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                webSpeechRef.current = new SpeechRecognition();
-                webSpeechRef.current.continuous = true;
-                webSpeechRef.current.interimResults = true;
-                webSpeechRef.current.lang = 'en-US';
-
-                webSpeechRef.current.onresult = (event) => {
-                    const transcript = Array.from(event.results)
-                        .map(result => result[0])
-                        .map(result => result.transcript)
-                        .join('');
-                    setInputText(transcript);
-                };
-
-                webSpeechRef.current.onerror = (event) => {
-                    console.error('Web Speech Error:', event.error);
-                    setIsRecording(false);
-                };
-
-                webSpeechRef.current.onend = () => {
-                    setIsRecording(false);
-                };
-            }
-        } else if (Voice) {
-            Voice.onSpeechStart = onSpeechStart;
-            Voice.onSpeechEnd = onSpeechEnd;
-            Voice.onSpeechResults = onSpeechResults;
-            Voice.onSpeechError = onSpeechError;
-        }
-
-        return () => {
-            if (Platform.OS === 'web' && webSpeechRef.current) {
-                webSpeechRef.current.stop();
-            } else if (Voice) {
-                Voice.destroy().then(Voice.removeAllListeners);
-            }
-        };
-    }, []);
-
-    const onSpeechStart = (e) => {
-        console.log('onSpeechStart: ', e);
-        setIsRecording(true);
-    };
-
-    const onSpeechEnd = (e) => {
-        console.log('onSpeechEnd: ', e);
-        setIsRecording(false);
-    };
-
-    const onSpeechError = (e) => {
-        console.log('onSpeechError: ', e);
-        setIsRecording(false);
-        // alert('Speech recognition error. Please try again.');
-    };
-
-    const onSpeechResults = (e) => {
-        console.log('onSpeechResults: ', e);
-        if (e.value && e.value.length > 0) {
-            const results = e.value[0];
-            setInputText(prev => (prev.trim() ? prev.trim() + ' ' : '') + results);
-        }
-    };
-
-    // ... (keep useEffects for socket and fetching same)
-
-    // Audio recording logic
+    // Start recording with cool animation
     const startRecording = async () => {
         try {
-            setInputText('');
             setIsRecording(true);
             setRecordingDuration(0);
+            Vibration.vibrate(50);
 
-            if (Platform.OS === 'web') {
-                if (webSpeechRef.current) {
-                    webSpeechRef.current.start();
-                } else {
-                    alert('Speech Recognition not supported in this browser.');
-                    setIsRecording(false);
-                }
-            } else {
-                if (Voice) {
-                    await Voice.start('en-US');
-                } else {
-                    alert('Voice module not available');
-                    setIsRecording(false);
-                    return;
-                }
-            }
+            // Start pulsing animation
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(recordingAnimValue, {
+                        toValue: 1,
+                        duration: 800,
+                        useNativeDriver: true,
+                        easing: Easing.inOut(Easing.ease)
+                    }),
+                    Animated.timing(recordingAnimValue, {
+                        toValue: 0,
+                        duration: 800,
+                        useNativeDriver: true,
+                        easing: Easing.inOut(Easing.ease)
+                    })
+                ])
+            ).start();
 
             timerRef.current = setInterval(() => {
                 setRecordingDuration(prev => prev + 1);
             }, 1000);
-            Vibration.vibrate(50);
         } catch (e) {
             console.error(e);
             setIsRecording(false);
@@ -593,19 +700,63 @@ const ChatScreen = ({ route, navigation }) => {
     const stopRecording = async (shouldSend = true) => {
         try {
             clearInterval(timerRef.current);
+            const duration = recordingDuration;
             setRecordingDuration(0);
-
-            if (Platform.OS === 'web') {
-                webSpeechRef.current?.stop();
-            } else {
-                await Voice?.stop();
-            }
+            recordingAnimValue.stopAnimation();
+            recordingAnimValue.setValue(0);
             setIsRecording(false);
+
+            if (shouldSend && duration > 0) {
+                // Send a message indicating voice note was recorded
+                const voiceNoteMessage = `🎤 Voice note (${formatDuration(duration)})`;
+                setInputText(voiceNoteMessage);
+
+                // Auto-send after a brief delay
+                setTimeout(() => {
+                    sendMessage();
+                }, 100);
+            }
         } catch (e) {
             console.error(e);
             setIsRecording(false);
         }
     };
+
+    // Socket listener for real-time read receipts
+    useEffect(() => {
+        if (!socket || !isGroupChat) return;
+
+        const handleMessagesRead = (data) => {
+            if (data.clubId === clubId) {
+                // Update messages with new readBy data
+                setMessages(prev => prev.map(msg => {
+                    const alreadyRead = msg.readBy?.some(r =>
+                        (r.userId?._id || r.userId) === data.userId
+                    );
+
+                    if (!alreadyRead) {
+                        return {
+                            ...msg,
+                            readBy: [
+                                ...(msg.readBy || []),
+                                {
+                                    userId: data.reader,
+                                    readAt: data.readAt
+                                }
+                            ]
+                        };
+                    }
+                    return msg;
+                }));
+            }
+        };
+
+        socket.on('group:messages:read', handleMessagesRead);
+
+        return () => {
+            socket.off('group:messages:read', handleMessagesRead);
+        };
+    }, [socket, isGroupChat, clubId]);
 
     const formatDuration = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -737,13 +888,17 @@ const ChatScreen = ({ route, navigation }) => {
                 res = await mediaAPI.uploadBase64({
                     image: attachment.base64,
                     type: 'chat'
+                }, (progress) => {
+                    setUploadProgress(progress);
                 });
             } else {
                 const file = await prepareFile(attachment.uri);
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('type', 'chat');
-                res = await mediaAPI.upload(formData);
+                res = await mediaAPI.upload(formData, (progress) => {
+                    setUploadProgress(progress);
+                });
             }
 
             if (res.success) {
@@ -957,6 +1112,84 @@ const ChatScreen = ({ route, navigation }) => {
         }
     }, [replyingTo]);
 
+    const handleCreatePoll = async (pollData) => {
+        setShowPollModal(false);
+        try {
+            const res = await groupChatAPI.sendMessage(clubId, {
+                type: 'poll',
+                pollData
+            });
+            if (res.success) {
+                // Socket will handle the update for everyone, but we update locally too if needed
+                // Message is already sent and handled by existing logic
+            }
+        } catch (err) {
+            console.error('Poll creation error:', err);
+            alert('Failed to create poll');
+        }
+    };
+
+    const handleCreateSpinner = async (spinnerData) => {
+        setShowSpinnerModal(false);
+        try {
+            const res = await groupChatAPI.sendMessage(clubId, {
+                type: 'spinner',
+                spinnerData
+            });
+            if (res.success) {
+                // Done
+            }
+        } catch (err) {
+            console.error('Spinner creation error:', err);
+            alert('Failed to create spinner');
+        }
+    };
+
+    const handleMessageUpdateSync = ({ messageId, pollData, spinnerData }) => {
+        setMessages(prev => prev.map(m => {
+            if (m._id === messageId) {
+                return { ...m, pollData: pollData || m.pollData, spinnerData: spinnerData || m.spinnerData };
+            }
+            return m;
+        }));
+    };
+
+    const handleVote = useCallback(async (messageId, optionIndex) => {
+        try {
+            const res = await groupChatAPI.votePoll(clubId, messageId, { optionIndex });
+            if (res.success) {
+                // Socket handled, but local update for speed
+                setMessages(prev => prev.map(m => m._id === messageId ? { ...m, pollData: res.pollData } : m));
+            }
+        } catch (err) {
+            console.error('Vote error:', err);
+        }
+    }, [clubId]);
+
+    const handleSpin = useCallback(async (messageId, items, reset = false) => {
+        try {
+            if (reset) {
+                await groupChatAPI.updateSpinner(clubId, messageId, { status: 'idle', result: null });
+                return;
+            }
+
+            // 1. Set status to spinning
+            await groupChatAPI.updateSpinner(clubId, messageId, { status: 'spinning' });
+
+            // 2. Wait for animation then set result
+            setTimeout(async () => {
+                const winner = items[Math.floor(Math.random() * items.length)];
+                await groupChatAPI.updateSpinner(clubId, messageId, {
+                    status: 'completed',
+                    result: winner
+                });
+            }, 3000);
+
+        } catch (err) {
+            console.error('Spin error:', err);
+        }
+    }, [clubId]);
+
     useEffect(() => {
         fetchMessages();
         markRead();
@@ -964,35 +1197,46 @@ const ChatScreen = ({ route, navigation }) => {
         if (socket) {
             if (isGroupChat) {
                 // Group chat socket listeners
+                socket.emit('club:join', clubId);
                 socket.on('group:message', handleReceiveMessage);
                 socket.on('group:message:delete', handleDeleteSync);
                 socket.on('group:message:reaction', handleReactionSync);
-                socket.on('club:members:update', (data) => {
-                    if (data.clubId === clubId.toString()) {
-                        fetchMessages();
-                    }
-                });
+                socket.on('group:message:update', handleMessageUpdateSync);
+                socket.on('group:typing', handleTypingStatus);
+                socket.on('club:members:update', fetchMessages);
+                socket.on('group:message:read', handleGroupReadSync);
             } else {
                 // Individual chat socket listeners
                 socket.on('message:receive', handleReceiveMessage);
                 socket.on('message:typing', handleTypingStatus);
                 socket.on('message:delete', handleDeleteSync);
                 socket.on('message:reaction', handleReactionSync);
+                socket.on('message:read', handleReadSync);
             }
         }
 
         return () => {
             if (socket) {
+                // Clear typing status on exit
+                socket.emit('message:typing', {
+                    receiverId: isGroupChat ? null : otherUser?._id,
+                    clubId: isGroupChat ? clubId : null,
+                    isTyping: false,
+                    senderId: user._id
+                });
                 if (isGroupChat) {
                     socket.off('group:message', handleReceiveMessage);
                     socket.off('group:message:delete', handleDeleteSync);
                     socket.off('group:message:reaction', handleReactionSync);
+                    socket.off('group:typing', handleTypingStatus);
                     socket.off('club:members:update');
+                    socket.off('group:message:read', handleGroupReadSync);
                 } else {
                     socket.off('message:receive', handleReceiveMessage);
                     socket.off('message:typing', handleTypingStatus);
                     socket.off('message:delete', handleDeleteSync);
                     socket.off('message:reaction', handleReactionSync);
+                    socket.off('message:read', handleReadSync);
                 }
             }
         };
@@ -1127,6 +1371,26 @@ const ChatScreen = ({ route, navigation }) => {
         ));
     };
 
+    const handleReadSync = ({ readerId, senderId }) => {
+        if (senderId === user._id) {
+            setMessages(prev => prev.map(m =>
+                (m.receiverId === readerId || m.receiverId?._id === readerId) ? { ...m, read: true } : m
+            ));
+        }
+    };
+
+    const handleGroupReadSync = ({ userId: readerId }) => {
+        setMessages(prev => prev.map(m => {
+            if (m.senderId !== readerId && !m.readBy?.some(r => (r.userId?._id || r.userId) === readerId)) {
+                return { ...m, readBy: [...(m.readBy || []), { userId: readerId, readAt: new Date() }] };
+            }
+            return m;
+        }));
+    };
+
+    const handleShowVoters = (msgId, optIdx, optText) => {
+        setVoterModal({ visible: true, messageId: msgId, optionIndex: optIdx, optionText: optText });
+    };
 
     const handleUpdateGroupIcon = async () => {
         if (!isGroupAdmin) {
@@ -1198,9 +1462,10 @@ const ChatScreen = ({ route, navigation }) => {
 
     const handleInputTyping = (text) => {
         setInputText(text);
-        if (socket && !isGroupChat) {
+        if (socket) {
             socket.emit('message:typing', {
-                receiverId: otherUser?._id,
+                receiverId: isGroupChat ? null : otherUser?._id,
+                clubId: isGroupChat ? clubId : null,
                 isTyping: text.length > 0,
                 senderId: user._id
             });
@@ -1333,10 +1598,14 @@ const ChatScreen = ({ route, navigation }) => {
                     setShowMediaViewer={setShowMediaViewer}
                     setReactionDetailsData={setReactionDetailsData}
                     setShowReactionDetails={setShowReactionDetails}
+                    onVote={handleVote}
+                    onSpin={handleSpin}
+                    clubId={clubId}
+                    onShowVoters={handleShowVoters}
                 />
             </View>
         );
-    }, [user?._id, otherUser?._id, messages, selectedMessages, isSelectionMode, toggleSelection, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails]);
+    }, [user?._id, otherUser?._id, messages, selectedMessages, isSelectionMode, toggleSelection, isGroupChat, setMediaViewerData, setShowMediaViewer, setReactionDetailsData, setShowReactionDetails, handleVote, handleSpin, clubId, handleShowVoters]);
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -1393,16 +1662,22 @@ const ChatScreen = ({ route, navigation }) => {
                                     <Text style={styles.headerName}>{isGroupChat ? currentClubName : otherUser?.displayName}</Text>
                                     <Text style={styles.headerStatus}>
                                         {isGroupChat
-                                            ? `${localGroupData?.members?.length || 0} members`
-                                            : (isTyping ? 'typing...' : (otherUser?.isOnline ? 'online' : 'last seen recently'))}
+                                            ? (isTyping ? 'Someone is typing...' : `${localGroupData?.members?.length || 0} members`)
+                                            : (isTyping ? 'typing...' : (otherUser?.isOnline ? 'online' : formatLastSeen(otherUser?.lastSeen)))}
                                     </Text>
                                 </View>
                             </TouchableOpacity>
                             <View style={styles.headerActions}>
-                                <TouchableOpacity style={styles.headerActionBtn}>
+                                <TouchableOpacity
+                                    style={styles.headerActionBtn}
+                                    onPress={() => handleCallPress('audio')}
+                                >
                                     <Ionicons name="call-outline" size={22} color="#0A66C2" />
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.headerActionBtn}>
+                                <TouchableOpacity
+                                    style={styles.headerActionBtn}
+                                    onPress={() => handleCallPress('video')}
+                                >
                                     <Ionicons name="videocam-outline" size={24} color="#0A66C2" />
                                 </TouchableOpacity>
                             </View>
@@ -1433,8 +1708,6 @@ const ChatScreen = ({ route, navigation }) => {
                                 renderItem={renderMessage}
                                 keyExtractor={item => item._id}
                                 contentContainerStyle={[styles.messageList, { paddingBottom: 20 }]}
-                                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                                onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                                 keyboardDismissMode="on-drag"
                                 ListFooterComponent={() => (
                                     <>
@@ -1526,18 +1799,55 @@ const ChatScreen = ({ route, navigation }) => {
                                         <Text style={styles.attachLabelText}>Location</Text>
                                     </View>
                                     <View style={styles.attachOptionContainer}>
-                                        <Pressable
-                                            style={({ pressed }) => [
-                                                styles.attachOption,
-                                                { backgroundColor: '#F59E0B', opacity: pressed ? 0.8 : 1 }
-                                            ]}
-                                            onPress={handleWebUploadFlow}
+                                        <TouchableOpacity
+                                            style={[styles.attachOption, { backgroundColor: '#F59E0B' }]}
+                                            onPress={() => {
+                                                setShowAttachMenu(false);
+                                                setShowPollModal(true);
+                                            }}
                                         >
-                                            <Ionicons name="globe" size={26} color="#FFF" />
-                                        </Pressable>
-                                        <Text style={styles.attachLabelText}>Browser</Text>
+                                            <Ionicons name="bar-chart" size={26} color="#FFF" />
+                                        </TouchableOpacity>
+                                        <Text style={styles.attachLabelText}>Poll</Text>
                                     </View>
                                 </View>
+
+                                {isGroupChat && (
+                                    <View style={styles.attachRow}>
+                                        <View style={styles.attachOptionContainer}>
+                                            <TouchableOpacity
+                                                style={[styles.attachOption, { backgroundColor: '#FF8C00' }]}
+                                                onPress={async () => {
+                                                    setShowAttachMenu(false);
+                                                    // Fetch members first
+                                                    try {
+                                                        const res = await clubsAPI.getMembers(clubId);
+                                                        if (res.success) setClubMembers(res.data);
+                                                    } catch (err) { console.error(err); }
+                                                    setShowSpinnerModal(true);
+                                                }}
+                                            >
+                                                <Ionicons name="sync-circle" size={28} color="#FFF" />
+                                            </TouchableOpacity>
+                                            <Text style={styles.attachLabelText}>Spinner</Text>
+                                        </View>
+                                        <View style={styles.attachOptionContainer}>
+                                            <Pressable
+                                                style={({ pressed }) => [
+                                                    styles.attachOption,
+                                                    { backgroundColor: '#4361EE', opacity: pressed ? 0.8 : 1 }
+                                                ]}
+                                                onPress={handleWebUploadFlow}
+                                            >
+                                                <Ionicons name="globe" size={26} color="#FFF" />
+                                            </Pressable>
+                                            <Text style={styles.attachLabelText}>Browser</Text>
+                                        </View>
+                                        <View style={[styles.attachOptionContainer, { opacity: 0 }]} pointerEvents='none'>
+                                            <View style={styles.attachOption} />
+                                        </View>
+                                    </View>
+                                )}
 
                             </View>
                         )}
@@ -1617,13 +1927,48 @@ const ChatScreen = ({ route, navigation }) => {
                                 <View style={styles.inputFieldContainer}>
 
                                     {isRecording ? (
-                                        <View style={styles.recordingOverlay}>
-                                            <Animatable.View animation="pulse" iterationCount="infinite" style={styles.recordingDot} />
+                                        <Animated.View style={[
+                                            styles.recordingOverlay,
+                                            {
+                                                opacity: recordingAnimValue.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [0.7, 1]
+                                                })
+                                            }
+                                        ]}>
+                                            <Animated.View style={[
+                                                styles.recordingDot,
+                                                {
+                                                    transform: [{
+                                                        scale: recordingAnimValue.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [1, 1.5]
+                                                        })
+                                                    }]
+                                                }
+                                            ]} />
+                                            <Animated.View style={[
+                                                styles.recordingWave,
+                                                {
+                                                    transform: [{
+                                                        scale: recordingAnimValue.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [1, 2]
+                                                        })
+                                                    }],
+                                                    opacity: recordingAnimValue.interpolate({
+                                                        inputRange: [0, 1],
+                                                        outputRange: [0.5, 0]
+                                                    })
+                                                }
+                                            ]} />
                                             <Text style={styles.recordingTime}>{formatDuration(recordingDuration)}</Text>
+                                            <Text style={styles.recordingHint}>Recording voice note...</Text>
                                             <TouchableOpacity onPress={() => stopRecording(false)} style={styles.cancelRecord}>
+                                                <Ionicons name="close-circle" size={24} color="#EF4444" />
                                                 <Text style={styles.cancelText}>Cancel</Text>
                                             </TouchableOpacity>
-                                        </View>
+                                        </Animated.View>
                                     ) : (
                                         <TextInput
                                             ref={inputRef}
@@ -1748,14 +2093,19 @@ const ChatScreen = ({ route, navigation }) => {
                                                 <Ionicons name="copy-outline" size={20} color="#374151" />
                                                 <Text style={styles.menuText}>Copy</Text>
                                             </TouchableOpacity>
-                                            <TouchableOpacity style={styles.menuItem} onPress={() => {
-                                                setMessageToForward(msg);
-                                                setShowForwardModal(true);
-                                                setShowOptionsId(null);
-                                            }}>
-                                                <Ionicons name="arrow-redo-outline" size={20} color="#374151" />
-                                                <Text style={styles.menuText}>Forward</Text>
-                                            </TouchableOpacity>
+
+                                            {/* Hide Forward for Polls and Spinners */}
+                                            {msg.type !== 'poll' && msg.type !== 'spinner' && (
+                                                <TouchableOpacity style={styles.menuItem} onPress={() => {
+                                                    setMessageToForward(msg);
+                                                    setShowForwardModal(true);
+                                                    setShowOptionsId(null);
+                                                }}>
+                                                    <Ionicons name="arrow-redo-outline" size={20} color="#374151" />
+                                                    <Text style={styles.menuText}>Forward</Text>
+                                                </TouchableOpacity>
+                                            )}
+
                                             <TouchableOpacity style={styles.menuItem} onPress={() => {
                                                 toggleSelection(msg._id);
                                                 setShowOptionsId(null);
@@ -1763,6 +2113,18 @@ const ChatScreen = ({ route, navigation }) => {
                                                 <Ionicons name="checkbox-outline" size={20} color="#374151" />
                                                 <Text style={styles.menuText}>Select</Text>
                                             </TouchableOpacity>
+
+                                            {/* Viewed By - only for sender in group chat */}
+                                            {isGroupChat && (msg.senderId?._id || msg.senderId) === user._id && (
+                                                <TouchableOpacity style={styles.menuItem} onPress={() => {
+                                                    setViewedByMessageId(msg._id);
+                                                    setShowViewedByModal(true);
+                                                    setShowOptionsId(null);
+                                                }}>
+                                                    <Ionicons name="eye-outline" size={20} color="#374151" />
+                                                    <Text style={styles.menuText}>Viewed By</Text>
+                                                </TouchableOpacity>
+                                            )}
                                         </>
                                     );
                                 })()}
@@ -1812,15 +2174,33 @@ const ChatScreen = ({ route, navigation }) => {
                             </View>
 
                             <View style={styles.profileActions}>
-                                <TouchableOpacity style={styles.actionBtn}>
+                                <TouchableOpacity
+                                    style={styles.actionBtn}
+                                    onPress={() => {
+                                        setShowProfileModal(false);
+                                        // Already in chat
+                                    }}
+                                >
                                     <Ionicons name="chatbubble-ellipses" size={24} color="#0A66C2" />
                                     <Text style={styles.actionText}>Message</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.actionBtn}>
+                                <TouchableOpacity
+                                    style={styles.actionBtn}
+                                    onPress={() => {
+                                        setShowProfileModal(false);
+                                        handleCallPress('audio');
+                                    }}
+                                >
                                     <Ionicons name="call" size={24} color="#0A66C2" />
                                     <Text style={styles.actionText}>Call</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.actionBtn}>
+                                <TouchableOpacity
+                                    style={styles.actionBtn}
+                                    onPress={() => {
+                                        setShowProfileModal(false);
+                                        handleCallPress('video');
+                                    }}
+                                >
                                     <Ionicons name="videocam" size={24} color="#0A66C2" />
                                     <Text style={styles.actionText}>Video</Text>
                                 </TouchableOpacity>
@@ -1835,6 +2215,21 @@ const ChatScreen = ({ route, navigation }) => {
                         </View>
                     </TouchableOpacity>
                 </Modal>
+
+                {/* Poll Modal */}
+                <PollModal
+                    visible={showPollModal}
+                    onClose={() => setShowPollModal(false)}
+                    onCreate={handleCreatePoll}
+                />
+
+                {/* Spinner Modal */}
+                <SpinnerModal
+                    visible={showSpinnerModal}
+                    onClose={() => setShowSpinnerModal(false)}
+                    onCreate={handleCreateSpinner}
+                    members={clubMembers}
+                />
 
                 {/* Group Info Modal */}
                 <Modal
@@ -2089,9 +2484,9 @@ const ChatScreen = ({ route, navigation }) => {
                         </View>
                     </TouchableOpacity>
                 </Modal>
-            </View >
+            </View>
             {/* Reaction Picker Modal */}
-            < Modal
+            <Modal
                 visible={showReactionPicker}
                 transparent={true}
                 animationType="slide"
@@ -2102,8 +2497,17 @@ const ChatScreen = ({ route, navigation }) => {
                     activeOpacity={1}
                     onPress={() => setShowReactionPicker(false)}
                 >
-                    <View style={[styles.optionsPopup, { height: '50%', paddingVertical: 20 }]}>
-                        <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 15, alignSelf: 'center', color: '#1F2937' }}>React</Text>
+                    <View style={[styles.optionsPopup, { height: '55%', paddingVertical: 20 }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 }}>
+                            <View style={{ width: 40 }} />
+                            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1F2937' }}>React</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowReactionPicker(false)}
+                                style={{ backgroundColor: '#F3F4F6', padding: 5, borderRadius: 20, width: 32, height: 32, justifyContent: 'center', alignItems: 'center' }}
+                            >
+                                <Ionicons name="close" size={24} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, paddingBottom: 20 }}>
                                 {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '🥲', '☺️', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '👍', '👎', '👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙'].map((emoji) => (
@@ -2192,10 +2596,10 @@ const ChatScreen = ({ route, navigation }) => {
                         </View>
                     )}
                 </View>
-            </Modal >
+            </Modal>
 
             {/* Reaction Details Modal */}
-            < Modal
+            <Modal
                 visible={showReactionDetails}
                 animationType="fade"
                 transparent={true}
@@ -2255,7 +2659,24 @@ const ChatScreen = ({ route, navigation }) => {
                 onNativePick={handleNativeGroupIconPick}
                 onWebUpload={handleGroupIconWebUpload}
             />
-        </GestureHandlerRootView >
+            <VoterListModal
+                visible={voterModal.visible}
+                clubId={clubId}
+                messageId={voterModal.messageId}
+                optionIndex={voterModal.optionIndex}
+                optionText={voterModal.optionText}
+                onClose={() => setVoterModal(prev => ({ ...prev, visible: false }))}
+            />
+            <ViewedByModal
+                visible={showViewedByModal}
+                clubId={clubId}
+                messageId={viewedByMessageId}
+                onClose={() => {
+                    setShowViewedByModal(false);
+                    setViewedByMessageId(null);
+                }}
+            />
+        </GestureHandlerRootView>
     );
 };
 
@@ -2682,6 +3103,56 @@ const styles = StyleSheet.create({
     micButton: {
         padding: 5,
     },
+    recordingOverlay: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 15,
+        backgroundColor: '#FEF3F2',
+        borderRadius: 20,
+    },
+    recordingDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#EF4444',
+        marginRight: 10,
+    },
+    recordingWave: {
+        position: 'absolute',
+        left: 15,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#EF4444',
+    },
+    recordingTime: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#EF4444',
+        marginRight: 10,
+    },
+    recordingHint: {
+        fontSize: 12,
+        color: '#DC2626',
+        fontStyle: 'italic',
+        flex: 1,
+    },
+    cancelRecord: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: '#FFF',
+        borderRadius: 15,
+        gap: 5,
+    },
+    cancelText: {
+        color: '#EF4444',
+        fontWeight: '700',
+        fontSize: 14,
+    },
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
@@ -3049,6 +3520,128 @@ const styles = StyleSheet.create({
     cancelText: {
         color: '#EF4444',
         fontWeight: '700',
+        fontSize: 14,
+    },
+    pollContainer: {
+        width: 250,
+        padding: 5,
+    },
+    pollQuestion: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 12,
+    },
+    pollOption: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
+        height: 40,
+        marginBottom: 8,
+        justifyContent: 'center',
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    pollBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        backgroundColor: '#D1E5FF',
+    },
+    pollOptionContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        zIndex: 1,
+    },
+    pollOptionText: {
+        fontSize: 14,
+        color: '#374151',
+        fontWeight: '600',
+    },
+    pollOptionRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    pollVoteCount: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontWeight: '700',
+    },
+    pollFooter: {
+        fontSize: 11,
+        color: '#9CA3AF',
+        marginTop: 5,
+    },
+    spinnerContainer: {
+        width: 240,
+        padding: 10,
+        alignItems: 'center',
+    },
+    spinnerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+        gap: 8,
+    },
+    spinnerIcon: {
+        fontSize: 22,
+    },
+    spinnerTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#1F2937',
+    },
+    spinnerInner: {
+        width: 160,
+        height: 160,
+        borderRadius: 80,
+        borderWidth: 8,
+        borderColor: '#F3F4F6',
+        backgroundColor: '#F9FAFB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    spinningActive: {
+        borderColor: '#0A66C2',
+        borderStyle: 'dashed',
+    },
+    spinningText: {
+        color: '#0A66C2',
+        fontWeight: '800',
+        fontSize: 14,
+    },
+    winnerBox: {
+        alignItems: 'center',
+    },
+    winnerText: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#0A66C2',
+        textAlign: 'center',
+    },
+    winnerLabel: {
+        fontSize: 10,
+        color: '#10B981',
+        fontWeight: '800',
+        marginTop: 5,
+    },
+    idleText: {
+        color: '#9CA3AF',
+        fontWeight: '600',
+    },
+    spinBtn: {
+        backgroundColor: '#0A66C2',
+        paddingHorizontal: 30,
+        paddingVertical: 10,
+        borderRadius: 20,
+    },
+    spinBtnText: {
+        color: '#FFF',
+        fontWeight: '800',
         fontSize: 14,
     },
 });

@@ -174,6 +174,27 @@ const SettingsScreen = ({ navigation, route }) => {
                     />
                 </View>
 
+                {/* Call Settings */}
+                <Text style={styles.sectionHeader}>Calls</Text>
+                <View style={styles.section}>
+                    <SettingItem
+                        icon="musical-note-outline"
+                        title="Ringtone"
+                        value="Default (Apex)"
+                        type="link"
+                        onPress={() => Alert.alert('Ringtones', 'Custom ringtones coming soon!')}
+                    />
+                    <View style={styles.divider} />
+                    <SettingItem
+                        icon="phone-portrait-outline"
+                        title="Vibration Only"
+                        value={false} // Placeholder for actual state
+                        onValueChange={(val) => {
+                            Alert.alert('Settings', val ? 'Calls set to Vibration Only' : 'Ringtone enabled');
+                        }}
+                    />
+                </View>
+
                 {/* Sidebar Banner Customization */}
                 <Text style={styles.sectionHeader}>Appearance</Text>
                 <View style={styles.section}>
@@ -237,12 +258,21 @@ const SettingsScreen = ({ navigation, route }) => {
                         icon="help-circle-outline"
                         title="Help Center"
                         type="link"
+                        onPress={() => navigation.navigate('HelpCenter')}
                     />
                     <View style={styles.divider} />
                     <SettingItem
                         icon="document-text-outline"
                         title="Privacy Policy"
                         type="link"
+                        onPress={() => navigation.navigate('PrivacyPolicy')}
+                    />
+                    <View style={styles.divider} />
+                    <SettingItem
+                        icon="information-circle-outline"
+                        title="About Us"
+                        type="link"
+                        onPress={() => navigation.navigate('AboutUs')}
                     />
                 </View>
 

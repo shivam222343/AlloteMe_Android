@@ -13,6 +13,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ProfileCompletionModal from './src/components/ProfileCompletionModal';
 import { authAPI } from './src/services/api';
+import { CallProvider } from './src/contexts/CallContext';
+import CallManager from './src/components/CallManager';
 
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -41,6 +43,9 @@ import CameraScreen from './src/screens/CameraScreen';
 import GalleryScreen from './src/screens/GalleryScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import TasksScreen from './src/screens/TasksScreen';
+import HelpCenterScreen from './src/screens/HelpCenterScreen';
+import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
+import AboutUsScreen from './src/screens/AboutUsScreen';
 
 const Stack = createStackNavigator();
 
@@ -167,6 +172,9 @@ const AppContent = () => {
               <Stack.Screen name="Gallery" component={GalleryScreen} />
               <Stack.Screen name="Analytics" component={AnalyticsScreen} />
               <Stack.Screen name="Tasks" component={TasksScreen} />
+              <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+              <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+              <Stack.Screen name="AboutUs" component={AboutUsScreen} />
             </>
           )}
         </Stack.Navigator>
@@ -194,7 +202,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppContent />
+        <CallProvider>
+          <AppContent />
+          <CallManager />
+        </CallProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

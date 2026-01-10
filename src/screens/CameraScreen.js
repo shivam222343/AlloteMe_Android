@@ -59,9 +59,10 @@ const CameraScreen = ({ navigation, route }) => {
 
     useEffect(() => {
         fetchClubs();
-        if (!micPermission?.granted) {
-            requestMicPermission();
-        }
+        (async () => {
+            const camRes = await requestPermission();
+            const micRes = await requestMicPermission();
+        })();
     }, []);
 
     useEffect(() => {
@@ -271,7 +272,10 @@ const CameraScreen = ({ navigation, route }) => {
             };
 
             console.log('Uploading snap with base64');
-            const res = await snapsAPI.uploadBase64(snapData);
+            const res = await snapsAPI.uploadBase64(snapData, (progress) => {
+                setUploadProgress(progress);
+                console.log(`Snap Upload Progress: ${progress}%`);
+            });
 
             if (res.success) {
                 navigation.goBack();
@@ -435,6 +439,31 @@ const CameraScreen = ({ navigation, route }) => {
                     </TouchableOpacity>
                 </Modal>
             </SafeAreaView>
+        );
+    }
+
+    if (!permission) {
+        return (
+            <View style={[styles.container, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#0A66C2" />
+            </View>
+        );
+    }
+
+    if (!permission.granted) {
+        return (
+            <View style={[styles.container, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+                <Ionicons name="camera-outline" size={64} color="#FFF" style={{ marginBottom: 20 }} />
+                <Text style={{ color: '#FFF', fontSize: 18, textAlign: 'center', marginBottom: 30 }}>
+                    We need your permission to use the camera to take snaps.
+                </Text>
+                <TouchableOpacity
+                    style={{ backgroundColor: '#0A66C2', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 25 }}
+                    onPress={requestPermission}
+                >
+                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Grant Permission</Text>
+                </TouchableOpacity>
+            </View>
         );
     }
 

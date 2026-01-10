@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "extra": {
       "eas": {
-        "projectId": "c17b5aac-9e6c-4e09-ae8f-9309e8f25b22"
+        "projectId": "872e808d-3c23-4ed2-8e41-a31ae6c283a7"
       }
     },
     "splash": {
@@ -27,14 +27,28 @@
         "backgroundColor": "#0A66C2"
       },
       "package": "com.mycompany.myauth",
+      "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "mavericks"
+          },
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "RECORD_AUDIO",
-        "NOTIFICATIONS"
+        "NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
       "notification": {
         "icon": "./assets/AS.png",
@@ -82,6 +96,6 @@
         }
       ]
     ],
-    "owner": "shivamdombe"
+    "owner": "shivamdombe23"
   }
 }

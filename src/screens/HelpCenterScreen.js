@@ -1,0 +1,269 @@
+import React from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    Linking,
+    Platform
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const HelpCenterScreen = ({ navigation }) => {
+    const faqs = [
+        {
+            question: "How do I join a club?",
+            answer: "Go to the Clubs section, browse available clubs, and click 'Join'. Some clubs might require an access key provided by the admin."
+        },
+        {
+            question: "How to upload a snap?",
+            answer: "Click on the Camera icon in the bottom navigation or the camera button in the Snaps section. Take a photo or video and select the club you want to post to."
+        },
+        {
+            question: "How can I mark attendance?",
+            answer: "During a meeting, the admin will provide a 4-digit code. Go to the meeting details and enter the code to mark your attendance."
+        },
+        {
+            question: "Can I delete my account?",
+            answer: "Account deletion can be requested through the 'Contact Support' section below. Our team will process it within 24-48 hours."
+        }
+    ];
+
+    const contactMethods = [
+        {
+            icon: "mail-outline",
+            title: "Email Support",
+            subtitle: "support@mavericks.app",
+            color: "#0A66C2",
+            onPress: () => Linking.openURL('mailto:support@mavericks.app')
+        },
+        {
+            icon: "chatbubble-ellipses-outline",
+            title: "Live Chat",
+            subtitle: "Available 24/7",
+            color: "#7C3AED",
+            onPress: () => alert('Live chat coming soon!')
+        }
+    ];
+
+    return (
+        <View style={styles.container}>
+            <LinearGradient
+                colors={['#0A66C2', '#7C3AED']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.header}
+            >
+                <SafeAreaView edges={['top']}>
+                    <View style={styles.headerContent}>
+                        <TouchableOpacity
+                            onPress={() => navigation.goBack()}
+                            style={styles.backButton}
+                        >
+                            <Ionicons name="arrow-back" size={28} color="#FFF" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Help Center</Text>
+                        <View style={{ width: 28 }} />
+                    </View>
+                    <View style={styles.headerStats}>
+                        <Text style={styles.headerSubtitle}>How can we help you today?</Text>
+                    </View>
+                </SafeAreaView>
+            </LinearGradient>
+
+            <ScrollView
+                style={styles.content}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+            >
+                <View style={styles.searchContainer}>
+                    <View style={styles.searchBar}>
+                        <Ionicons name="search-outline" size={20} color="#64748B" />
+                        <Text style={styles.searchText}>Search for help...</Text>
+                    </View>
+                </View>
+
+                <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+                {faqs.map((faq, index) => (
+                    <View key={index} style={styles.faqCard}>
+                        <Text style={styles.faqQuestion}>{faq.question}</Text>
+                        <Text style={styles.faqAnswer}>{faq.answer}</Text>
+                    </View>
+                ))}
+
+                <Text style={styles.sectionTitle}>Contact Us</Text>
+                <View style={styles.contactRow}>
+                    {contactMethods.map((method, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={styles.contactCard}
+                            onPress={method.onPress}
+                        >
+                            <View style={[styles.contactIcon, { backgroundColor: method.color + '15' }]}>
+                                <Ionicons name={method.icon} size={24} color={method.color} />
+                            </View>
+                            <Text style={styles.contactTitle}>{method.title}</Text>
+                            <Text style={styles.contactSubtitle}>{method.subtitle}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                <TouchableOpacity style={styles.communityBtn}>
+                    <LinearGradient
+                        colors={['#F59E0B', '#D97706']}
+                        style={styles.communityGradient}
+                    >
+                        <Ionicons name="people" size={22} color="#FFF" />
+                        <Text style={styles.communityText}>Join Mavericks Community</Text>
+                    </LinearGradient>
+                </TouchableOpacity>
+            </ScrollView>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+    },
+    header: {
+        paddingBottom: 30,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+    },
+    headerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 10,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#FFF',
+    },
+    headerStats: {
+        alignItems: 'center',
+        marginTop: 20,
+    },
+    headerSubtitle: {
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    content: {
+        flex: 1,
+        marginTop: -20,
+        paddingHorizontal: 20,
+    },
+    searchContainer: {
+        marginBottom: 25,
+    },
+    searchBar: {
+        backgroundColor: '#FFF',
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 15,
+        borderRadius: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    searchText: {
+        color: '#64748B',
+        marginLeft: 10,
+        fontSize: 15,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: 15,
+        marginTop: 10,
+    },
+    faqCard: {
+        backgroundColor: '#FFF',
+        padding: 20,
+        borderRadius: 15,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    faqQuestion: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#334155',
+        marginBottom: 8,
+    },
+    faqAnswer: {
+        fontSize: 14,
+        color: '#64748B',
+        lineHeight: 20,
+    },
+    contactRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    contactCard: {
+        backgroundColor: '#FFF',
+        width: '48%',
+        padding: 20,
+        borderRadius: 20,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    contactIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    contactTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    contactSubtitle: {
+        fontSize: 12,
+        color: '#64748B',
+        marginTop: 4,
+    },
+    communityBtn: {
+        marginTop: 10,
+        borderRadius: 15,
+        overflow: 'hidden',
+    },
+    communityGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+    },
+    communityText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '700',
+        marginLeft: 10,
+    }
+});
+
+export default HelpCenterScreen;

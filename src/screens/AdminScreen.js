@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,7 +12,9 @@ import {
     Platform,
     Modal,
     Image,
+    Dimensions,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -57,6 +59,20 @@ const AdminScreen = ({ navigation }) => {
         template: ''
     });
     const [filterClubId, setFilterClubId] = useState('all');
+    const navScrollRef = useRef(null);
+    const tabLayouts = useRef({});
+
+    useEffect(() => {
+        if (activeTab && navScrollRef.current && tabLayouts.current[activeTab]) {
+            const { x, width: tabWidth } = tabLayouts.current[activeTab];
+            const screenWidth = Dimensions.get('window').width;
+            // Center the tab in the scroll view
+            navScrollRef.current.scrollTo({
+                x: x - (screenWidth / 2 - tabWidth / 2),
+                animated: true
+            });
+        }
+    }, [activeTab]);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [showMeetingForm, setShowMeetingForm] = useState(false);
@@ -129,6 +145,36 @@ const AdminScreen = ({ navigation }) => {
             socket.off('meeting_deleted');
         };
     }, [socket, activeTab]);
+
+    const handleTabSwipe = (direction) => {
+        const tabs = ['dashboard', 'clubs', 'users', 'meetings', 'gallery', 'notifications'];
+        const currentIndex = tabs.indexOf(activeTab);
+        if (currentIndex === -1) return;
+
+        let nextIndex;
+        if (direction === 'left') { // finger moves right to left -> next tab
+            nextIndex = (currentIndex + 1) % tabs.length;
+        } else { // finger moves left to right -> previous tab
+            nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        }
+
+        setActiveTab(tabs[nextIndex]);
+    };
+
+    const onSwipeGestureEvent = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            const { translationX, velocityX } = event.nativeEvent;
+
+            // Require both enough translation and enough velocity to prevent accidental swipes
+            if (Math.abs(translationX) > 80 && Math.abs(velocityX) > 500) {
+                if (translationX > 0) {
+                    handleTabSwipe('right');
+                } else {
+                    handleTabSwipe('left');
+                }
+            }
+        }
+    };
 
     const handleCreateClub = async () => {
         if (!newClubName || !newClubDesc) {
@@ -988,6 +1034,7 @@ const AdminScreen = ({ navigation }) => {
                 {/* Custom Navbar/Tabs - Now Scrollable */}
                 <View style={styles.navBar}>
                     <ScrollView
+                        ref={navScrollRef}
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.navBarScroll}
@@ -997,6 +1044,9 @@ const AdminScreen = ({ navigation }) => {
                                 key={tab}
                                 style={[styles.navItem, activeTab === tab && styles.navItemActive]}
                                 onPress={() => setActiveTab(tab)}
+                                onLayout={(event) => {
+                                    tabLayouts.current[tab] = event.nativeEvent.layout;
+                                }}
                             >
                                 <Text style={[styles.navText, activeTab === tab && styles.navTextActive]}>
                                     {tab === 'gallery' ? 'PENDING' : tab.toUpperCase()}
@@ -1006,72 +1056,78 @@ const AdminScreen = ({ navigation }) => {
                     </ScrollView>
                 </View>
 
-                <ScrollView
-                    style={styles.content}
-                    contentContainerStyle={{ paddingBottom: 40 }}
+                <PanGestureHandler
+                    onHandlerStateChange={onSwipeGestureEvent}
+                    activeOffsetX={[-20, 20]}
+                    failOffsetY={[-20, 20]}
                 >
-                    {loading ? (
-                        <View style={styles.tabContent}>
-                            {activeTab === 'dashboard' && (
-                                <>
-                                    <SkeletonStatsGrid items={4} />
-                                    <SkeletonCard style={{ marginTop: 24 }}>
-                                        <SkeletonBox width={150} height={20} style={{ marginBottom: 16 }} />
-                                        <SkeletonBox width="100%" height={40} style={{ marginBottom: 12 }} />
-                                    </SkeletonCard>
-                                </>
-                            )}
-                            {activeTab === 'clubs' && (
-                                <>
+                    <ScrollView
+                        style={styles.content}
+                        contentContainerStyle={{ paddingBottom: 40 }}
+                    >
+                        {loading ? (
+                            <View style={styles.tabContent}>
+                                {activeTab === 'dashboard' && (
+                                    <>
+                                        <SkeletonStatsGrid items={4} />
+                                        <SkeletonCard style={{ marginTop: 24 }}>
+                                            <SkeletonBox width={150} height={20} style={{ marginBottom: 16 }} />
+                                            <SkeletonBox width="100%" height={40} style={{ marginBottom: 12 }} />
+                                        </SkeletonCard>
+                                    </>
+                                )}
+                                {activeTab === 'clubs' && (
+                                    <>
+                                        <SkeletonCard>
+                                            <SkeletonBox width={120} height={20} style={{ marginBottom: 16 }} />
+                                            <SkeletonBox width="100%" height={48} style={{ marginBottom: 12 }} />
+                                            <SkeletonBox width="100%" height={48} style={{ marginBottom: 12 }} />
+                                            <SkeletonBox width="100%" height={40} borderRadius={8} />
+                                        </SkeletonCard>
+                                        {[1, 2, 3].map((_, i) => (
+                                            <SkeletonCard key={i}>
+                                                <SkeletonBox width="80%" height={18} style={{ marginBottom: 8 }} />
+                                                <SkeletonBox width="60%" height={14} />
+                                            </SkeletonCard>
+                                        ))}
+                                    </>
+                                )}
+                                {activeTab === 'users' && (
                                     <SkeletonCard>
-                                        <SkeletonBox width={120} height={20} style={{ marginBottom: 16 }} />
-                                        <SkeletonBox width="100%" height={48} style={{ marginBottom: 12 }} />
-                                        <SkeletonBox width="100%" height={48} style={{ marginBottom: 12 }} />
-                                        <SkeletonBox width="100%" height={40} borderRadius={8} />
+                                        <SkeletonBox width={100} height={20} style={{ marginBottom: 16 }} />
+                                        {[1, 2, 3, 4, 5].map((_, i) => (
+                                            <SkeletonTableRow key={i} columns={4} />
+                                        ))}
                                     </SkeletonCard>
-                                    {[1, 2, 3].map((_, i) => (
-                                        <SkeletonCard key={i}>
-                                            <SkeletonBox width="80%" height={18} style={{ marginBottom: 8 }} />
-                                            <SkeletonBox width="60%" height={14} />
-                                        </SkeletonCard>
-                                    ))}
-                                </>
-                            )}
-                            {activeTab === 'users' && (
-                                <SkeletonCard>
-                                    <SkeletonBox width={100} height={20} style={{ marginBottom: 16 }} />
-                                    {[1, 2, 3, 4, 5].map((_, i) => (
-                                        <SkeletonTableRow key={i} columns={4} />
-                                    ))}
-                                </SkeletonCard>
-                            )}
-                            {activeTab === 'meetings' && (
-                                <>
-                                    {[1, 2, 3].map((_, i) => (
-                                        <SkeletonCard key={i}>
-                                            <SkeletonBox width="90%" height={18} style={{ marginBottom: 8 }} />
-                                            <SkeletonBox width="70%" height={14} style={{ marginBottom: 6 }} />
-                                            <SkeletonBox width="60%" height={14} />
-                                        </SkeletonCard>
-                                    ))}
-                                </>
-                            )}
-                            {activeTab === 'gallery' && (
-                                <SkeletonGalleryGrid items={6} />
-                            )}
-                        </View>
-                    ) : (
-                        <>
-                            {activeTab === 'dashboard' && renderDashboard()}
-                            {activeTab === 'clubs' && renderClubs()}
-                            {activeTab === 'users' && renderUsers()}
-                            {activeTab === 'meetings' && renderMeetings()}
-                            {activeTab === 'gallery' && renderGallery()}
-                            {activeTab === 'notifications' && renderNotifications()}
-                        </>
-                    )}
-                    <View style={{ height: 40 }} />
-                </ScrollView>
+                                )}
+                                {activeTab === 'meetings' && (
+                                    <>
+                                        {[1, 2, 3].map((_, i) => (
+                                            <SkeletonCard key={i}>
+                                                <SkeletonBox width="90%" height={18} style={{ marginBottom: 8 }} />
+                                                <SkeletonBox width="70%" height={14} style={{ marginBottom: 6 }} />
+                                                <SkeletonBox width="60%" height={14} />
+                                            </SkeletonCard>
+                                        ))}
+                                    </>
+                                )}
+                                {activeTab === 'gallery' && (
+                                    <SkeletonGalleryGrid items={6} />
+                                )}
+                            </View>
+                        ) : (
+                            <>
+                                {activeTab === 'dashboard' && renderDashboard()}
+                                {activeTab === 'clubs' && renderClubs()}
+                                {activeTab === 'users' && renderUsers()}
+                                {activeTab === 'meetings' && renderMeetings()}
+                                {activeTab === 'gallery' && renderGallery()}
+                                {activeTab === 'notifications' && renderNotifications()}
+                            </>
+                        )}
+                        <View style={{ height: 40 }} />
+                    </ScrollView>
+                </PanGestureHandler>
 
                 {/* Manage Club Modal */}
                 <Modal

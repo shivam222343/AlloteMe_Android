@@ -8,7 +8,9 @@ import {
     ActivityIndicator,
     Dimensions,
     FlatList,
-    Animated as RNAnimated
+    Animated,
+    PanResponder,
+    Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { notificationsAPI } from '../services/api';
@@ -19,6 +21,36 @@ import { SkeletonNotification } from './SkeletonLoader';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const NotificationsModal = ({ visible, onClose }) => {
+    const panY = React.useRef(new Animated.Value(0)).current;
+
+    const panResponder = React.useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderMove: (e, gs) => {
+                if (gs.dy > 0) {
+                    panY.setValue(gs.dy);
+                }
+            },
+            onPanResponderRelease: (e, gs) => {
+                if (gs.dy > 150 || gs.vy > 0.5) {
+                    onClose();
+                } else {
+                    Animated.spring(panY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    React.useEffect(() => {
+        if (visible) {
+            panY.setValue(0);
+        }
+    }, [visible]);
+
     const { refreshUnreadCount } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -94,13 +126,26 @@ const NotificationsModal = ({ visible, onClose }) => {
     };
 
     const clearAll = async () => {
-        try {
-            await notificationsAPI.clearAll();
-            setNotifications([]);
-            refreshUnreadCount();
-        } catch (error) {
-            console.error('Clear all error:', error);
-        }
+        Alert.alert(
+            'Clear All Notifications',
+            'Are you sure you want to delete all notifications? This action cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear All',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await notificationsAPI.clearAll();
+                            setNotifications([]);
+                            refreshUnreadCount();
+                        } catch (error) {
+                            console.error('Clear all error:', error);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const getIcon = (type) => {
@@ -133,9 +178,9 @@ const NotificationsModal = ({ visible, onClose }) => {
         });
         return (
             <TouchableOpacity onPress={() => deleteNotification(item._id)} style={styles.deleteAction}>
-                <RNAnimated.View style={[styles.deleteIcon, { transform: [{ scale }] }]}>
+                <Animated.View style={[styles.deleteIcon, { transform: [{ scale }] }]}>
                     <Ionicons name="trash-outline" size={24} color="#FFF" />
-                </RNAnimated.View>
+                </Animated.View>
             </TouchableOpacity>
         );
     };
@@ -148,9 +193,9 @@ const NotificationsModal = ({ visible, onClose }) => {
         });
         return (
             <TouchableOpacity onPress={() => deleteNotification(item._id)} style={styles.deleteActionLeft}>
-                <RNAnimated.View style={[styles.deleteIcon, { transform: [{ scale }] }]}>
+                <Animated.View style={[styles.deleteIcon, { transform: [{ scale }] }]}>
                     <Ionicons name="trash-outline" size={24} color="#FFF" />
-                </RNAnimated.View>
+                </Animated.View>
             </TouchableOpacity>
         );
     };
@@ -187,7 +232,15 @@ const NotificationsModal = ({ visible, onClose }) => {
         >
             <View style={styles.overlay}>
                 <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-                <View style={styles.modalContent}>
+                <Animated.View
+                    style={[
+                        styles.modalContent,
+                        { transform: [{ translateY: panY }] }
+                    ]}
+                >
+                    <View {...panResponder.panHandlers}>
+                        <View style={styles.handle} />
+                    </View>
                     <View style={styles.header}>
                         <View style={styles.headerTitleRow}>
                             <Text style={styles.title}>Notifications</Text>
@@ -202,9 +255,6 @@ const NotificationsModal = ({ visible, onClose }) => {
                                 </TouchableOpacity>
                             )}
                         </View>
-                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={24} color="#1F2937" />
-                        </TouchableOpacity>
                     </View>
 
                     {loading ? (
@@ -249,7 +299,14 @@ const NotificationsModal = ({ visible, onClose }) => {
                             <Text style={styles.emptyText}>No notifications yet</Text>
                         </View>
                     )}
-                </View>
+
+                    <TouchableOpacity
+                        style={styles.bottomCloseBtn}
+                        onPress={onClose}
+                    >
+                        <Text style={styles.bottomCloseText}>Close</Text>
+                    </TouchableOpacity>
+                </Animated.View>
             </View>
         </Modal>
     );
@@ -399,6 +456,28 @@ const styles = StyleSheet.create({
         color: '#0A66C2',
         fontWeight: '600',
     },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 3,
+        alignSelf: 'center',
+        marginTop: 10,
+    },
+    bottomCloseBtn: {
+        marginHorizontal: 20,
+        marginTop: 10,
+        backgroundColor: '#F3F4F6',
+        paddingVertical: 14,
+        borderRadius: 15,
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    bottomCloseText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#6B7280',
+    }
 });
 
 export default NotificationsModal;

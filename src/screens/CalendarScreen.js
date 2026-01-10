@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { meetingsAPI } from '../services/api';
 import MainLayout from '../components/MainLayout';
@@ -27,26 +28,34 @@ const CalendarScreen = ({ navigation }) => {
     const [markedDates, setMarkedDates] = useState({});
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState(null);
-    const [dayEvents, setDayEvents] = useState({ meetings: [], holiday: null });
+    const [dayEvents, setDayEvents] = useState({ meetings: [], festival: null });
     const [modalVisible, setModalVisible] = useState(false);
+    const [upcomingMeetings, setUpcomingMeetings] = useState([]);
     const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
     const [todayHighlight, setTodayHighlight] = useState('#FFD700');
 
     const handleTodayView = () => {
         const today = new Date().toISOString().split('T')[0];
         setCurrentDate(today);
-
-        // Blink animation logic
-        let count = 0;
-        const interval = setInterval(() => {
-            setTodayHighlight(prev => prev === '#FFD700' ? 'transparent' : '#FFD700');
-            count++;
-            if (count >= 6) { // Blink 3 times
-                clearInterval(interval);
-                setTodayHighlight('#FFD700'); // Ensure it stays visible at the end
-            }
-        }, 400); // Toggle every 400ms
     };
+
+    // Auto-animate today highlight if meetings exist
+    useEffect(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const hasMeetingsToday = meetings.some(m => {
+            const mDate = new Date(m.date).toISOString().split('T')[0];
+            return mDate === todayStr;
+        });
+
+        if (hasMeetingsToday) {
+            const interval = setInterval(() => {
+                setTodayHighlight(prev => prev === '#FFD700' ? 'rgba(255, 215, 0, 0.3)' : '#FFD700');
+            }, 1000);
+            return () => clearInterval(interval);
+        } else {
+            setTodayHighlight('#FFD700');
+        }
+    }, [meetings]);
 
     const fetchAllMeetings = async () => {
         try {
@@ -55,7 +64,12 @@ const CalendarScreen = ({ navigation }) => {
             if (res.success) {
                 const allMeetings = [...res.data.upcoming, ...res.data.past];
                 setMeetings(allMeetings);
-                // Data generation is now handled by useEffect
+
+                // Filter top 3 upcoming
+                const top3 = res.data.upcoming
+                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+                    .slice(0, 3);
+                setUpcomingMeetings(top3);
             }
         } catch (error) {
             console.error('Error fetching meetings for calendar:', error);
@@ -76,6 +90,31 @@ const CalendarScreen = ({ navigation }) => {
         }
     }, [meetings, todayHighlight]);
 
+    // Handle deep linking from notifications
+    useEffect(() => {
+        const routeState = navigation.getState();
+        const currentRoute = routeState?.routes[routeState.index];
+        const params = currentRoute?.params;
+
+        if (params?.selectedMeetingId && meetings.length > 0) {
+            const meeting = meetings.find(m => (m._id?.toString() || m._id) === params.selectedMeetingId);
+            if (meeting) {
+                const dateStr = new Date(meeting.date).toISOString().split('T')[0];
+                setSelectedDate(dateStr);
+                const dayMeetings = meetings.filter(m => new Date(m.date).toISOString().split('T')[0] === dateStr);
+                setDayEvents({
+                    meetings: dayMeetings,
+                    festival: FESTIVALS[dateStr] || null
+                });
+                setModalVisible(true);
+                setCurrentDate(dateStr);
+
+                // Clear params to prevent re-opening on next focus
+                navigation.setParams({ selectedMeetingId: null });
+            }
+        }
+    }, [meetings, navigation]);
+
     const generateCalendarData = (meetingsList) => {
         const marked = {};
         const todayStr = new Date().toISOString().split('T')[0];
@@ -93,22 +132,43 @@ const CalendarScreen = ({ navigation }) => {
             const dayMeetings = meetingsByDate[dateStr];
             const uniqueClubs = new Set(dayMeetings.map(m => m.clubId?._id?.toString() || 'unknown'));
 
-            let bgColor = Colors.secondary[100];
-            let textColor = Colors.secondary[600];
+            let bgColor = 'transparent';
+            let textColor = Colors.secondary[800];
+            let borderColor = 'transparent';
+            let borderWidth = 0;
 
-            if (dayMeetings.some(m => m.status === 'upcoming' || m.status === 'ongoing')) {
+            const isUpcoming = dayMeetings.some(m => m.status === 'upcoming' || m.status === 'ongoing');
+            const isCancelled = dayMeetings.every(m => m.status === 'cancelled' || m.status === 'canceled');
+            const mFirst = dayMeetings[0];
+            const isPast = dayMeetings.every(m => m.status === 'completed' || new Date(m.date) < new Date());
+
+            if (isUpcoming) {
                 bgColor = Colors.success[50];
                 textColor = Colors.success[700];
-            } else if (dayMeetings.every(m => m.status === 'cancelled' || m.status === 'canceled')) {
+                borderColor = Colors.success[500];
+                borderWidth = 1.5;
+            } else if (isCancelled) {
                 bgColor = Colors.error[50];
                 textColor = Colors.error[700];
+                borderColor = Colors.error[200];
+                borderWidth = 1;
+            } else if (isPast) {
+                bgColor = Colors.secondary[50];
+                textColor = Colors.secondary[400];
+                borderColor = Colors.secondary[200];
+                borderWidth = 1;
             }
 
             let customStyles = {
                 container: {
                     backgroundColor: bgColor,
-                    borderRadius: 8,
-                    borderWidth: 0,
+                    borderRadius: 25,
+                    borderWidth: borderWidth,
+                    borderColor: borderColor,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: 36,
+                    height: 36,
                 },
                 text: {
                     color: textColor,
@@ -122,7 +182,7 @@ const CalendarScreen = ({ navigation }) => {
                 customStyles.container.borderColor = '#FF3B30';
                 customStyles.container.borderWidth = 3;
                 customStyles.container.borderRadius = 25;
-                customStyles.text.color = todayHighlight === 'transparent' ? Colors.secondary[800] : '#000000';
+                customStyles.text.color = (todayHighlight === 'transparent' || todayHighlight.startsWith('rgba')) ? Colors.secondary[800] : '#000000';
             }
 
             // Multi-club Borders
@@ -156,12 +216,26 @@ const CalendarScreen = ({ navigation }) => {
 
                 if (!marked[dateStr]) {
                     marked[dateStr] = {
-                        dots: [festivalDot],
+                        customStyles: {
+                            container: {
+                                backgroundColor: '#FFF9F2',
+                                borderRadius: 25,
+                                borderWidth: 1,
+                                borderColor: '#FFEDD5',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                width: 36,
+                                height: 36,
+                            },
+                            text: {
+                                color: '#C2410C',
+                                fontWeight: 'bold'
+                            }
+                        },
                         festival: festival
                     };
                 } else {
-                    if (!marked[dateStr].dots) marked[dateStr].dots = [];
-                    marked[dateStr].dots.push(festivalDot);
+                    // Meeting already exists, maybe just add festival to data
                     marked[dateStr].festival = festival;
                 }
             });
@@ -178,7 +252,7 @@ const CalendarScreen = ({ navigation }) => {
                         borderRadius: 25,
                     },
                     text: {
-                        color: todayHighlight === 'transparent' ? Colors.secondary[800] : '#000000',
+                        color: (todayHighlight === 'transparent' || todayHighlight.startsWith('rgba')) ? Colors.secondary[800] : '#000000',
                         fontWeight: 'bold',
                     }
                 }
@@ -192,7 +266,7 @@ const CalendarScreen = ({ navigation }) => {
                     borderRadius: 25,
                 },
                 text: {
-                    color: todayHighlight === 'transparent' ? Colors.secondary[800] : '#000000',
+                    color: (todayHighlight === 'transparent' || todayHighlight.startsWith('rgba')) ? Colors.secondary[800] : '#000000',
                     fontWeight: 'bold',
                 }
             };
@@ -280,7 +354,7 @@ const CalendarScreen = ({ navigation }) => {
                                 onMonthChange={(month) => setCurrentDate(month.dateString)}
                                 onDayPress={handleDayPress}
                                 markedDates={markedDates}
-                                markingType={'multi-dot'}
+                                markingType={'custom'}
                                 enableSwipeMonths={true}
                                 theme={{
                                     backgroundColor: '#ffffff',
@@ -309,19 +383,19 @@ const CalendarScreen = ({ navigation }) => {
                             <Text style={styles.guideTitle}>Calendar Guide</Text>
                             <View style={styles.guideGrid}>
                                 <View style={styles.guideItem}>
-                                    <View style={[styles.colorBox, { backgroundColor: Colors.success[100] }]} />
+                                    <View style={[styles.colorBox, { backgroundColor: Colors.success[50], borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' }]} />
                                     <Text style={styles.guideText}>Upcoming</Text>
                                 </View>
                                 <View style={styles.guideItem}>
-                                    <View style={[styles.colorBox, { backgroundColor: Colors.secondary[200] }]} />
+                                    <View style={[styles.colorBox, { backgroundColor: Colors.secondary[100], borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' }]} />
                                     <Text style={styles.guideText}>Past</Text>
                                 </View>
                                 <View style={styles.guideItem}>
-                                    <View style={[styles.colorBox, { backgroundColor: Colors.error[100] }]} />
+                                    <View style={[styles.colorBox, { backgroundColor: Colors.error[50], borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' }]} />
                                     <Text style={styles.guideText}>Cancelled</Text>
                                 </View>
                                 <View style={styles.guideItem}>
-                                    <View style={[styles.colorBox, { borderWidth: 2, borderColor: Colors.primary[500] }]} />
+                                    <View style={[styles.colorBox, { borderWidth: 3, borderColor: '#FF3B30', backgroundColor: todayHighlight }]} />
                                     <Text style={styles.guideText}>Today</Text>
                                 </View>
                                 <View style={styles.guideItem}>
@@ -329,6 +403,53 @@ const CalendarScreen = ({ navigation }) => {
                                     <Text style={styles.guideText}>Multiple Clubs</Text>
                                 </View>
                             </View>
+                        </View>
+
+                        {/* Upcoming 3 Meetings Section */}
+                        <View style={styles.upcomingSection}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Upcoming  Meetings</Text>
+                            </View>
+
+                            {upcomingMeetings.length > 0 ? (
+                                upcomingMeetings.map((meeting) => (
+                                    <TouchableOpacity
+                                        key={meeting._id}
+                                        style={styles.upcomingCard}
+                                        onPress={() => {
+                                            setSelectedDate(new Date(meeting.date).toISOString().split('T')[0]);
+                                            setDayEvents({ meetings: [meeting], festival: null });
+                                            setModalVisible(true);
+                                        }}
+                                    >
+                                        <LinearGradient
+                                            colors={[Colors.primary[500], Colors.primary[600]]}
+                                            style={styles.upcomingDateBox}
+                                        >
+                                            <Text style={styles.upcomingDay}>{new Date(meeting.date).getDate()}</Text>
+                                            <Text style={styles.upcomingMonth}>
+                                                {new Date(meeting.date).toLocaleDateString(undefined, { month: 'short' }).toUpperCase()}
+                                            </Text>
+                                        </LinearGradient>
+                                        <View style={styles.upcomingInfo}>
+                                            <Text style={styles.upcomingName} numberOfLines={1}>{meeting.name}</Text>
+                                            <Text style={styles.upcomingClub}>{meeting.clubId?.name}</Text>
+                                            <View style={styles.upcomingMeta}>
+                                                <Ionicons name="time-outline" size={14} color={Colors.secondary[400]} />
+                                                <Text style={styles.upcomingMetaText}>{meeting.time}</Text>
+                                                <View style={styles.metaDot} />
+                                                <Ionicons name="location-outline" size={14} color={Colors.secondary[400]} />
+                                                <Text style={styles.upcomingMetaText} numberOfLines={1}>{meeting.locationCategory || meeting.platform}</Text>
+                                            </View>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={20} color={Colors.secondary[300]} />
+                                    </TouchableOpacity>
+                                ))
+                            ) : (
+                                <View style={styles.emptyUpcoming}>
+                                    <Text style={styles.emptyUpcomingText}>No upcoming meetings scheduled</Text>
+                                </View>
+                            )}
                         </View>
                     </ScrollView>
                 )}
@@ -662,6 +783,90 @@ const styles = StyleSheet.create({
         color: Colors.primary[500],
         fontSize: 12,
         fontWeight: 'bold',
+    },
+    upcomingSection: {
+        marginHorizontal: Spacing.md,
+        marginBottom: Spacing.xl,
+    },
+    sectionHeader: {
+        marginBottom: Spacing.md,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: Colors.secondary[900],
+    },
+    upcomingCard: {
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        borderRadius: BorderRadius.lg,
+        padding: Spacing.md,
+        alignItems: 'center',
+        marginBottom: Spacing.md,
+        ...Shadows.sm,
+        borderWidth: 1,
+        borderColor: Colors.secondary[50],
+    },
+    upcomingDateBox: {
+        width: 50,
+        height: 50,
+        borderRadius: BorderRadius.md,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: Spacing.md,
+    },
+    upcomingDay: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    upcomingMonth: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    upcomingInfo: {
+        flex: 1,
+    },
+    upcomingName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: Colors.secondary[900],
+    },
+    upcomingClub: {
+        fontSize: 12,
+        color: Colors.primary[600],
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+    upcomingMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    upcomingMetaText: {
+        fontSize: 11,
+        color: Colors.secondary[500],
+        marginLeft: 4,
+    },
+    metaDot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: Colors.secondary[300],
+        marginHorizontal: 8,
+    },
+    emptyUpcoming: {
+        backgroundColor: Colors.secondary[50],
+        padding: Spacing.xl,
+        borderRadius: BorderRadius.lg,
+        alignItems: 'center',
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        borderColor: Colors.secondary[200],
+    },
+    emptyUpcomingText: {
+        color: Colors.secondary[400],
+        fontSize: 14,
     },
 });
 

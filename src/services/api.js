@@ -233,9 +233,15 @@ export const messagesAPI = {
         }
         return api.post('/messages', data);
     },
-    sendBase64: (data) => api.post('/messages/upload-base64', data, {
+    sendBase64: (data, onProgress) => api.post('/messages/upload-base64', data, {
         timeout: 600000,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
     }),
 
     markAsRead: (userId) => api.put(`/messages/${userId}/read`),
@@ -260,9 +266,15 @@ export const snapsAPI = {
         // If data is plain object (web upload result), send as JSON
         return api.post('/snaps', data);
     },
-    uploadBase64: (data) => api.post('/snaps/upload-base64', data, {
+    uploadBase64: (data, onProgress) => api.post('/snaps/upload-base64', data, {
         timeout: 600000,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
     }),
 
     getClubSnaps: (clubId) => api.get(`/snaps/club/${clubId}`),
@@ -271,6 +283,7 @@ export const snapsAPI = {
     delete: (snapId) => api.delete(`/snaps/${snapId}`),
     getViewers: (snapId) => api.get(`/snaps/${snapId}/viewers`),
     updateCaption: (snapId, caption) => api.put(`/snaps/${snapId}/caption`, { caption }),
+    toggleLike: (snapId) => api.post(`/snaps/${snapId}/like`),
 };
 
 // Gallery API
@@ -286,10 +299,16 @@ export const galleryAPI = {
             }
         }
     }),
-    uploadBase64: (data) => api.post('/gallery/upload-base64', data, {
+    uploadBase64: (data, onProgress) => api.post('/gallery/upload-base64', data, {
         timeout: 600000, // 10 minutes for large uploads
         headers: {
             'Content-Type': 'application/json',
+        },
+        onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
         }
     }),
     updateStatus: (id, status) => api.put(`/gallery/${id}/status`, { status }),
@@ -312,7 +331,7 @@ export const adminAPI = {
 
 // Group Chat API
 export const groupChatAPI = {
-    getGroupChat: (clubId) => api.get(`/group-chat/${clubId}`),
+    getGroupChat: (clubId, params) => api.get(`/group-chat/${clubId}`, { params }),
     sendMessage: (clubId, data, file) => {
         if (file) {
             const formData = new FormData();
@@ -333,26 +352,48 @@ export const groupChatAPI = {
         }
         return api.post(`/group-chat/${clubId}/messages`, data);
     },
-    sendBase64Message: (clubId, data) => api.post(`/group-chat/${clubId}/messages-base64`, data, {
+    sendBase64Message: (clubId, data, onProgress) => api.post(`/group-chat/${clubId}/messages-base64`, data, {
         timeout: 600000,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
     }),
 
     markAsRead: (clubId) => api.put(`/group-chat/${clubId}/read`),
     deleteMessage: (clubId, messageId, type) => api.delete(`/group-chat/${clubId}/messages/${messageId}`, { params: { type } }),
     addReaction: (clubId, messageId, data) => api.post(`/group-chat/${clubId}/messages/${messageId}/reaction`, data),
     getUnreadCount: (clubId) => api.get(`/group-chat/${clubId}/unread-count`),
+    votePoll: (clubId, messageId, data) => api.post(`/group-chat/${clubId}/messages/${messageId}/vote`, data),
+    updateSpinner: (clubId, messageId, data) => api.put(`/group-chat/${clubId}/messages/${messageId}/spin`, data),
+    getMessageViewers: (clubId, messageId) => api.get(`/group-chat/${clubId}/messages/${messageId}/viewers`),
+    getPollVoters: (clubId, messageId, optionIndex) => api.get(`/group-chat/${clubId}/messages/${messageId}/votes/${optionIndex}`),
 };
 
 // Media/Generic Upload API
 export const mediaAPI = {
-    upload: (formData) => api.post('/web-upload', formData, {
+    upload: (formData, onProgress) => api.post('/web-upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 600000
+        timeout: 600000,
+        onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
     }),
-    uploadBase64: (data) => api.post('/web-upload/base64', data, {
+    uploadBase64: (data, onProgress) => api.post('/web-upload/base64', data, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 600000
+        timeout: 600000,
+        onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
     })
 };
 

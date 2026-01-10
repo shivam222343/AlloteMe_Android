@@ -8,6 +8,8 @@ import {
     TouchableOpacity,
     ScrollView,
     Platform,
+    Animated,
+    PanResponder
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,6 +20,36 @@ const ProfileCompletionModal = ({ visible, onComplete, onClose, initialData = {}
     const [branch, setBranch] = useState(initialData.branch || '');
     const [passoutYear, setPassoutYear] = useState(initialData.passoutYear || '');
     const [showDatePicker, setShowDatePicker] = useState(false);
+
+    const panY = React.useRef(new Animated.Value(0)).current;
+
+    const panResponder = React.useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderMove: (e, gs) => {
+                if (gs.dy > 0) {
+                    panY.setValue(gs.dy);
+                }
+            },
+            onPanResponderRelease: (e, gs) => {
+                if (gs.dy > 150 || gs.vy > 0.5) {
+                    handleClose();
+                } else {
+                    Animated.spring(panY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    React.useEffect(() => {
+        if (visible) {
+            panY.setValue(0);
+        }
+    }, [visible]);
 
     const branches = [
         'Computer Science',
@@ -69,14 +101,20 @@ const ProfileCompletionModal = ({ visible, onComplete, onClose, initialData = {}
             onRequestClose={handleClose}
         >
             <View style={styles.overlay}>
-                <View style={styles.modalContainer}>
-                    <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={handleClose}
-                    >
-                        <Ionicons name="close" size={24} color="#6B7280" />
-                    </TouchableOpacity>
-
+                <TouchableOpacity
+                    style={StyleSheet.absoluteFill}
+                    activeOpacity={1}
+                    onPress={handleClose}
+                />
+                <Animated.View
+                    style={[
+                        styles.modalContainer,
+                        { transform: [{ translateY: panY }] }
+                    ]}
+                >
+                    <View {...panResponder.panHandlers}>
+                        <View style={styles.handle} />
+                    </View>
                     <Text style={styles.formTitle}>Complete Your Profile</Text>
 
                     <ScrollView
@@ -189,8 +227,15 @@ const ProfileCompletionModal = ({ visible, onComplete, onClose, initialData = {}
                         >
                             <Text style={styles.submitButtonText}>Save Profile</Text>
                         </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.bottomCloseBtn}
+                            onPress={handleClose}
+                        >
+                            <Text style={styles.bottomCloseText}>Close</Text>
+                        </TouchableOpacity>
                     </ScrollView>
-                </View>
+                </Animated.View>
             </View>
         </Modal>
     );
@@ -294,6 +339,26 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
     },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 3,
+        alignSelf: 'center',
+        marginBottom: 10,
+    },
+    bottomCloseBtn: {
+        marginTop: 15,
+        backgroundColor: '#F3F4F6',
+        paddingVertical: 14,
+        borderRadius: 15,
+        alignItems: 'center',
+    },
+    bottomCloseText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#6B7280',
+    }
 });
 
 export default ProfileCompletionModal;

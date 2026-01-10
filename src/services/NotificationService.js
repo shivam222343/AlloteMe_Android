@@ -40,10 +40,8 @@ export const registerForPushNotificationsAsync = async (userId) => {
             return null;
         }
 
-        // Get Expo push token
-        const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: 'c17b5aac-9e6c-4e09-ae8f-9309e8f25b22', // Your EAS project ID
-        });
+        // Get Native Device push token (FCM)
+        const tokenData = await Notifications.getDevicePushTokenAsync();
         const token = tokenData.data;
         console.log('Expo Push Token:', token);
 
@@ -127,12 +125,22 @@ export const handleNotificationResponse = async (response, navigation) => {
         return;
     }
 
+    // Specific Redirections based on type or data
     if (data?.type === 'new_message' || data?.senderId) {
         navigation.navigate('Chat', {
             otherUser: {
                 _id: data.senderId,
                 displayName: data.senderName
             }
+        });
+    } else if (data?.type === 'meeting_created' || data?.meetingId) {
+        navigation.navigate('Calendar', {
+            selectedMeetingId: data.meetingId,
+            clubId: data.clubId
+        });
+    } else if (data?.type === 'task_assigned' || data?.taskId) {
+        navigation.navigate('Tasks', {
+            focusTaskId: data.taskId
         });
     } else if (data?.clubId) {
         navigation.navigate('Chat', {

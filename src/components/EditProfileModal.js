@@ -11,6 +11,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    Animated,
+    PanResponder
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -27,6 +29,36 @@ const EditProfileModal = ({ visible, onClose }) => {
         passoutYear: '',
         birthDate: new Date(),
     });
+
+    const panY = React.useRef(new Animated.Value(0)).current;
+
+    const panResponder = React.useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderMove: (e, gs) => {
+                if (gs.dy > 0) {
+                    panY.setValue(gs.dy);
+                }
+            },
+            onPanResponderRelease: (e, gs) => {
+                if (gs.dy > 150 || gs.vy > 0.5) {
+                    onClose();
+                } else {
+                    Animated.spring(panY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    React.useEffect(() => {
+        if (visible) {
+            panY.setValue(0);
+        }
+    }, [visible]);
 
     useEffect(() => {
         if (user) {
@@ -88,129 +120,144 @@ const EditProfileModal = ({ visible, onClose }) => {
             visible={visible}
             onRequestClose={onClose}
         >
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={styles.modalOverlay}
-            >
-                <TouchableWithoutFeedback onPress={onClose}>
-                    <View style={styles.backdrop} />
-                </TouchableWithoutFeedback>
+            <View style={styles.modalOverlay}>
+                <TouchableOpacity
+                    style={styles.backdrop}
+                    activeOpacity={1}
+                    onPress={onClose}
+                />
 
-                <View style={styles.modalContent}>
-                    <View style={styles.header}>
-                        <Text style={styles.title}>Edit Profile</Text>
-                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={24} color="#6B7280" />
-                        </TouchableOpacity>
+                <Animated.View
+                    style={[
+                        styles.modalContent,
+                        { transform: [{ translateY: panY }] }
+                    ]}
+                >
+                    <View {...panResponder.panHandlers}>
+                        <View style={styles.handle} />
                     </View>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    >
+                        <View style={styles.header}>
+                            <Text style={styles.title}>Edit Profile</Text>
+                        </View>
 
-                    <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
-                        {/* Name Input */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Full Name *</Text>
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="person-outline" size={20} color="#6B7280" />
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.displayName}
-                                    onChangeText={(text) => handleChange('displayName', text)}
-                                    placeholder="Enter your name"
-                                    placeholderTextColor="#9CA3AF"
-                                />
+                        <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+                            {/* Name Input */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Full Name *</Text>
+                                <View style={styles.inputContainer}>
+                                    <Ionicons name="person-outline" size={20} color="#6B7280" />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={formData.displayName}
+                                        onChangeText={(text) => handleChange('displayName', text)}
+                                        placeholder="Enter your name"
+                                        placeholderTextColor="#9CA3AF"
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Phone Input */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Phone Number</Text>
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="call-outline" size={20} color="#6B7280" />
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.phoneNumber}
-                                    onChangeText={(text) => handleChange('phoneNumber', text)}
-                                    placeholder="Enter your phone number"
-                                    placeholderTextColor="#9CA3AF"
-                                    keyboardType="phone-pad"
-                                />
+                            {/* Phone Input */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Phone Number</Text>
+                                <View style={styles.inputContainer}>
+                                    <Ionicons name="call-outline" size={20} color="#6B7280" />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={formData.phoneNumber}
+                                        onChangeText={(text) => handleChange('phoneNumber', text)}
+                                        placeholder="Enter your phone number"
+                                        placeholderTextColor="#9CA3AF"
+                                        keyboardType="phone-pad"
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Branch Input */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Branch</Text>
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="school-outline" size={20} color="#6B7280" />
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.branch}
-                                    onChangeText={(text) => handleChange('branch', text)}
-                                    placeholder="e.g., Computer Science"
-                                    placeholderTextColor="#9CA3AF"
-                                />
+                            {/* Branch Input */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Branch</Text>
+                                <View style={styles.inputContainer}>
+                                    <Ionicons name="school-outline" size={20} color="#6B7280" />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={formData.branch}
+                                        onChangeText={(text) => handleChange('branch', text)}
+                                        placeholder="e.g., Computer Science"
+                                        placeholderTextColor="#9CA3AF"
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Passout Year Input */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Passout Year</Text>
-                            <View style={styles.inputContainer}>
-                                <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-                                <TextInput
-                                    style={styles.input}
-                                    value={formData.passoutYear}
-                                    onChangeText={(text) => handleChange('passoutYear', text)}
-                                    placeholder="e.g., 2025"
-                                    placeholderTextColor="#9CA3AF"
-                                    keyboardType="numeric"
-                                    maxLength={4}
-                                />
+                            {/* Passout Year Input */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Passout Year</Text>
+                                <View style={styles.inputContainer}>
+                                    <Ionicons name="calendar-outline" size={20} color="#6B7280" />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={formData.passoutYear}
+                                        onChangeText={(text) => handleChange('passoutYear', text)}
+                                        placeholder="e.g., 2025"
+                                        placeholderTextColor="#9CA3AF"
+                                        keyboardType="numeric"
+                                        maxLength={4}
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Birth Date Input */}
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Birth Date</Text>
-                            <TouchableOpacity
-                                style={styles.inputContainer}
-                                onPress={() => setShowDatePicker(true)}
-                            >
-                                <Ionicons name="gift-outline" size={20} color="#6B7280" />
-                                <Text style={styles.dateText}>
-                                    {formData.birthDate.toLocaleDateString('en-US', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
-                                    })}
-                                </Text>
-                                <Ionicons name="chevron-down-outline" size={20} color="#6B7280" style={{ marginLeft: 'auto' }} />
-                            </TouchableOpacity>
-                        </View>
+                            {/* Birth Date Input */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Birth Date</Text>
+                                <TouchableOpacity
+                                    style={styles.inputContainer}
+                                    onPress={() => setShowDatePicker(true)}
+                                >
+                                    <Ionicons name="gift-outline" size={20} color="#6B7280" />
+                                    <Text style={styles.dateText}>
+                                        {formData.birthDate.toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                        })}
+                                    </Text>
+                                    <Ionicons name="chevron-down-outline" size={20} color="#6B7280" style={{ marginLeft: 'auto' }} />
+                                </TouchableOpacity>
+                            </View>
 
-                        {showDatePicker && (
-                            <DateTimePicker
-                                value={formData.birthDate}
-                                mode="date"
-                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                onChange={handleDateChange}
-                                maximumDate={new Date()}
-                            />
-                        )}
-
-                        <TouchableOpacity
-                            style={styles.saveButton}
-                            onPress={handleSave}
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.saveButtonText}>Save Changes</Text>
+                            {showDatePicker && (
+                                <DateTimePicker
+                                    value={formData.birthDate}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={handleDateChange}
+                                    maximumDate={new Date()}
+                                />
                             )}
-                        </TouchableOpacity>
-                    </ScrollView>
-                </View>
-            </KeyboardAvoidingView>
+
+                            <TouchableOpacity
+                                style={styles.saveButton}
+                                onPress={handleSave}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.bottomCloseBtn}
+                                onPress={onClose}
+                            >
+                                <Text style={styles.bottomCloseText}>Close</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+                </Animated.View>
+            </View>
         </Modal>
     );
 };
@@ -305,6 +352,26 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 3,
+        alignSelf: 'center',
+        marginTop: 10,
+    },
+    bottomCloseBtn: {
+        marginTop: 15,
+        backgroundColor: '#F3F4F6',
+        paddingVertical: 14,
+        borderRadius: 15,
+        alignItems: 'center',
+    },
+    bottomCloseText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#6B7280',
+    }
 });
 
 export default EditProfileModal;

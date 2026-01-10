@@ -14,6 +14,7 @@ import {
     Platform,
     ScrollView,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Svg, Circle, Rect, G } from 'react-native-svg';
@@ -24,6 +25,37 @@ import { SkeletonMemberCard, SkeletonFilterChips, SkeletonBox } from '../compone
 import theme from '../constants/theme';
 
 const { width } = Dimensions.get('window');
+
+// Utility function to format last seen time
+const formatLastSeen = (lastSeenDate) => {
+    if (!lastSeenDate) return 'Last seen recently';
+
+    const now = new Date();
+    const lastSeen = new Date(lastSeenDate);
+    const diffMs = now - lastSeen;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+    // Within last 24 hours: show time with AM/PM
+    if (diffHours < 24) {
+        return `Last seen at ${lastSeen.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        })}`;
+    }
+
+    // Yesterday
+    if (diffDays < 2 && lastSeen.getDate() === now.getDate() - 1) {
+        return 'Last seen yesterday';
+    }
+
+    // Older: show date
+    return `Last seen ${lastSeen.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+    })}`;
+};
 
 const MembersScreen = ({ navigation }) => {
     const { user, socket, refreshUser, selectedClubId, updateSelectedClub } = useAuth();
@@ -101,18 +133,17 @@ const MembersScreen = ({ navigation }) => {
         }
     }, [selectedClubId, clubs]);
 
-    // Socket listeners for real-time status
     useEffect(() => {
         if (!socket) return;
 
-        const handleStatusChange = (data) => {
-            const { userId, isOnline } = data;
+        const handleMemberUpdate = (data) => {
             setMembers(prev => prev.map(m =>
-                m._id === userId ? { ...m, isOnline, lastSeen: new Date() } : m
+                m._id === data.userId ? { ...m, isOnline: data.isOnline, lastSeen: data.lastSeen || m.lastSeen } : m
             ));
         };
 
-        socket.on('user:status', handleStatusChange);
+        socket.on('user:online', handleMemberUpdate);
+        socket.on('user:offline', handleMemberUpdate);
 
         const handleAttendanceUpdate = () => {
             fetchMembers();
@@ -122,7 +153,8 @@ const MembersScreen = ({ navigation }) => {
         socket.on('attendance_updated_manual', handleAttendanceUpdate);
 
         return () => {
-            socket.off('user:status', handleStatusChange);
+            socket.off('user:online', handleMemberUpdate);
+            socket.off('user:offline', handleMemberUpdate);
             socket.off('attendance_marked', handleAttendanceUpdate);
             socket.off('attendance_updated_manual', handleAttendanceUpdate);
         };
@@ -140,6 +172,40 @@ const MembersScreen = ({ navigation }) => {
         await fetchData();
         await fetchMembers();
         setRefreshing(false);
+    };
+
+    const handleClubSwipe = (direction) => {
+        if (!clubs || clubs.length <= 1) return;
+
+        const currentIndex = clubs.findIndex(c => (c._id?.toString() || c._id) === (selectedClub?._id?.toString() || selectedClub?._id));
+        if (currentIndex === -1) return;
+
+        if (direction === 'next') {
+            if (currentIndex < clubs.length - 1) {
+                const nextClub = clubs[currentIndex + 1];
+                setSelectedClub(nextClub);
+                updateSelectedClub(nextClub._id);
+            }
+        } else {
+            if (currentIndex > 0) {
+                const prevClub = clubs[currentIndex - 1];
+                setSelectedClub(prevClub);
+                updateSelectedClub(prevClub._id);
+            }
+        }
+    };
+
+    const onSwipeGestureEvent = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            const { translationX, velocityX } = event.nativeEvent;
+            if (Math.abs(translationX) > 60 && Math.abs(velocityX) > 300) {
+                if (translationX < 0) {
+                    handleClubSwipe('next');
+                } else {
+                    handleClubSwipe('prev');
+                }
+            }
+        }
     };
 
     const isUserInClub = (clubId) => {
@@ -205,7 +271,7 @@ const MembersScreen = ({ navigation }) => {
                             )}
                         </View>
                         <Text style={styles.lastSeen}>
-                            {item.isOnline ? 'Online' : `Last seen ${new Date(item.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                            {item.isOnline ? 'Online' : formatLastSeen(item.lastSeen)}
                         </Text>
                     </View>
                     <Text style={styles.memberStatus} numberOfLines={1}>
@@ -299,43 +365,51 @@ const MembersScreen = ({ navigation }) => {
                 </View>
 
                 {/* Main Content */}
-                {loading ? (
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                        <ActivityIndicator size="large" color="#0A66C2" />
-                    </View>
-                ) : selectedClub && !isUserInClub(selectedClub._id) ? (
-                    <View style={styles.joinContainer}>
-                        <Ionicons name="lock-closed" size={48} color="#0A66C2" style={styles.lockIcon} />
-                        <Text style={styles.joinTitle}>Join {selectedClub.name}</Text>
-                        <Text style={styles.joinSubtitle}>You are not a member of this club yet. Join to see the member list and attendance data.</Text>
-                        <TouchableOpacity
-                            style={styles.joinButton}
-                            onPress={() => setJoinModalVisible(true)}
-                        >
-                            <LinearGradient
-                                colors={['#0A66C2', '#0E76A8']}
-                                style={styles.gradientButton}
-                            >
-                                <Text style={styles.joinButtonText}>Join Club</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <FlatList
-                        data={filteredMembers}
-                        renderItem={renderMemberCard}
-                        keyExtractor={item => item._id}
-                        contentContainerStyle={styles.listContent}
-                        refreshControl={
-                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                        }
-                        ListEmptyComponent={
-                            <View style={styles.emptyContainer}>
-                                <Text style={styles.emptyText}>No members found</Text>
+                <PanGestureHandler
+                    onHandlerStateChange={onSwipeGestureEvent}
+                    activeOffsetX={[-20, 20]}
+                    failOffsetY={[-20, 20]}
+                >
+                    <View style={{ flex: 1 }}>
+                        {loading ? (
+                            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                <ActivityIndicator size="large" color="#0A66C2" />
                             </View>
-                        }
-                    />
-                )}
+                        ) : selectedClub && !isUserInClub(selectedClub._id) ? (
+                            <View style={styles.joinContainer}>
+                                <Ionicons name="lock-closed" size={48} color="#0A66C2" style={styles.lockIcon} />
+                                <Text style={styles.joinTitle}>Join {selectedClub.name}</Text>
+                                <Text style={styles.joinSubtitle}>You are not a member of this club yet. Join to see the member list and attendance data.</Text>
+                                <TouchableOpacity
+                                    style={styles.joinButton}
+                                    onPress={() => setJoinModalVisible(true)}
+                                >
+                                    <LinearGradient
+                                        colors={['#0A66C2', '#0E76A8']}
+                                        style={styles.gradientButton}
+                                    >
+                                        <Text style={styles.joinButtonText}>Join Club</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={filteredMembers}
+                                renderItem={renderMemberCard}
+                                keyExtractor={item => item._id}
+                                contentContainerStyle={styles.listContent}
+                                refreshControl={
+                                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                                }
+                                ListEmptyComponent={
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyText}>No members found</Text>
+                                    </View>
+                                }
+                            />
+                        )}
+                    </View>
+                </PanGestureHandler>
 
                 {/* Profile Modal */}
                 <Modal

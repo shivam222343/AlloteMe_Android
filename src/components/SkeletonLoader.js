@@ -215,6 +215,25 @@ export const SkeletonNotification = () => (
     </View>
 );
 
+// Snaps List Skeleton
+export const SkeletonSnaps = ({ count = 4 }) => (
+    <View style={{ flexDirection: 'row', paddingHorizontal: 20, marginBottom: 20 }}>
+        {Array.from({ length: count }).map((_, i) => (
+            <View key={i} style={{ alignItems: 'center', marginRight: 15 }}>
+                <SkeletonBox width={60} height={60} borderRadius={30} />
+                <SkeletonBox width={40} height={10} style={{ marginTop: 8 }} />
+            </View>
+        ))}
+    </View>
+);
+
+// Group Chat Card Skeleton
+export const SkeletonGroupChat = () => (
+    <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+        <SkeletonBox width="100%" height={100} borderRadius={16} />
+    </View>
+);
+
 const styles = StyleSheet.create({
     skeleton: {
         backgroundColor: '#E2E8F0',

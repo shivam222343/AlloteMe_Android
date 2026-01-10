@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     View,
@@ -13,6 +13,7 @@ import {
     Modal,
     Platform,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
@@ -46,7 +47,22 @@ const DashboardScreen = ({ navigation }) => {
     const sliderRef = React.useRef(null);
     const [greeting, setGreeting] = React.useState('');
     const [profilePromptVisible, setProfilePromptVisible] = React.useState(false);
-    const [bannerPromptVisible, setBannerPromptVisible] = React.useState(false);
+    const initialLoadRef = React.useRef(true);
+    const [bannerPromptVisible, setBannerPromptVisible] = useState(false);
+
+    const clubScrollRef = useRef(null);
+    const clubLayouts = useRef({});
+
+    useEffect(() => {
+        const id = selectedClubId?.toString();
+        if (id && clubScrollRef.current && clubLayouts.current[id]) {
+            const { x, width: tabWidth } = clubLayouts.current[id];
+            clubScrollRef.current.scrollTo({
+                x: x - (width / 2 - tabWidth / 2),
+                animated: true
+            });
+        }
+    }, [selectedClubId, width]);
 
     // Check for first-time prompts (Profile & Banner)
     React.useEffect(() => {
@@ -84,22 +100,33 @@ const DashboardScreen = ({ navigation }) => {
         }
     }, [user]);
 
-    const fetchDashboardData = React.useCallback(async () => {
+    const fetchDashboardData = React.useCallback(async (skipGallery = false) => {
         try {
-            const [dashRes, galleryRes] = await Promise.all([
-                authAPI.getDashboard(),
-                galleryAPI.getImages({ limit: 5, status: 'approved' })
-            ]);
-            if (dashRes.success) {
-                setDashboardData(dashRes.data);
+            if (initialLoadRef.current) {
+                setLoading(true);
             }
-            if (galleryRes.success) {
-                setRecentImages(galleryRes.data.slice(0, 5));
+            if (skipGallery) {
+                const dashRes = await authAPI.getDashboard();
+                if (dashRes.success) {
+                    setDashboardData(dashRes.data);
+                }
+            } else {
+                const [dashRes, galleryRes] = await Promise.all([
+                    authAPI.getDashboard(),
+                    galleryAPI.getImages({ limit: 5, status: 'approved' })
+                ]);
+                if (dashRes.success) {
+                    setDashboardData(dashRes.data);
+                }
+                if (galleryRes.success) {
+                    setRecentImages(galleryRes.data.slice(0, 5));
+                }
             }
         } catch (error) {
             console.error('Fetch dashboard data error:', error);
         } finally {
             setLoading(false);
+            initialLoadRef.current = false;
         }
     }, []);
 
@@ -195,8 +222,11 @@ const DashboardScreen = ({ navigation }) => {
     // Sync with global club selection when it changes from other screens
     // Sync with global club selection
     React.useEffect(() => {
-        setLoading(true);
-        fetchDashboardData();
+        // Only show loading if we don't have stats for this club yet
+        if (selectedClubId !== 'all' && !dashboardData.clubStats.find(c => c.clubId === selectedClubId)) {
+            setLoading(true);
+        }
+        fetchDashboardData(true); // Don't re-fetch gallery when switching clubs
     }, [selectedClubId, fetchDashboardData]);
 
     React.useEffect(() => {
@@ -215,6 +245,38 @@ const DashboardScreen = ({ navigation }) => {
             socket.off('task_assigned', handleUpdate);
         };
     }, [socket, fetchDashboardData]);
+
+    const handleClubSwipe = (direction) => {
+        const clubs = [{ clubId: 'all', clubName: 'Global' }, ...dashboardData.clubStats];
+        if (clubs.length <= 1) return;
+
+        const currentIndex = clubs.findIndex(c => c.clubId === selectedClubId);
+        if (currentIndex === -1) return;
+
+        let nextIndex;
+        if (direction === 'left') {
+            nextIndex = (currentIndex + 1) % clubs.length;
+        } else {
+            nextIndex = (currentIndex - 1 + clubs.length) % clubs.length;
+        }
+
+        updateSelectedClub(clubs[nextIndex].clubId);
+    };
+
+    const onSwipeGestureEvent = (event) => {
+        if (event.nativeEvent.state === State.END) {
+            const { translationX, velocityX } = event.nativeEvent;
+
+            // Require both enough translation and enough velocity to prevent accidental swipes
+            if (Math.abs(translationX) > 80 && Math.abs(velocityX) > 500) {
+                if (translationX > 0) {
+                    handleClubSwipe('right');
+                } else {
+                    handleClubSwipe('left');
+                }
+            }
+        }
+    };
 
     // Shimmer animation for skeletons
     const shimmerAnim = React.useRef(new Animated.Value(0)).current;
@@ -259,87 +321,93 @@ const DashboardScreen = ({ navigation }) => {
     if (loading) {
         return (
             <MainLayout navigation={navigation} currentRoute="Dashboard" title="Dashboard">
-                <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-                    {/* Actual Header - Not Loading */}
-                    <View style={styles.header}>
-                        <Text style={styles.greetingText}>{greeting}</Text>
-                        <Text style={styles.nameText}>{user?.displayName || 'Maverick'}</Text>
-                    </View>
-
-                    {/* Skeleton Carousel - Loading with Shimmer */}
-                    <View style={styles.carouselSection}>
-                        <View style={styles.carouselHeader}>
-                            <Text style={styles.carouselTitle}>Recent Gallery</Text>
-                            <Text style={styles.viewAll}>View all</Text>
+                <PanGestureHandler
+                    onHandlerStateChange={onSwipeGestureEvent}
+                    activeOffsetX={[-20, 20]}
+                    failOffsetY={[-20, 20]}
+                >
+                    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+                        {/* Actual Header - Not Loading */}
+                        <View style={styles.header}>
+                            <Text style={styles.greetingText}>{greeting}</Text>
+                            <Text style={styles.nameText}>{user?.displayName || 'Maverick'}</Text>
                         </View>
-                        <ShimmerSkeleton width={width - 48} height={200} borderRadius={20} />
-                        <View style={styles.pagination}>
+
+                        {/* Skeleton Carousel - Loading with Shimmer */}
+                        <View style={styles.carouselSection}>
+                            <View style={styles.carouselHeader}>
+                                <Text style={styles.carouselTitle}>Recent Gallery</Text>
+                                <Text style={styles.viewAll}>View all</Text>
+                            </View>
+                            <ShimmerSkeleton width={width - 48} height={200} borderRadius={20} />
+                            <View style={styles.pagination}>
+                                {[1, 2, 3, 4].map((_, i) => (
+                                    <ShimmerSkeleton key={i} width={8} height={8} borderRadius={4} />
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Skeleton Filter - Loading with Shimmer */}
+                        <View style={styles.filterContainer}>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                {[1, 2, 3].map((_, i) => (
+                                    <ShimmerSkeleton key={i} width={80} height={36} borderRadius={24} />
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Skeleton Stats Grid - Loading with Shimmer */}
+                        <View style={styles.statsGrid}>
                             {[1, 2, 3, 4].map((_, i) => (
-                                <ShimmerSkeleton key={i} width={8} height={8} borderRadius={4} />
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Skeleton Filter - Loading with Shimmer */}
-                    <View style={styles.filterContainer}>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                            {[1, 2, 3].map((_, i) => (
-                                <ShimmerSkeleton key={i} width={80} height={36} borderRadius={24} />
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Skeleton Stats Grid - Loading with Shimmer */}
-                    <View style={styles.statsGrid}>
-                        {[1, 2, 3, 4].map((_, i) => (
-                            <View key={i} style={styles.statCard}>
-                                <ShimmerSkeleton width={44} height={44} borderRadius={12} style={{ marginBottom: 16 }} />
-                                <ShimmerSkeleton width={60} height={28} borderRadius={6} style={{ marginBottom: 8 }} />
-                                <ShimmerSkeleton width={80} height={16} borderRadius={4} />
-                            </View>
-                        ))}
-                    </View>
-
-                    {/* Skeleton Meetings - Loading with Shimmer */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recent Meetings</Text>
-                            <Text style={styles.viewAll}>View all</Text>
-                        </View>
-                        {[1, 2, 3].map((_, i) => (
-                            <View key={i} style={styles.meetingItem}>
-                                <ShimmerSkeleton width={56} height={56} borderRadius={14} style={{ marginRight: 16 }} />
-                                <View style={{ flex: 1 }}>
-                                    <ShimmerSkeleton width="80%" height={18} borderRadius={4} style={{ marginBottom: 8 }} />
-                                    <ShimmerSkeleton width="60%" height={14} borderRadius={4} />
+                                <View key={i} style={styles.statCard}>
+                                    <ShimmerSkeleton width={44} height={44} borderRadius={12} style={{ marginBottom: 16 }} />
+                                    <ShimmerSkeleton width={60} height={28} borderRadius={6} style={{ marginBottom: 8 }} />
+                                    <ShimmerSkeleton width={80} height={16} borderRadius={4} />
                                 </View>
-                            </View>
-                        ))}
-                    </View>
-
-                    {/* Actual Quick Actions - Not Loading */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Quick Actions</Text>
-                        <View style={styles.actionRow}>
-                            <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Tasks')}>
-                                <Ionicons name="checkbox-outline" size={24} color="#0A66C2" />
-                                <Text style={styles.actionBtnText}>Tasks</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Analytics')}>
-                                <Ionicons name="bar-chart-outline" size={24} color="#0A66C2" />
-                                <Text style={styles.actionBtnText}>Insights</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.actionBtn} onPress={() => setScanModalVisible(true)}>
-                                <Ionicons name="qr-code-outline" size={24} color="#0A66C2" />
-                                <Text style={styles.actionBtnText}>Scan QR</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Profile')}>
-                                <Ionicons name="person-outline" size={24} color="#0A66C2" />
-                                <Text style={styles.actionBtnText}>Profile</Text>
-                            </TouchableOpacity>
+                            ))}
                         </View>
-                    </View>
-                </ScrollView>
+
+                        {/* Skeleton Meetings - Loading with Shimmer */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Recent Meetings</Text>
+                                <Text style={styles.viewAll}>View all</Text>
+                            </View>
+                            {[1, 2, 3].map((_, i) => (
+                                <View key={i} style={styles.meetingItem}>
+                                    <ShimmerSkeleton width={56} height={56} borderRadius={14} style={{ marginRight: 16 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <ShimmerSkeleton width="80%" height={18} borderRadius={4} style={{ marginBottom: 8 }} />
+                                        <ShimmerSkeleton width="60%" height={14} borderRadius={4} />
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+
+                        {/* Actual Quick Actions - Not Loading */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Quick Actions</Text>
+                            <View style={styles.actionRow}>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Tasks')}>
+                                    <Ionicons name="checkbox-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Tasks</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Analytics')}>
+                                    <Ionicons name="bar-chart-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Insights</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => setScanModalVisible(true)}>
+                                    <Ionicons name="qr-code-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Scan QR</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Profile')}>
+                                    <Ionicons name="person-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Profile</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </ScrollView>
+                </PanGestureHandler>
             </MainLayout>
         );
     }
@@ -472,10 +540,18 @@ const DashboardScreen = ({ navigation }) => {
 
                 {/* Club Filter Tags */}
                 <View style={styles.filterContainer}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+                    <ScrollView
+                        ref={clubScrollRef}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.filterScroll}
+                    >
                         <TouchableOpacity
                             style={[styles.filterChip, selectedClubId === 'all' && styles.filterChipActive]}
                             onPress={() => updateSelectedClub('all')}
+                            onLayout={(event) => {
+                                clubLayouts.current['all'] = event.nativeEvent.layout;
+                            }}
                         >
                             <Text style={[styles.filterChipText, selectedClubId === 'all' && styles.filterChipTextActive]}>
                                 Global
@@ -486,6 +562,9 @@ const DashboardScreen = ({ navigation }) => {
                                 key={club.clubId}
                                 style={[styles.filterChip, selectedClubId === club.clubId && styles.filterChipActive]}
                                 onPress={() => updateSelectedClub(club.clubId)}
+                                onLayout={(event) => {
+                                    clubLayouts.current[club.clubId.toString()] = event.nativeEvent.layout;
+                                }}
                             >
                                 <Text style={[styles.filterChipText, selectedClubId === club.clubId && styles.filterChipTextActive]}>
                                     {club.clubName}
@@ -495,115 +574,124 @@ const DashboardScreen = ({ navigation }) => {
                     </ScrollView>
                 </View>
 
-                {/* Stats Grid */}
-                <View style={styles.statsGrid}>
-                    {stats.map((stat, index) => (
-                        <View key={index} style={styles.statCard}>
-                            {Platform.OS === 'web' ? (
-                                <View style={[styles.iconBox, { backgroundColor: stat.color + '10' }]}>
-                                    <Ionicons name={stat.icon} size={20} color={stat.color} />
+                {/* Swipeable Content Area */}
+                <PanGestureHandler
+                    onHandlerStateChange={onSwipeGestureEvent}
+                    activeOffsetX={[-20, 20]}
+                    failOffsetY={[-20, 20]}
+                >
+                    <View>
+                        {/* Stats Grid */}
+                        <View style={styles.statsGrid}>
+                            {stats.map((stat, index) => (
+                                <View key={index} style={styles.statCard}>
+                                    {Platform.OS === 'web' ? (
+                                        <View style={[styles.iconBox, { backgroundColor: stat.color + '10' }]}>
+                                            <Ionicons name={stat.icon} size={20} color={stat.color} />
+                                        </View>
+                                    ) : (
+                                        <Ionicons name={stat.icon} size={28} color={stat.color} style={{ marginBottom: 12 }} />
+                                    )}
+                                    <Text style={styles.statValue}>{stat.value}</Text>
+                                    <Text style={styles.statLabel}>{stat.label}</Text>
                                 </View>
-                            ) : (
-                                <Ionicons name={stat.icon} size={28} color={stat.color} style={{ marginBottom: 12 }} />
-                            )}
-                            <Text style={styles.statValue}>{stat.value}</Text>
-                            <Text style={styles.statLabel}>{stat.label}</Text>
+                            ))}
                         </View>
-                    ))}
-                </View>
 
-                {/* Recent Activity Section */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Meetings</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Meetings')}>
-                            <Text style={styles.viewAll}>View all</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {dashboardData.recentMeetings.length > 0 ? (
-                        dashboardData.recentMeetings
-                            .filter(m => selectedClubId === 'all' || m.clubId?._id === selectedClubId || m.clubId === selectedClubId)
-                            .slice(0, 5).map((meeting, idx) => (
-                                <TouchableOpacity
-                                    key={meeting._id || idx}
-                                    style={styles.meetingItem}
-                                    onPress={() => navigation.navigate('Meetings')}
-                                >
-                                    <View style={[styles.meetingIcon, { backgroundColor: '#F0F9FF' }]}>
-                                        <View style={styles.dateChip}>
-                                            <Text style={styles.dateChipDay}>
-                                                {new Date(meeting.date).getDate()}
-                                            </Text>
-                                            <Text style={styles.dateChipMonth}>
-                                                {new Date(meeting.date).toLocaleDateString(undefined, { month: 'short' }).toUpperCase()}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <View style={styles.meetingInfo}>
-                                        <View style={styles.meetingTitleRow}>
-                                            <Text style={styles.meetingName} numberOfLines={1}>{meeting.name}</Text>
-                                            <View style={[
-                                                styles.attendanceBadge,
-                                                {
-                                                    backgroundColor:
-                                                        meeting.attendanceStatus === 'Attended' ? '#DCFCE7' :
-                                                            meeting.attendanceStatus === 'Not Attended' ? '#FEE2E2' :
-                                                                meeting.attendanceStatus === 'Upcoming' ? '#E0F2FE' : '#F1F5F9'
-                                                }
-                                            ]}>
-                                                <Text style={[
-                                                    styles.attendanceBadgeText,
-                                                    {
-                                                        color:
-                                                            meeting.attendanceStatus === 'Attended' ? '#166534' :
-                                                                meeting.attendanceStatus === 'Not Attended' ? '#991B1B' :
-                                                                    meeting.attendanceStatus === 'Upcoming' ? '#075985' : '#64748B'
-                                                    }
-                                                ]}>
-                                                    {meeting.attendanceStatus}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        <View style={styles.meetingMetaRow}>
-                                            <Ionicons name="time-outline" size={12} color="#94A3B8" />
-                                            <Text style={styles.meetingMeta}>{meeting.time}</Text>
-                                            <View style={styles.metaDot} />
-                                            <Text style={styles.meetingClubName} numberOfLines={1}>{meeting.clubId?.name}</Text>
-                                        </View>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+                        {/* Recent Activity Section */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Recent Meetings</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('Meetings')}>
+                                    <Text style={styles.viewAll}>View all</Text>
                                 </TouchableOpacity>
-                            ))
-                    ) : (
-                        <View style={styles.emptyBox}>
-                            <Text style={styles.emptyText}>No recent meetings</Text>
-                        </View>
-                    )}
-                </View>
+                            </View>
 
-                {/* Quick Actions */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Quick Actions</Text>
-                    <View style={styles.actionRow}>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Tasks')}>
-                            <Ionicons name="checkbox-outline" size={24} color="#0A66C2" />
-                            <Text style={styles.actionBtnText}>Tasks</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Analytics')}>
-                            <Ionicons name="bar-chart-outline" size={24} color="#0A66C2" />
-                            <Text style={styles.actionBtnText}>Insights</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => setScanModalVisible(true)}>
-                            <Ionicons name="qr-code-outline" size={24} color="#0A66C2" />
-                            <Text style={styles.actionBtnText}>Scan QR</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Profile')}>
-                            <Ionicons name="person-outline" size={24} color="#0A66C2" />
-                            <Text style={styles.actionBtnText}>Profile</Text>
-                        </TouchableOpacity>
+                            {dashboardData.recentMeetings.length > 0 ? (
+                                dashboardData.recentMeetings
+                                    .filter(m => selectedClubId === 'all' || m.clubId?._id === selectedClubId || m.clubId === selectedClubId)
+                                    .slice(0, 5).map((meeting, idx) => (
+                                        <TouchableOpacity
+                                            key={meeting._id || idx}
+                                            style={styles.meetingItem}
+                                            onPress={() => navigation.navigate('Meetings')}
+                                        >
+                                            <View style={[styles.meetingIcon, { backgroundColor: '#F0F9FF' }]}>
+                                                <View style={styles.dateChip}>
+                                                    <Text style={styles.dateChipDay}>
+                                                        {new Date(meeting.date).getDate()}
+                                                    </Text>
+                                                    <Text style={styles.dateChipMonth}>
+                                                        {new Date(meeting.date).toLocaleDateString(undefined, { month: 'short' }).toUpperCase()}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <View style={styles.meetingInfo}>
+                                                <View style={styles.meetingTitleRow}>
+                                                    <Text style={styles.meetingName} numberOfLines={1}>{meeting.name}</Text>
+                                                    <View style={[
+                                                        styles.attendanceBadge,
+                                                        {
+                                                            backgroundColor:
+                                                                meeting.attendanceStatus === 'Attended' ? '#DCFCE7' :
+                                                                    meeting.attendanceStatus === 'Not Attended' ? '#FEE2E2' :
+                                                                        meeting.attendanceStatus === 'Upcoming' ? '#E0F2FE' : '#F1F5F9'
+                                                        }
+                                                    ]}>
+                                                        <Text style={[
+                                                            styles.attendanceBadgeText,
+                                                            {
+                                                                color:
+                                                                    meeting.attendanceStatus === 'Attended' ? '#166534' :
+                                                                        meeting.attendanceStatus === 'Not Attended' ? '#991B1B' :
+                                                                            meeting.attendanceStatus === 'Upcoming' ? '#075985' : '#64748B'
+                                                            }
+                                                        ]}>
+                                                            {meeting.attendanceStatus}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <View style={styles.meetingMetaRow}>
+                                                    <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                                                    <Text style={styles.meetingMeta}>{meeting.time}</Text>
+                                                    <View style={styles.metaDot} />
+                                                    <Text style={styles.meetingClubName} numberOfLines={1}>{meeting.clubId?.name}</Text>
+                                                </View>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+                                        </TouchableOpacity>
+                                    ))
+                            ) : (
+                                <View style={styles.emptyBox}>
+                                    <Text style={styles.emptyText}>No recent meetings</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Quick Actions */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Quick Actions</Text>
+                            <View style={styles.actionRow}>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Tasks')}>
+                                    <Ionicons name="checkbox-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Tasks</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Analytics')}>
+                                    <Ionicons name="bar-chart-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Insights</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => setScanModalVisible(true)}>
+                                    <Ionicons name="qr-code-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Scan QR</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Profile')}>
+                                    <Ionicons name="person-outline" size={24} color="#0A66C2" />
+                                    <Text style={styles.actionBtnText}>Profile</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     </View>
-                </View>
+                </PanGestureHandler>
 
                 <QRScannerModal
                     visible={scanModalVisible}
@@ -648,7 +736,7 @@ const DashboardScreen = ({ navigation }) => {
                                     style={styles.promptButtonPrimary}
                                     onPress={() => {
                                         setProfilePromptVisible(false);
-                                        navigation.navigate('Settings', { openBannerModal: true });
+                                        navigation.navigate('Profile', { editProfile: true });
                                     }}
                                 >
                                     <Text style={styles.promptButtonTextPrimary}>Customize</Text>
@@ -697,7 +785,7 @@ const DashboardScreen = ({ navigation }) => {
                     </View>
                 </Modal>
             </ScrollView>
-        </MainLayout>
+        </MainLayout >
     );
 };
 
