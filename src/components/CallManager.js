@@ -262,7 +262,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.2)',
-        backdropFilter: 'blur(10px)', // For web
+        ...Platform.select({
+            web: {
+                backdropFilter: 'blur(10px)',
+            },
+        }),
         flexDirection: 'row',
         paddingHorizontal: 20,
     },
