@@ -40,7 +40,13 @@ api.interceptors.request.use(
             if (isFormData) {
                 // In React Native + Axios, deleting Content-Type is the most 
                 // reliable way to let the system generate the boundary.
-                delete config.headers['Content-Type'];
+                if (config.headers.delete) {
+                    config.headers.delete('Content-Type');
+                    config.headers.delete('content-type');
+                } else {
+                    delete config.headers['Content-Type'];
+                    delete config.headers['content-type'];
+                }
                 console.log(`[API] Processing FormData request to: ${config.url}`);
             } else if (!config.headers['Content-Type']) {
                 config.headers['Content-Type'] = 'application/json';
@@ -327,6 +333,8 @@ export const adminAPI = {
     generateReports: (params) => api.get('/admin/reports', { params }),
     getClubAttendanceReport: (clubId, months) => api.get(`/admin/attendance-report/${clubId}`, { params: { months } }),
     sendNotification: (data) => api.post('/admin/send-notification', data),
+    getGames: () => api.get('/admin/games'),
+    updateGameConfig: (data) => api.post('/admin/games', data),
 };
 
 // Group Chat API
@@ -376,7 +384,6 @@ export const groupChatAPI = {
 // Media/Generic Upload API
 export const mediaAPI = {
     upload: (formData, onProgress) => api.post('/web-upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 600000,
         onUploadProgress: (progressEvent) => {
             if (onProgress && progressEvent.total) {

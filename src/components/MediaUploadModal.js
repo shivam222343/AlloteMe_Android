@@ -13,11 +13,11 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Animated, PanResponder } from 'react-native';
+import { Animated, PanResponder, Image } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
-const MediaUploadModal = ({ visible, onClose, onNativePick, onWebUpload, title = "Upload Media" }) => {
+const MediaUploadModal = ({ visible, onClose, onNativePick, onWebUpload, title = "Upload Media", history = [], onSelectHistory }) => {
     const panY = React.useRef(new Animated.Value(0)).current;
 
     const panResponder = React.useRef(
@@ -108,6 +108,32 @@ const MediaUploadModal = ({ visible, onClose, onNativePick, onWebUpload, title =
                                 </View>
                             </Pressable>
 
+                            {/* Recent Avatars History Section */}
+                            {history && history.length > 0 && (
+                                <View style={styles.historyContainer}>
+                                    <Text style={styles.historyTitle}>Recently Uploaded</Text>
+                                    <View style={styles.historyGrid}>
+                                        {history.slice(0, 3).map((item, index) => (
+                                            <TouchableOpacity
+                                                key={`history-${index}`}
+                                                style={styles.historyItem}
+                                                onPress={() => {
+                                                    onClose();
+                                                    onSelectHistory(item.url);
+                                                }}
+                                            >
+                                                <Image
+                                                    source={{ uri: item.url }}
+                                                    style={styles.historyImage}
+                                                />
+                                                <View style={styles.historyOverlay}>
+                                                    <Ionicons name="checkmark-circle" size={18} color="#FFF" />
+                                                </View>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
                         </View>
 
                         <TouchableOpacity
@@ -251,6 +277,41 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#64748B',
+    },
+    // History Styles
+    historyContainer: {
+        marginTop: 24,
+    },
+    historyTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: 12,
+        letterSpacing: -0.2,
+    },
+    historyGrid: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    historyItem: {
+        width: (width - 48 - 24) / 3, // Adjust based on padding and gap
+        aspectRatio: 1,
+        borderRadius: 16,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+        ...Shadows.sm,
+    },
+    historyImage: {
+        width: '100%',
+        height: '100%',
+    },
+    historyOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        opacity: 0, // Show only on selection or hover if needed, but here we just make it look good
     }
 });
 

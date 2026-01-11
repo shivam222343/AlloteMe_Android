@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
+import { SkeletonBannerItem } from '../components/SkeletonLoader';
 
 const SettingsScreen = ({ navigation, route }) => {
     const { user, refreshUser } = useAuth();
@@ -25,6 +26,8 @@ const SettingsScreen = ({ navigation, route }) => {
     const [changePasswordVisible, setChangePasswordVisible] = useState(false);
     const [bannerModalVisible, setBannerModalVisible] = useState(false);
     const [activeBannerTab, setActiveBannerTab] = useState('All');
+    const [bannersLoading, setBannersLoading] = useState(false);
+    const [selectingBanner, setSelectingBanner] = useState(null);
 
     const localBanners = [
         { id: 'local-banner-1', source: require('../../assets/banners/blue_geometric.png') },
@@ -50,28 +53,31 @@ const SettingsScreen = ({ navigation, route }) => {
     }, [bannerModalVisible]);
 
     const generateNewBanners = () => {
-        const newBanners = Array(6).fill(0).map((_, i) => {
-            const seed = Math.random().toString(36).substring(7);
-            return `https://picsum.photos/seed/${seed}/400/200`;
-        });
-        setGeneratedBanners(newBanners);
+        setBannersLoading(true);
+        // Simulate a slight delay for AI "generation"
+        setTimeout(() => {
+            const newBanners = Array(6).fill(0).map((_, i) => {
+                const seed = Math.random().toString(36).substring(7);
+                return `https://picsum.photos/seed/${seed}/400/200`;
+            });
+            setGeneratedBanners(newBanners);
+            setBannersLoading(false);
+        }, 1500);
     };
 
     const updateSidebarBanner = async (url) => {
         try {
+            setSelectingBanner(url || 'default');
             const preferences = {
                 ...user.preferences,
                 sidebarBanner: url
             };
 
-            // We need to call API to update user preferences
-            // Assuming authController.updateProfile handles preferences merging
             const res = await authAPI.updateProfile({
                 preferences
             });
 
             if (res.success) {
-                // Update local user context if needed, or let refreshUser handle it
                 await refreshUser();
                 setBannerModalVisible(false);
             } else {
@@ -80,6 +86,8 @@ const SettingsScreen = ({ navigation, route }) => {
         } catch (error) {
             console.error(error);
             Alert.alert('Error', 'Failed to update banner');
+        } finally {
+            setSelectingBanner(null);
         }
     };
 
@@ -350,7 +358,12 @@ const SettingsScreen = ({ navigation, route }) => {
                                             borderRadius: 20,
                                             backgroundColor: activeBannerTab === tab ? '#0A66C2' : '#F1F5F9'
                                         }}
-                                        onPress={() => setActiveBannerTab(tab)}
+                                        onPress={() => {
+                                            setActiveBannerTab(tab);
+                                            if (tab === 'AI Generated' && generatedBanners.length === 0) {
+                                                generateNewBanners();
+                                            }
+                                        }}
                                     >
                                         <Text style={{
                                             color: activeBannerTab === tab ? '#FFF' : '#64748B',
@@ -366,6 +379,7 @@ const SettingsScreen = ({ navigation, route }) => {
                                 <TouchableOpacity
                                     style={[styles.bannerOption, !user?.preferences?.sidebarBanner && styles.bannerOptionActive]}
                                     onPress={() => updateSidebarBanner(null)}
+                                    disabled={!!selectingBanner}
                                 >
                                     <LinearGradient
                                         colors={['#0A66C2', '#0E76A8']}
@@ -373,16 +387,20 @@ const SettingsScreen = ({ navigation, route }) => {
                                         end={{ x: 1, y: 1 }}
                                         style={styles.bannerImage}
                                     >
-                                        <View style={styles.defaultBannerContent}>
-                                            <Image
-                                                source={require('../../assets/AS.png')}
-                                                style={{ width: 30, height: 30, marginRight: 10, tintColor: '#FFFFFF', opacity: 0.9 }}
-                                                resizeMode="contain"
-                                            />
-                                            <Text style={{ color: '#FFF', fontWeight: '600' }}>Classic Blue</Text>
-                                        </View>
+                                        {selectingBanner === 'default' ? (
+                                            <ActivityIndicator color="#FFF" />
+                                        ) : (
+                                            <View style={styles.defaultBannerContent}>
+                                                <Image
+                                                    source={require('../../assets/AS.png')}
+                                                    style={{ width: 30, height: 30, marginRight: 10, tintColor: '#FFFFFF', opacity: 0.9 }}
+                                                    resizeMode="contain"
+                                                />
+                                                <Text style={{ color: '#FFF', fontWeight: '600' }}>Classic Blue</Text>
+                                            </View>
+                                        )}
                                     </LinearGradient>
-                                    {!user?.preferences?.sidebarBanner && (
+                                    {!user?.preferences?.sidebarBanner && !selectingBanner && (
                                         <View style={styles.checkBadge}>
                                             <Ionicons name="checkmark" size={14} color="#FFF" />
                                         </View>
@@ -401,16 +419,25 @@ const SettingsScreen = ({ navigation, route }) => {
                                                         user?.preferences?.sidebarBanner === banner.id && styles.bannerOptionActive
                                                     ]}
                                                     onPress={() => updateSidebarBanner(banner.id)}
+                                                    disabled={!!selectingBanner}
                                                 >
-                                                    <Image
-                                                        source={banner.source}
-                                                        style={styles.bannerGridImage}
-                                                        resizeMode="cover"
-                                                    />
-                                                    {user?.preferences?.sidebarBanner === banner.id && (
-                                                        <View style={styles.checkBadge}>
-                                                            <Ionicons name="checkmark" size={14} color="#FFF" />
+                                                    {selectingBanner === banner.id ? (
+                                                        <View style={styles.bannerLoadingCard}>
+                                                            <ActivityIndicator size="small" color="#0A66C2" />
                                                         </View>
+                                                    ) : (
+                                                        <>
+                                                            <Image
+                                                                source={banner.source}
+                                                                style={styles.bannerGridImage}
+                                                                resizeMode="cover"
+                                                            />
+                                                            {user?.preferences?.sidebarBanner === banner.id && (
+                                                                <View style={styles.checkBadge}>
+                                                                    <Ionicons name="checkmark" size={14} color="#FFF" />
+                                                                </View>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </TouchableOpacity>
                                             ))}
@@ -422,35 +449,57 @@ const SettingsScreen = ({ navigation, route }) => {
                                     <>
                                         <Text style={[styles.inputLabel, { marginBottom: 10, marginTop: 10 }]}>AI Generated Themes</Text>
                                         <View style={styles.bannerGrid}>
-                                            {generatedBanners.map((url, index) => (
-                                                <TouchableOpacity
-                                                    key={`ai-${index}`}
-                                                    style={[
-                                                        styles.bannerGridItem,
-                                                        user?.preferences?.sidebarBanner === url && styles.bannerOptionActive
-                                                    ]}
-                                                    onPress={() => updateSidebarBanner(url)}
-                                                >
-                                                    <Image
-                                                        source={{ uri: url }}
-                                                        style={styles.bannerGridImage}
-                                                        resizeMode="cover"
-                                                    />
-                                                    {user?.preferences?.sidebarBanner === url && (
-                                                        <View style={styles.checkBadge}>
-                                                            <Ionicons name="checkmark" size={14} color="#FFF" />
-                                                        </View>
-                                                    )}
-                                                </TouchableOpacity>
-                                            ))}
+                                            {bannersLoading ? (
+                                                [1, 2, 3, 4, 5, 6].map(i => (
+                                                    <SkeletonBannerItem key={i} />
+                                                ))
+                                            ) : (
+                                                generatedBanners.map((url, index) => (
+                                                    <TouchableOpacity
+                                                        key={`ai-${index}`}
+                                                        style={[
+                                                            styles.bannerGridItem,
+                                                            user?.preferences?.sidebarBanner === url && styles.bannerOptionActive
+                                                        ]}
+                                                        onPress={() => updateSidebarBanner(url)}
+                                                        disabled={!!selectingBanner}
+                                                    >
+                                                        {selectingBanner === url ? (
+                                                            <View style={styles.bannerLoadingCard}>
+                                                                <ActivityIndicator size="small" color="#0A66C2" />
+                                                            </View>
+                                                        ) : (
+                                                            <>
+                                                                <Image
+                                                                    source={{ uri: url }}
+                                                                    style={styles.bannerGridImage}
+                                                                    resizeMode="cover"
+                                                                />
+                                                                {user?.preferences?.sidebarBanner === url && (
+                                                                    <View style={styles.checkBadge}>
+                                                                        <Ionicons name="checkmark" size={14} color="#FFF" />
+                                                                    </View>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </TouchableOpacity>
+                                                ))
+                                            )}
                                         </View>
 
                                         <TouchableOpacity
-                                            style={[styles.generateBtn, { marginTop: 20, marginBottom: 40 }]}
+                                            style={[styles.generateBtn, (bannersLoading || !!selectingBanner) && { opacity: 0.6 }]}
                                             onPress={generateNewBanners}
+                                            disabled={bannersLoading || !!selectingBanner}
                                         >
-                                            <Ionicons name="sparkles" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                                            <Text style={styles.submitBtnText}>Generate New Themes</Text>
+                                            {bannersLoading ? (
+                                                <ActivityIndicator color="#FFF" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="sparkles" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                                                    <Text style={styles.generateBtnText}>Generate New Themes</Text>
+                                                </>
+                                            )}
                                         </TouchableOpacity>
                                     </>
                                 )}
@@ -638,6 +687,12 @@ const styles = StyleSheet.create({
     bannerGridImage: {
         width: '100%',
         height: '100%',
+    },
+    bannerLoadingCard: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
     },
     headerOverlay: {
         ...StyleSheet.absoluteFillObject,

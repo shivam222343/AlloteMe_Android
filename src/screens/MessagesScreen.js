@@ -184,11 +184,11 @@ const MessagesScreen = ({ navigation }) => {
             if (conversationsRes.success) setConversations(conversationsRes.data);
             if (clubsRes.success) {
                 // Filter clubs to only show those the user has joined
-                const userClubIds = user.clubsJoined.map(c =>
-                    (c.clubId?._id || c.clubId).toString()
+                const userClubIds = (user?.clubsJoined || []).map(c =>
+                    (c.clubId?._id || c.clubId || '').toString()
                 );
-                const joinedClubs = clubsRes.data.filter(club =>
-                    userClubIds.includes(club._id.toString())
+                const joinedClubs = (clubsRes.data || []).filter(club =>
+                    club && club._id && userClubIds.includes(club._id.toString())
                 );
                 setClubs(joinedClubs);
 

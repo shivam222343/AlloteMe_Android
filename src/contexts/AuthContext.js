@@ -4,6 +4,7 @@ import { authAPI } from '../services/api';
 import io from 'socket.io-client';
 import { API_CONFIG } from '../constants/theme';
 import { registerForPushNotificationsAsync } from '../services/NotificationService';
+import * as Notifications from 'expo-notifications';
 
 const AuthContext = createContext({});
 
@@ -72,6 +73,7 @@ export const AuthProvider = ({ children }) => {
                 newSocket.emit('user:online', user._id);
 
                 // Join club rooms for real-time updates
+                newSocket.emit('club:join', 'all');
                 if (user.clubsJoined && Array.isArray(user.clubsJoined)) {
                     user.clubsJoined.forEach(c => {
                         const clubId = c.clubId?._id || c.clubId;
@@ -82,16 +84,72 @@ export const AuthProvider = ({ children }) => {
                 }
             });
 
-            newSocket.on('notification_receive', () => {
+            newSocket.on('notification:game_hosted', (data) => {
+                Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: data.title,
+                        body: data.message,
+                        data: { roomId: data.roomId, screen: 'SketchHeads' },
+                    },
+                    trigger: null,
+                });
+            });
+
+            // Generic real-time notification listener
+            newSocket.on('notification:receive', (data) => {
+                console.log('Real-time notification received via socket:', data);
+                if (data && data.title) {
+                    Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: data.title,
+                            body: data.message || data.body || '',
+                            data: data.data || data,
+                            sound: true,
+                        },
+                        trigger: null,
+                    });
+                }
                 fetchUnreadCount();
             });
 
-            newSocket.on('message:receive', () => {
+            newSocket.on('message:receive', (message) => {
+                console.log('New private message received via socket');
+                if (message && message.content) {
+                    Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: `New Message from ${message.senderId?.displayName || 'User'}`,
+                            body: message.content,
+                            data: { screen: 'Chat', params: { otherUser: message.senderId } },
+                            sound: true,
+                        },
+                        trigger: null,
+                    });
+                }
                 fetchUnreadMessageCount();
             });
 
-            newSocket.on('group:message', () => {
+            newSocket.on('group:message', (data) => {
+                console.log('New group message received via socket');
+                // Only show notification if it's not from self (senderId usually handles this but safety first)
+                if (data.message && data.message.senderId?._id !== user._id) {
+                    Notifications.scheduleNotificationAsync({
+                        content: {
+                            title: `${data.message.senderId?.displayName} in ${data.clubName || 'Group'}`,
+                            body: data.message.content,
+                            data: {
+                                screen: 'Chat',
+                                params: { clubId: data.clubId, isGroupChat: true, clubName: data.clubName },
+                                category: 'chat-reply'
+                            },
+                        },
+                        trigger: null,
+                    });
+                }
                 fetchUnreadMessageCount();
+            });
+
+            newSocket.on('notification_receive', () => {
+                fetchUnreadCount();
             });
 
             setSocket(newSocket);
@@ -124,7 +182,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const { notificationsAPI } = require('../services/api');
             const res = await notificationsAPI.getAll();
-            if (res.success) {
+            if (res.success && Array.isArray(res.data)) {
                 const count = res.data.filter(n => !n.read).length;
                 setUnreadCount(count);
             }

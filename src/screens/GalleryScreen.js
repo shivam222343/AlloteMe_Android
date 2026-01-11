@@ -330,7 +330,7 @@ const GalleryScreen = ({ navigation }) => {
                 ? `data:image/jpeg;base64,${selectedImage.base64}`
                 : selectedImage.uri;
 
-            console.log('Uploading with base64, data length:', base64Img.length);
+            console.log('Uploading with base64, data length:', base64Img?.length || 0);
             console.log('Upload data:', {
                 title: uploadData.title,
                 category: uploadData.category,
@@ -481,26 +481,6 @@ const GalleryScreen = ({ navigation }) => {
         }
     };
 
-    const handleScreenPress = (event) => {
-        const x = event.nativeEvent.pageX;
-        const { width: screenWidth } = Dimensions.get('window');
-
-        const currentIndex = categories.indexOf(selectedCategory);
-        if (currentIndex === -1) return;
-
-        if (x < screenWidth / 4) {
-            // Move to previous category
-            if (currentIndex > 0) {
-                setSelectedCategory(categories[currentIndex - 1]);
-            }
-        } else if (x > (screenWidth * 3) / 4) {
-            // Move to next category
-            if (currentIndex < categories.length - 1) {
-                setSelectedCategory(categories[currentIndex + 1]);
-            }
-        }
-    };
-
     // Pinterest Layout logic: distribute into 2 columns
     const { leftColumn, rightColumn } = useMemo(() => {
         const left = images.filter((_, i) => i % 2 === 0);
@@ -591,17 +571,14 @@ const GalleryScreen = ({ navigation }) => {
                     activeOffsetX={[-20, 20]}
                     failOffsetY={[-20, 20]}
                 >
-                    <TouchableOpacity
-                        activeOpacity={1}
-                        style={{ flex: 1 }}
-                        onPress={handleScreenPress}
-                    >
+                    <View style={{ flex: 1 }}>
                         {/* Filters */}
                         <View style={styles.filterSection}>
                             <ScrollView
                                 ref={categoryScrollRef}
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
+                                nestedScrollEnabled={true}
                             >
                                 {categories.map(cat => (
                                     <TouchableOpacity
@@ -651,7 +628,7 @@ const GalleryScreen = ({ navigation }) => {
                                 )}
                             </ScrollView>
                         )}
-                    </TouchableOpacity>
+                    </View>
                 </PanGestureHandler>
 
                 {/* Floating Add Button */}

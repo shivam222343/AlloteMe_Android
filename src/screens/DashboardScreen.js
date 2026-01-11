@@ -36,7 +36,6 @@ const DashboardScreen = ({ navigation }) => {
             attendanceRate: '0%'
         },
         clubStats: [],
-        clubStats: [],
         recentMeetings: [],
         birthdays: []
     });
@@ -133,18 +132,18 @@ const DashboardScreen = ({ navigation }) => {
     const getCurrentStats = () => {
         if (selectedClubId === 'all') {
             return [
-                { label: 'Clubs', value: dashboardData.globalStats.clubsJoined, icon: 'business-outline', color: '#6366F1' },
-                { label: 'Meetings', value: dashboardData.globalStats.upcomingMeetings, icon: 'calendar-outline', color: '#0EA5E9' },
-                { label: 'Tasks', value: dashboardData.globalStats.pendingTasks, icon: 'list-outline', color: '#F59E0B' },
-                { label: 'Attendance', value: dashboardData.globalStats.attendanceRate, icon: 'checkmark-circle-outline', color: '#10B981' },
+                { label: 'Clubs', value: dashboardData?.globalStats?.clubsJoined || 0, icon: 'business-outline', color: '#6366F1' },
+                { label: 'Meetings', value: dashboardData?.globalStats?.upcomingMeetings || 0, icon: 'calendar-outline', color: '#0EA5E9' },
+                { label: 'Tasks', value: dashboardData?.globalStats?.pendingTasks || 0, icon: 'list-outline', color: '#F59E0B' },
+                { label: 'Attendance', value: dashboardData?.globalStats?.attendanceRate || '0%', icon: 'checkmark-circle-outline', color: '#10B981' },
             ];
         } else {
-            const club = dashboardData.clubStats.find(c => c.clubId === selectedClubId);
+            const club = (dashboardData?.clubStats || []).find(c => c.clubId === selectedClubId);
             if (!club) return [];
             return [
-                { label: 'Upcoming', value: club.stats.upcomingMeetings, icon: 'calendar-outline', color: '#0EA5E9' },
-                { label: 'Tasks', value: club.stats.pendingTasks, icon: 'list-outline', color: '#F59E0B' },
-                { label: 'Attendance', value: club.stats.attendanceRate, icon: 'checkmark-circle-outline', color: '#10B981' },
+                { label: 'Upcoming', value: club.stats?.upcomingMeetings || 0, icon: 'calendar-outline', color: '#0EA5E9' },
+                { label: 'Tasks', value: club.stats?.pendingTasks || 0, icon: 'list-outline', color: '#F59E0B' },
+                { label: 'Attendance', value: club.stats?.attendanceRate || '0%', icon: 'checkmark-circle-outline', color: '#10B981' },
             ];
         }
     };

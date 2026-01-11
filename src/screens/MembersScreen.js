@@ -63,6 +63,7 @@ const MembersScreen = ({ navigation }) => {
     const [selectedClub, setSelectedClub] = useState(null);
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [membersLoading, setMembersLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedMember, setSelectedMember] = useState(null);
@@ -106,12 +107,15 @@ const MembersScreen = ({ navigation }) => {
     const fetchMembers = useCallback(async () => {
         if (!selectedClub) return;
         try {
+            setMembersLoading(true);
             const res = await api.get(`/members/${selectedClub._id}`);
             if (res.success) {
                 setMembers(res.data);
             }
         } catch (error) {
             console.error('Error fetching members:', error);
+        } finally {
+            setMembersLoading(false);
         }
     }, [selectedClub]);
 
@@ -372,8 +376,11 @@ const MembersScreen = ({ navigation }) => {
                 >
                     <View style={{ flex: 1 }}>
                         {loading ? (
-                            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                                <ActivityIndicator size="large" color="#0A66C2" />
+                            <View style={styles.listContent}>
+                                <SkeletonFilterChips count={4} />
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <SkeletonMemberCard key={i} />
+                                ))}
                             </View>
                         ) : selectedClub && !isUserInClub(selectedClub._id) ? (
                             <View style={styles.joinContainer}>
@@ -394,17 +401,19 @@ const MembersScreen = ({ navigation }) => {
                             </View>
                         ) : (
                             <FlatList
-                                data={filteredMembers}
-                                renderItem={renderMemberCard}
-                                keyExtractor={item => item._id}
+                                data={membersLoading ? [1, 2, 3, 4, 5, 6] : filteredMembers}
+                                renderItem={membersLoading ? () => <SkeletonMemberCard /> : renderMemberCard}
+                                keyExtractor={item => membersLoading ? `skeleton-${item}` : item._id}
                                 contentContainerStyle={styles.listContent}
                                 refreshControl={
                                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                                 }
                                 ListEmptyComponent={
-                                    <View style={styles.emptyContainer}>
-                                        <Text style={styles.emptyText}>No members found</Text>
-                                    </View>
+                                    !membersLoading && (
+                                        <View style={styles.emptyContainer}>
+                                            <Text style={styles.emptyText}>No members found</Text>
+                                        </View>
+                                    )
                                 }
                             />
                         )}

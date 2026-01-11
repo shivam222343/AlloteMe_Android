@@ -229,6 +229,7 @@ const ProfileScreen = ({ navigation, route }) => {
         try {
             setUploading(true);
             setShowAvatarModal(false);
+            setShowUploadModal(false);
 
             // Call updateProfile with the new URL
             const result = await updateProfile({
@@ -611,6 +612,8 @@ const ProfileScreen = ({ navigation, route }) => {
                     onClose={() => setShowUploadModal(false)}
                     onNativePick={pickImage}
                     onWebUpload={handleWebUploadFlow}
+                    history={user?.profilePictureHistory || []}
+                    onSelectHistory={confirmAvatarSelection}
                     title="Update Profile Photo"
                 />
 

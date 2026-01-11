@@ -17,9 +17,10 @@ import { groupChatAPI } from '../services/api';
 
 const { height } = Dimensions.get('window');
 
-const VoterListModal = ({ visible, onClose, clubId, messageId, optionIndex, optionText }) => {
+const VoterListModal = ({ visible, onClose, clubId, messageId, optionIndex, optionText, pollData }) => {
     const [voters, setVoters] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const panY = useRef(new Animated.Value(0)).current;
 
     const panResponder = useRef(
@@ -48,13 +49,22 @@ const VoterListModal = ({ visible, onClose, clubId, messageId, optionIndex, opti
         if (visible) {
             panY.setValue(0);
             if (clubId && messageId && optionIndex !== null) {
-                fetchVoters();
+                fetchVoters(true); // Initial load
             }
         }
-    }, [visible, optionIndex]);
+    }, [visible, messageId, optionIndex]);
 
-    const fetchVoters = async () => {
-        setLoading(true);
+    // Handle real-time updates when pollData changes
+    useEffect(() => {
+        if (visible && clubId && messageId && optionIndex !== null) {
+            fetchVoters(false); // Background refresh
+        }
+    }, [pollData]);
+
+    const fetchVoters = async (isInitial = true) => {
+        if (isInitial) setLoading(true);
+        else setRefreshing(true);
+
         try {
             const res = await groupChatAPI.getPollVoters(clubId, messageId, optionIndex);
             if (res.success) {
@@ -64,6 +74,7 @@ const VoterListModal = ({ visible, onClose, clubId, messageId, optionIndex, opti
             console.error('Error fetching voters:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 

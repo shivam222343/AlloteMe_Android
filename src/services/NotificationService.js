@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { Platform, Alert } from 'react-native';
 import { authAPI, messagesAPI, groupChatAPI } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -13,12 +14,25 @@ Notifications.setNotificationHandler({
     }),
 });
 
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 /**
  * Register user for push notifications and update token in backend
  */
 export const registerForPushNotificationsAsync = async (userId) => {
     try {
         if (Platform.OS === 'web') return null;
+
+        // Check for Expo Go
+        if (isExpoGo) {
+            console.warn(
+                '📢 Notifications: Remote push notifications are NOT supported in Expo Go for SDK 54.\n' +
+                'Please use a Development Build (npx expo run:android) to test actual push delivery.'
+            );
+            // We can still try to get a token, but it will likely fail or return a dummy one
+            // In SDK 54, getDevicePushTokenAsync will definitely throw/fail in Expo Go
+            return null;
+        }
 
         // Check if running on physical device
         if (!Device.isDevice) {

@@ -4,7 +4,9 @@ import {
     StyleSheet,
     Dimensions,
     Platform,
+    Text,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import BottomBar from './BottomBar';
@@ -21,6 +23,42 @@ const MainLayout = ({ children, navigation, currentRoute, title, transparentNavb
     const [notificationsOpen, setNotificationsOpen] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
     const { user, unreadCount, unreadMessageCount } = useAuth();
+    const [isConnected, setIsConnected] = useState(true);
+
+    useEffect(() => {
+        // Simple connectivity check for Expo/RN
+        const checkConnection = async () => {
+            try {
+                // If navigator.onLine is available (web), use it as a first check
+                if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
+                    setIsConnected(navigator.onLine);
+                } else {
+                    // For native, attempt a small fetch
+                    const response = await fetch('https://google.com', { method: 'HEAD' });
+                    setIsConnected(response.ok);
+                }
+            } catch (error) {
+                setIsConnected(false);
+            }
+        };
+
+        const interval = setInterval(checkConnection, 10000); // Check every 10 seconds
+        checkConnection();
+
+        // Also listen to web events if applicable
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.addEventListener('online', () => setIsConnected(true));
+            window.addEventListener('offline', () => setIsConnected(false));
+        }
+
+        return () => {
+            clearInterval(interval);
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.removeEventListener('online', () => setIsConnected(true));
+                window.removeEventListener('offline', () => setIsConnected(false));
+            }
+        };
+    }, []);
 
     const handleProfilePress = () => {
         if (currentRoute !== 'Profile') {
@@ -30,6 +68,12 @@ const MainLayout = ({ children, navigation, currentRoute, title, transparentNavb
 
     return (
         <View style={styles.container}>
+            {!isConnected && (
+                <View style={styles.offlineBanner}>
+                    <Ionicons name="cloud-offline" size={16} color="#FFF" />
+                    <Text style={styles.offlineText}>No Internet Connection</Text>
+                </View>
+            )}
             {/* Sidebar */}
             <Sidebar
                 isOpen={sidebarOpen}
@@ -57,6 +101,7 @@ const MainLayout = ({ children, navigation, currentRoute, title, transparentNavb
                 <NotificationsModal
                     visible={notificationsOpen}
                     onClose={() => setNotificationsOpen(false)}
+                    navigation={navigation}
                 />
 
                 <QRScannerModal
@@ -110,6 +155,24 @@ const styles = StyleSheet.create({
     },
     contentAreaMobile: {
         paddingBottom: 90, // Space for BottomBar
+    },
+    offlineBanner: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#EF4444',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 4,
+        zIndex: 9999,
+        gap: 8,
+    },
+    offlineText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
     },
 });
 

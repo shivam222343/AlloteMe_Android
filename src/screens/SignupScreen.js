@@ -269,10 +269,12 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     logoImage: {
-        width: 180,
-        height: 60,
-        marginBottom: 12,
-        borderRadius: 16, // Rounded corners
+        width: 100,
+        height: 100,
+        marginBottom: 16,
+        borderRadius: 50,
+        backgroundColor: '#FFFFFF',
+        padding: 15,
     },
     tagline: {
         fontSize: 14,

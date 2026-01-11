@@ -34,7 +34,7 @@ const MeetingsScreen = ({ navigation }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [myClubs, setMyClubs] = useState([]);
     const [selectedClub, setSelectedClub] = useState(null);
-    const [meetings, setMeetings] = useState({ upcoming: [], past: [] });
+    const [meetings, setMeetings] = useState({ upcoming: [], past: [], canceled: [] });
     const [activeTab, setActiveTab] = useState('upcoming');
     const [statusModal, setStatusModal] = useState({ visible: false, title: '', message: '', type: 'success' });
     const [attendanceModalVisible, setAttendanceModalVisible] = useState(false);
@@ -88,7 +88,11 @@ const MeetingsScreen = ({ navigation }) => {
         try {
             const res = await meetingsAPI.getClubMeetings(clubId);
             if (res.success) {
-                setMeetings(res.data);
+                setMeetings({
+                    upcoming: res.data.upcoming || [],
+                    past: res.data.past || [],
+                    canceled: res.data.canceled || []
+                });
             }
         } catch (error) {
             console.error('Load meetings error:', error);
@@ -214,16 +218,7 @@ const MeetingsScreen = ({ navigation }) => {
         }
     };
 
-    const handleScreenPress = (event) => {
-        const x = event.nativeEvent.pageX;
-        const { width: screenWidth } = Dimensions.get('window');
 
-        if (x < screenWidth / 4) {
-            if (activeTab !== 'upcoming') setActiveTab('upcoming');
-        } else if (x > (screenWidth * 3) / 4) {
-            if (activeTab !== 'past') setActiveTab('past');
-        }
-    };
 
     const isAdmin = () => {
         if (!user) return false;
@@ -238,7 +233,7 @@ const MeetingsScreen = ({ navigation }) => {
     const getMeetingStatus = (meeting) => {
         const myStatus = meeting.attendees.find(a => (a.userId?._id || a.userId) === user._id);
         if (myStatus && myStatus.status === 'present') return { label: 'Present', color: '#22C55E', bg: '#DCFCE7' };
-        if (meeting.status === 'canceled') return { label: 'Canceled', color: '#EF4444', bg: '#FEE2E2' };
+        if (meeting.status === 'canceled' || meeting.status === 'cancelled') return { label: 'Canceled', color: '#EF4444', bg: '#FEE2E2' };
         if (meeting.status === 'upcoming') return { label: 'Upcoming', color: '#0A66C2', bg: '#E0F2FE' };
         if (meeting.status === 'completed') return { label: 'Completed', color: '#6B7280', bg: '#F3F4F6' };
         if (meeting.status === 'ongoing') return { label: 'Live', color: '#EF4444', bg: '#FEE2E2' };
@@ -388,53 +383,54 @@ const MeetingsScreen = ({ navigation }) => {
         <MainLayout navigation={navigation} currentRoute="Meetings" title="Meetings">
             <View style={styles.container}>
                 {/* Club Selector - Always Visible */}
+                {/* Club Selector - Always Visible - Moved outside PanGestureHandler for better scrollability */}
+                {myClubs.length > 0 ? (
+                    <View style={styles.clubSelector}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled={true}>
+                            {loading ? (
+                                <SkeletonFilterChips count={3} />
+                            ) : (
+                                myClubs.map(club => (
+                                    <TouchableOpacity
+                                        key={club._id}
+                                        style={[styles.chip, selectedClub?._id === club._id && styles.chipActive]}
+                                        onPress={() => setSelectedClub(club)}
+                                    >
+                                        <Text style={[styles.chipText, selectedClub?._id === club._id && styles.chipTextActive]}>
+                                            {club.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                ) : !loading && (
+                    <View style={styles.noClubs}>
+                        <Text style={styles.noClubsText}>Join a club first!</Text>
+                    </View>
+                )}
+
+                {selectedClub && (
+                    <View style={styles.tabs}>
+                        <TouchableOpacity style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]} onPress={() => setActiveTab('upcoming')}>
+                            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>Upcoming</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.tab, activeTab === 'past' && styles.tabActive]} onPress={() => setActiveTab('past')}>
+                            <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>Past / History</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.tab, activeTab === 'canceled' && styles.tabActive]} onPress={() => setActiveTab('canceled')}>
+                            <Text style={[styles.tabText, activeTab === 'canceled' && styles.tabTextActive]}>Canceled</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <PanGestureHandler
                     onHandlerStateChange={onSwipeGestureEvent}
                     activeOffsetX={[-20, 20]}
                     failOffsetY={[-20, 20]}
                 >
-                    <TouchableOpacity
-                        activeOpacity={1}
-                        style={{ flex: 1 }}
-                        onPress={handleScreenPress}
-                    >
-                        {/* Club Selector - Always Visible */}
-                        {myClubs.length > 0 ? (
-                            <View style={styles.clubSelector}>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    {loading ? (
-                                        <SkeletonFilterChips count={3} />
-                                    ) : (
-                                        myClubs.map(club => (
-                                            <TouchableOpacity
-                                                key={club._id}
-                                                style={[styles.chip, selectedClub?._id === club._id && styles.chipActive]}
-                                                onPress={() => setSelectedClub(club)}
-                                            >
-                                                <Text style={[styles.chipText, selectedClub?._id === club._id && styles.chipTextActive]}>
-                                                    {club.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))
-                                    )}
-                                </ScrollView>
-                            </View>
-                        ) : !loading && (
-                            <View style={styles.noClubs}>
-                                <Text style={styles.noClubsText}>Join a club first!</Text>
-                            </View>
-                        )}
+                    <View style={{ flex: 1 }}>
 
-                        {selectedClub && (
-                            <View style={styles.tabs}>
-                                <TouchableOpacity style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]} onPress={() => setActiveTab('upcoming')}>
-                                    <Text style={[styles.tabText, activeTab === 'upcoming' && styles.tabTextActive]}>Upcoming</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={[styles.tab, activeTab === 'past' && styles.tabActive]} onPress={() => setActiveTab('past')}>
-                                    <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>Past / History</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
 
                         <ScrollView
                             style={styles.content}
@@ -454,12 +450,12 @@ const MeetingsScreen = ({ navigation }) => {
                                     <SkeletonMeetingCard />
                                 </>
                             ) : (
-                                (activeTab === 'upcoming' ? meetings.upcoming : meetings.past).length === 0 ? (
+                                (meetings[activeTab] || []).length === 0 ? (
                                     <View style={styles.emptyState}>
                                         <Text style={styles.emptyText}>No {activeTab} meetings found.</Text>
                                     </View>
                                 ) : (
-                                    (activeTab === 'upcoming' ? meetings.upcoming : meetings.past).map(meeting => {
+                                    (meetings[activeTab] || []).map(meeting => {
                                         const status = getMeetingStatus(meeting);
                                         // Check if attendance active
                                         const canMark = meeting.isAttendanceActive && !meeting.attendees.find(a => (a.userId?._id || a.userId) === user._id);
@@ -517,7 +513,7 @@ const MeetingsScreen = ({ navigation }) => {
                                 )
                             )}
                         </ScrollView>
-                    </TouchableOpacity>
+                    </View>
                 </PanGestureHandler>
 
                 {/* Modals */}

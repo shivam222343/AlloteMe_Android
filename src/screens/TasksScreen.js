@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/MainLayout';
 import { SkeletonBox, SkeletonListItem, SkeletonCard } from '../components/SkeletonLoader';
-import { tasksAPI, clubsAPI, meetingsAPI } from '../services/api';
+import { tasksAPI, clubsAPI, meetingsAPI, mediaAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -197,21 +197,46 @@ const TasksScreen = ({ navigation }) => {
             });
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
+                setCreateLoading(true);
+                setShowUploadModal(false);
+
                 const asset = result.assets[0];
-                // For now, we'll just handle one attachment or upload immediately
-                // But native picking here requires a direct upload usually.
-                // For simplicity in this Task flow, let's just use it to select
-                // and we'll handle actual upload during creation OR use the existing upload API.
+                const formData = new FormData();
 
-                // Let's assume we want to upload it immediately and get the URL
-                // Actually, let's keep it simple: browser upload provides URL directly.
-                // Native pick would need FormData upload which tasksAPI.create doesn't support yet.
-                // So I'll encourage browser upload or implement a quick upload helper.
+                // Get file name and extension
+                const uri = asset.uri;
+                const fileName = uri.split('/').pop();
+                const fileType = asset.type === 'video' ? 'video/mp4' : 'image/jpeg';
 
-                Alert.alert('Notice', 'Direct native upload for tasks is coming soon. Please use the Browser option for now.');
+                formData.append('file', {
+                    uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+                    name: fileName || 'upload.jpg',
+                    type: fileType,
+                });
+                formData.append('type', 'gallery');
+
+                const uploadRes = await mediaAPI.upload(formData);
+
+                if (uploadRes.success) {
+                    setNewTask(prev => ({
+                        ...prev,
+                        attachments: [...prev.attachments, {
+                            url: uploadRes.data.url,
+                            publicId: uploadRes.data.publicId,
+                            fileName: fileName || 'Attachment',
+                            fileType: asset.type === 'video' ? 'video' : 'image'
+                        }]
+                    }));
+                    Alert.alert('Success', 'Media attached successfully!');
+                } else {
+                    Alert.alert('Upload Failed', uploadRes.message || 'Could not upload media');
+                }
             }
         } catch (error) {
-            Alert.alert('Error', 'Failed to pick media');
+            console.error('Task native upload error:', error);
+            Alert.alert('Error', 'Failed to pick or upload media');
+        } finally {
+            setCreateLoading(false);
         }
     };
 
@@ -317,7 +342,7 @@ const TasksScreen = ({ navigation }) => {
     };
 
     const renderTaskItem = ({ item }) => {
-        const myAssignment = item.assignedTo.find(a => a.user._id === user._id || a.user === user._id);
+        const myAssignment = (item?.assignedTo || []).find(a => (a.user?._id || a.user) === user?._id);
         const myStatus = myAssignment ? myAssignment.status : 'N/A';
         const isOverdue = new Date(item.dueDate) < new Date() && myStatus !== 'completed';
 
@@ -347,7 +372,7 @@ const TasksScreen = ({ navigation }) => {
                     </View>
                     <View style={styles.metaItem}>
                         <Ionicons name="people-outline" size={14} color="#6B7280" />
-                        <Text style={styles.metaText}>{item.assignedTo.length} assigned</Text>
+                        <Text style={styles.metaText}>{(item?.assignedTo || []).length} assigned</Text>
                     </View>
                 </View>
 
@@ -376,7 +401,7 @@ const TasksScreen = ({ navigation }) => {
                 <View style={styles.assigneesContainer}>
                     <Text style={styles.assigneesLabel}>Assigned Members:</Text>
                     <View style={styles.assigneeList}>
-                        {item.assignedTo.map((assignee, idx) => (
+                        {(item?.assignedTo || []).map((assignee, idx) => (
                             <View key={idx} style={styles.assigneeIndividual}>
                                 <View style={[
                                     styles.statusIndicator,
@@ -437,9 +462,9 @@ const TasksScreen = ({ navigation }) => {
         }
     };
 
-    const filteredTasks = tasks.filter(t => {
+    const filteredTasks = (tasks || []).filter(t => {
         // Tab Filter (Status)
-        const myAssignment = t.assignedTo.find(a => a.user?._id === user._id || a.user === user._id);
+        const myAssignment = (t?.assignedTo || []).find(a => (a.user?._id || a.user) === user?._id);
         const status = myAssignment ? myAssignment.status : 'pending';
 
         let matchesTab = true;
@@ -491,7 +516,7 @@ const TasksScreen = ({ navigation }) => {
 
                 {/* Filters */}
                 <View style={styles.filterSection}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll} nestedScrollEnabled={true}>
                         <TouchableOpacity
                             style={[styles.filterChip, selectedFilterClub === 'all' && styles.filterChipActive]}
                             onPress={() => {
@@ -535,11 +560,7 @@ const TasksScreen = ({ navigation }) => {
                     activeOffsetX={[-20, 20]}
                     failOffsetY={[-20, 20]}
                 >
-                    <TouchableOpacity
-                        activeOpacity={1}
-                        style={{ flex: 1 }}
-                        onPress={handleScreenPress}
-                    >
+                    <View style={{ flex: 1 }}>
                         {loading ? (
                             <View style={{ flex: 1 }}>
                                 {/* Skeleton Task Cards - Loading */}
@@ -572,7 +593,7 @@ const TasksScreen = ({ navigation }) => {
                                 }
                             />
                         )}
-                    </TouchableOpacity>
+                    </View>
                 </PanGestureHandler>
 
                 {isAdmin && (

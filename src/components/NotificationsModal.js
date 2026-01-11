@@ -20,7 +20,7 @@ import { SkeletonNotification } from './SkeletonLoader';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const NotificationsModal = ({ visible, onClose }) => {
+const NotificationsModal = ({ visible, onClose, navigation }) => {
     const panY = React.useRef(new Animated.Value(0)).current;
 
     const panResponder = React.useRef(
@@ -115,6 +115,30 @@ const NotificationsModal = ({ visible, onClose }) => {
         }
     };
 
+    const handleNotificationPress = async (item) => {
+        if (!item.read) {
+            markAsRead(item._id);
+        }
+        onClose();
+
+        if (item.type === 'game_hosted' && item.data?.roomId) {
+            navigation.navigate('SketchHeads', { roomId: item.data.roomId });
+        } else if (item.data?.screen) {
+            try {
+                const params = typeof item.data.params === 'string' ? JSON.parse(item.data.params) : item.data.params;
+                navigation.navigate(item.data.screen, params || {});
+            } catch (e) {
+                navigation.navigate(item.data.screen);
+            }
+        } else if (item.type.includes('meeting') || item.relatedModel === 'Meeting') {
+            navigation.navigate('Calendar', { selectedMeetingId: item.relatedId, clubId: item.clubId });
+        } else if (item.type.includes('task') || item.relatedModel === 'Task') {
+            navigation.navigate('Tasks', { focusTaskId: item.relatedId });
+        } else if (item.type === 'new_message' && item.relatedId) {
+            navigation.navigate('Chat', { otherUser: { _id: item.relatedId } });
+        }
+    };
+
     const markAllAsRead = async () => {
         try {
             await notificationsAPI.markAllAsRead();
@@ -158,11 +182,15 @@ const NotificationsModal = ({ visible, onClose }) => {
         switch (type) {
             case 'new_message': return 'chatbubble';
             case 'club_announcement': return 'megaphone';
+            case 'game_hosted': return 'game-controller';
+            case 'gallery_upload': return 'camera';
+            case 'gallery_approved': return 'image';
             default: return 'notifications';
         }
     };
 
     const getIconColor = (type) => {
+        if (type === 'game_hosted') return '#8B5CF6'; // Purple for games
         if (type.includes('created') || type.includes('assigned')) return '#0A66C2';
         if (type.includes('marked') || type.includes('approved') || type.includes('completed')) return '#22C55E';
         if (type.includes('cancelled') || type.includes('rejected') || type.includes('removed')) return '#EF4444';
@@ -207,7 +235,7 @@ const NotificationsModal = ({ visible, onClose }) => {
         >
             <TouchableOpacity
                 style={[styles.notificationItem, !item.read && styles.unreadItem]}
-                onPress={() => markAsRead(item._id)}
+                onPress={() => handleNotificationPress(item)}
                 activeOpacity={0.7}
             >
                 <View style={[styles.iconContainer, { backgroundColor: `${getIconColor(item.type)}15` }]}>

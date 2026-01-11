@@ -35,8 +35,8 @@ import { useWebUpload } from '../hooks/useWebUpload';
 import MediaUploadModal from '../components/MediaUploadModal';
 import PollModal from '../components/PollModal';
 import SpinnerModal from '../components/SpinnerModal';
-import VoterListModal from '../components/VoterListModal';
 import ViewedByModal from '../components/ViewedByModal';
+import VoterListModal from '../components/VoterListModal';
 
 
 
@@ -473,11 +473,38 @@ const MessageItem = React.memo(({ item, index, user, otherUser, messages, setRep
                                                 acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
                                                 return acc;
                                             }, {});
-                                            return Object.entries(reactionCounts).map(([emoji, count]) => (
-                                                <View key={emoji} style={styles.reactionChip}>
-                                                    <Text style={styles.reactionEmoji}>{emoji}</Text>
-                                                </View>
-                                            ));
+
+                                            const reactionEntries = Object.entries(reactionCounts);
+                                            const totalReactionTypes = reactionEntries.length;
+                                            const displayReactions = reactionEntries.slice(0, 4);
+                                            const remainingCount = totalReactionTypes - 4;
+
+                                            const myUserId = user._id;
+                                            const myReactions = item.reactions
+                                                .filter(r => (r.userId?._id || r.userId) === myUserId)
+                                                .map(r => r.emoji);
+
+                                            return (
+                                                <>
+                                                    {displayReactions.map(([emoji, count]) => (
+                                                        <View
+                                                            key={emoji}
+                                                            style={[
+                                                                styles.reactionChip,
+                                                                myReactions.includes(emoji) && { backgroundColor: '#D1E5FF', borderRadius: 10, paddingHorizontal: 4 }
+                                                            ]}
+                                                        >
+                                                            <Text style={styles.reactionEmoji}>{emoji}</Text>
+                                                            {count > 1 && <Text style={styles.reactionCount}>{count}</Text>}
+                                                        </View>
+                                                    ))}
+                                                    {remainingCount > 0 && (
+                                                        <View style={[styles.reactionChip, { backgroundColor: '#F3F4F6', borderRadius: 10, paddingHorizontal: 6 }]}>
+                                                            <Text style={[styles.reactionCount, { marginLeft: 0 }]}>+{remainingCount}</Text>
+                                                        </View>
+                                                    )}
+                                                </>
+                                            );
                                         })()}
                                     </TouchableOpacity>
                                 </View>
@@ -597,23 +624,37 @@ const ChatScreen = ({ route, navigation }) => {
         }
     }, [localGroupData, user._id]);
 
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+    const [isAtBottom, setIsAtBottom] = useState(true);
+
     useEffect(() => {
         setNewGroupName(currentClubName);
     }, [currentClubName]);
 
     // Auto-scroll to bottom when new messages arrive, but not in selection mode
     useEffect(() => {
-        if (messages.length > 0 && !isSelectionMode) {
+        if (messages.length > 0 && !isSelectionMode && isAtBottom) {
             const timer = setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: true });
-                // Ensure we scroll to the absolute bottom
-                setTimeout(() => {
-                    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-                }, 100);
             }, 300);
             return () => clearTimeout(timer);
         }
     }, [messages.length, isSelectionMode]);
+
+    const handleScroll = (event) => {
+        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+        const paddingToBottom = 30; // Increased sensitivity (was 100)
+        const reachedBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+
+        setIsAtBottom(reachedBottom);
+        setShowScrollToBottom(!reachedBottom);
+    };
+
+    const scrollToBottom = () => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+        setIsAtBottom(true);
+        setShowScrollToBottom(false);
+    };
 
     useEffect(() => {
         if (showGroupInfoModal && isGroupChat) {
@@ -1138,16 +1179,56 @@ const ChatScreen = ({ route, navigation }) => {
     };
 
     const handleVote = useCallback(async (messageId, optionIndex) => {
+        if (!user?._id) return;
+
+        // Optimistic update
+        setMessages(prev => prev.map(m => {
+            if (m._id === messageId && m.pollData) {
+                const newPollData = JSON.parse(JSON.stringify(m.pollData));
+                const opt = newPollData.options[optionIndex];
+                const userId = user._id;
+
+                // Toggle vote logic
+                const alreadyVotedIndex = opt.votes.indexOf(userId);
+                if (alreadyVotedIndex > -1) {
+                    opt.votes.splice(alreadyVotedIndex, 1);
+                } else {
+                    // Logic for maxVotes
+                    const maxVotes = newPollData.maxVotes || 1;
+                    let userTotalVotes = 0;
+                    newPollData.options.forEach(o => {
+                        if (o.votes.includes(userId)) userTotalVotes++;
+                    });
+
+                    if (userTotalVotes >= maxVotes) {
+                        if (maxVotes === 1) {
+                            // Replace existing vote
+                            newPollData.options.forEach(o => {
+                                const vIdx = o.votes.indexOf(userId);
+                                if (vIdx > -1) o.votes.splice(vIdx, 1);
+                            });
+                        } else {
+                            return m; // Can't vote more
+                        }
+                    }
+                    opt.votes.push(userId);
+                }
+                return { ...m, pollData: newPollData };
+            }
+            return m;
+        }));
+
         try {
             const res = await groupChatAPI.votePoll(clubId, messageId, { optionIndex });
             if (res.success) {
-                // Socket handled, but local update for speed
+                // Sync with server truth
                 setMessages(prev => prev.map(m => m._id === messageId ? { ...m, pollData: res.pollData } : m));
             }
         } catch (err) {
             console.error('Vote error:', err);
+            fetchMessages(); // Rollback to server state
         }
-    }, [clubId]);
+    }, [clubId, user?._id]);
 
     const handleSpin = useCallback(async (messageId, items, reset = false) => {
         try {
@@ -1456,21 +1537,55 @@ const ChatScreen = ({ route, navigation }) => {
     };
 
     const toggleReaction = async (messageId, emoji) => {
+        // 1. Close UI immediately for best responsiveness
+        setShowOptionsId(null);
+
         try {
+            const myUserId = user._id?.toString();
+
+            // 2. Optimistic Update
+            setMessages(prev => prev.map(m => {
+                if (m._id === messageId) {
+                    const currentReactions = m.reactions || [];
+
+                    // Robust check for existing reaction using string comparison
+                    const myExistingReactionIndex = currentReactions.findIndex(r => {
+                        const rUserId = (r.userId?._id || r.userId)?.toString();
+                        return r.emoji === emoji && rUserId === myUserId;
+                    });
+
+                    let newReactions;
+                    if (myExistingReactionIndex > -1) {
+                        // Remove instantly
+                        newReactions = currentReactions.filter((_, i) => i !== myExistingReactionIndex);
+                    } else {
+                        // Add instantly
+                        newReactions = [...currentReactions, { emoji, userId: user._id }];
+                    }
+
+                    return { ...m, reactions: newReactions };
+                }
+                return m;
+            }));
+
+            // 3. API Call in background
             let res;
             if (isGroupChat) {
                 res = await groupChatAPI.addReaction(clubId, messageId, { emoji });
             } else {
                 res = await messagesAPI.addReaction(messageId, { emoji });
             }
+
+            // 4. Final Sync with server
             if (res.success) {
                 setMessages(prev => prev.map(m =>
                     m._id === messageId ? { ...m, reactions: res.data } : m
                 ));
-                setShowOptionsId(null);
             }
         } catch (error) {
-            console.log('Error reacting');
+            console.log('Error reacting:', error);
+            // On hard error, resync to be safe
+            fetchMessages();
         }
     };
 
@@ -1522,33 +1637,34 @@ const ChatScreen = ({ route, navigation }) => {
         setDeleteConfirmModalVisible(true);
     };
 
-    const confirmDeleteMessage = async () => {
-        const idsToDelete = isSelectionMode ? selectedMessages : [messageToDelete];
+    const confirmDeleteMessage = () => {
+        const idsToDelete = isSelectionMode ? [...selectedMessages] : [messageToDelete];
         if (idsToDelete.length === 0) return;
 
-        setDeleting(true);
-        try {
-            for (const id of idsToDelete) {
-                if (isGroupChat) {
-                    await groupChatAPI.deleteMessage(clubId, id, deleteType);
-                } else {
-                    await messagesAPI.deleteMessage(id, deleteType);
-                }
-            }
+        // 1. Optimistic UI Update - Remove instantly from background list
+        setMessages(prev => prev.filter(m => !idsToDelete.includes(m._id)));
+        setDeleting(true); // Show brief loading spinner in modal
 
-            setMessages(prev => prev.filter(m => !idsToDelete.includes(m._id)));
+        // 2. Clear selection state
+        setSelectedMessages([]);
+        setMessageToDelete(null);
+        setShowOptionsId(null);
 
-            setSelectedMessages([]);
-            setMessageToDelete(null);
-            setDeleteConfirmModalVisible(false);
-            setShowOptionsId(null);
-        } catch (error) {
-            console.error('Error deleting messages:', error);
-            alert('Failed to delete some messages');
-        } finally {
+        // 3. Initiate Background deletion (don't await)
+        idsToDelete.forEach(id => {
+            const deleteCall = isGroupChat
+                ? groupChatAPI.deleteMessage(clubId, id, deleteType)
+                : messagesAPI.deleteMessage(id, deleteType);
+
+            deleteCall.catch(err => console.error(`Background delete failed for ${id}:`, err));
+        });
+
+        // 4. Brief 500ms delay for visual feedback then close modal
+        // This makes the UI feel responsive yet professional
+        setTimeout(() => {
             setDeleting(false);
             setDeleteConfirmModalVisible(false);
-        }
+        }, 500);
     };
 
     const renderMessage = useCallback(({ item, index }) => {
@@ -1704,7 +1820,32 @@ const ChatScreen = ({ route, navigation }) => {
                                         )}
                                     </>
                                 )}
+                                onScroll={handleScroll}
+                                scrollEventThrottle={16}
+                                onContentSizeChange={() => {
+                                    if (isAtBottom && !isSelectionMode) {
+                                        // Use a small timeout to ensure the list has rendered the new content
+                                        setTimeout(() => {
+                                            flatListRef.current?.scrollToEnd({ animated: true });
+                                        }, 100);
+                                    }
+                                }}
                             />
+                        )}
+
+                        {/* Scroll to Bottom Button */}
+                        {showScrollToBottom && (
+                            <TouchableOpacity
+                                style={styles.scrollToBottomBtn}
+                                onPress={scrollToBottom}
+                            >
+                                <Ionicons name="chevron-down" size={24} color="#FFF" />
+                                {refreshUnreadMessageCount > 0 && (
+                                    <View style={styles.scrollBadge}>
+                                        <Text style={styles.scrollBadgeText}>{refreshUnreadMessageCount}</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
                         )}
                     </View>
 
@@ -2625,6 +2766,7 @@ const ChatScreen = ({ route, navigation }) => {
                 optionIndex={voterModal.optionIndex}
                 optionText={voterModal.optionText}
                 onClose={() => setVoterModal(prev => ({ ...prev, visible: false }))}
+                pollData={messages.find(m => m._id === voterModal.messageId)?.pollData}
             />
             <ViewedByModal
                 visible={showViewedByModal}
@@ -3602,6 +3744,42 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontWeight: '800',
         fontSize: 14,
+    },
+    scrollToBottomBtn: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#0A66C2',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        zIndex: 100,
+    },
+    scrollBadge: {
+        position: 'absolute',
+        top: -5,
+        right: -5,
+        backgroundColor: '#EF4444',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        paddingHorizontal: 5,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#FFF',
+    },
+    scrollBadgeText: {
+        color: '#FFF',
+        fontSize: 10,
+        fontWeight: '700',
     },
 });
 

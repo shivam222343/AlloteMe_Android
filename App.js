@@ -44,6 +44,8 @@ import TasksScreen from './src/screens/TasksScreen';
 import HelpCenterScreen from './src/screens/HelpCenterScreen';
 import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
 import AboutUsScreen from './src/screens/AboutUsScreen';
+import MaverickGamesScreen from './src/screens/MaverickGamesScreen';
+import SketchHeadsScreen from './src/screens/SketchHeadsScreen';
 
 const Stack = createStackNavigator();
 
@@ -173,6 +175,8 @@ const AppContent = () => {
               <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
               <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
               <Stack.Screen name="AboutUs" component={AboutUsScreen} />
+              <Stack.Screen name="MaverickGames" component={MaverickGamesScreen} />
+              <Stack.Screen name="SketchHeads" component={SketchHeadsScreen} />
             </>
           )}
         </Stack.Navigator>

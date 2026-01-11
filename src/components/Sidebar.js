@@ -30,6 +30,7 @@ const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => 
         { id: 'calendar', icon: 'calendar-outline', label: 'Calendar', route: 'Calendar' },
         { id: 'gallery', icon: 'images', label: 'Gallery', route: 'Gallery' },
         { id: 'messages', icon: 'chatbubbles', label: 'Messages', route: 'Messages' },
+        { id: 'games', icon: 'game-controller', label: 'Maverick Games', route: 'MaverickGames' },
         { id: 'analytics', icon: 'stats-chart', label: 'Analytics', route: 'Analytics' },
     ];
 
@@ -50,7 +51,9 @@ const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => 
         }
 
         // Only navigate to implemented screens
-        const implementedScreens = ['Dashboard', 'Profile', 'Admin', 'Login', 'Meetings', 'Members', 'Calendar', 'Settings', 'Messages', 'Chat', 'Camera', 'Gallery', 'Analytics', 'Tasks'];
+        const implementedScreens = ['Dashboard', 'Profile', 'Admin', 'Login', 'Meetings', 'Members', 'Calendar', 'Settings', 'Messages', 'Chat', 'Camera', 'Gallery', 'Analytics', 'Tasks', 'MaverickGames', 'SketchHeads'];
+
+        console.log('Navigating to:', route, 'Is implemented:', implementedScreens.includes(route));
 
         if (implementedScreens.includes(route)) {
             navigation.navigate(route);

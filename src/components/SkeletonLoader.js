@@ -89,13 +89,18 @@ export const SkeletonMeetingCard = () => (
     </SkeletonCard>
 );
 
-// Member Card Skeleton
+// Member Card Skeleton (List Style)
 export const SkeletonMemberCard = () => (
-    <View style={styles.memberCard}>
-        <SkeletonBox width={64} height={64} borderRadius={32} style={{ marginBottom: 12 }} />
-        <SkeletonBox width="80%" height={16} style={{ marginBottom: 6 }} />
-        <SkeletonBox width="60%" height={12} style={{ marginBottom: 8 }} />
-        <SkeletonBox width={80} height={24} borderRadius={12} />
+    <View style={styles.memberCardList}>
+        <SkeletonBox width={54} height={54} borderRadius={27} />
+        <View style={{ flex: 1, marginLeft: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <SkeletonBox width="45%" height={16} />
+                <SkeletonBox width="25%" height={12} />
+            </View>
+            <SkeletonBox width="75%" height={14} />
+        </View>
+        <SkeletonBox width={16} height={16} borderRadius={8} style={{ marginLeft: 8 }} />
     </View>
 );
 
@@ -234,6 +239,13 @@ export const SkeletonGroupChat = () => (
     </View>
 );
 
+// Banner Item Skeleton
+export const SkeletonBannerItem = ({ fullWidth = false }) => (
+    <View style={{ width: fullWidth ? '100%' : '48%', height: 80, borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+        <SkeletonBox width="100%" height="100%" borderRadius={12} />
+    </View>
+);
+
 const styles = StyleSheet.create({
     skeleton: {
         backgroundColor: '#E2E8F0',
@@ -258,15 +270,14 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
     },
-    memberCard: {
-        backgroundColor: '#F8FAFC',
-        borderRadius: 16,
-        padding: 16,
+    memberCardList: {
+        flexDirection: 'row',
         alignItems: 'center',
-        width: (width - 64) / 2,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
     },
     chatMessage: {
         flexDirection: 'row',
