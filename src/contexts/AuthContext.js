@@ -89,7 +89,14 @@ export const AuthProvider = ({ children }) => {
                     content: {
                         title: data.title,
                         body: data.message,
-                        data: { roomId: data.roomId, screen: 'SketchHeads' },
+                        data: {
+                            screen: 'MaverickGames',
+                            params: {
+                                autoOpenLobby: true,
+                                gameType: data.gameType || 'sketch_heads',
+                                roomId: data.roomId
+                            }
+                        },
                     },
                     trigger: null,
                 });

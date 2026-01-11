@@ -36,7 +36,7 @@ const GAMES = [
     }
 ];
 
-const MaverickGamesScreen = ({ navigation }) => {
+const MaverickGamesScreen = ({ navigation, route }) => {
     const { user, socket, selectedClubId } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeRooms, setActiveRooms] = useState([]);
@@ -98,6 +98,20 @@ const MaverickGamesScreen = ({ navigation }) => {
             fetchRooms();
         }
     }, [showLobbyModal, selectedGame, fetchRooms]);
+
+    // Handle deep linking / notification navigation
+    useEffect(() => {
+        if (route?.params?.autoOpenLobby) {
+            const gameType = route.params.gameType || 'sketch_heads';
+            const game = GAMES.find(g => g.id === gameType);
+            if (game) {
+                setSelectedGame(game);
+                setShowLobbyModal(true);
+                // Clear params after handling
+                navigation.setParams({ autoOpenLobby: undefined, gameType: undefined });
+            }
+        }
+    }, [route?.params]);
 
     useEffect(() => {
         if (socket) {

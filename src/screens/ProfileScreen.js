@@ -113,6 +113,10 @@ const ProfileScreen = ({ navigation, route }) => {
             setShowEditModal(true);
             navigation.setParams({ editProfile: undefined });
         }
+        if (route?.params?.openAvatarModal) {
+            setShowAvatarModal(true);
+            navigation.setParams({ openAvatarModal: undefined });
+        }
     }, [route?.params]);
 
     // Stable styles for Trending mode to ensure fast loading and no errors

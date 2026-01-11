@@ -735,7 +735,7 @@ const DashboardScreen = ({ navigation }) => {
                                     style={styles.promptButtonPrimary}
                                     onPress={() => {
                                         setProfilePromptVisible(false);
-                                        navigation.navigate('Profile', { editProfile: true });
+                                        navigation.navigate('Profile', { openAvatarModal: true });
                                     }}
                                 >
                                     <Text style={styles.promptButtonTextPrimary}>Customize</Text>
