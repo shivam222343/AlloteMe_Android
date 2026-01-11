@@ -29,7 +29,7 @@ const GAMES = [
         id: 'sketch_heads',
         name: 'Sketch Heads',
         description: 'Co-op drawing and guessing chaos!',
-        image: require('../../assets/games/sketch_heads_corrupt.png'),
+        image: require('../../assets/games/sketch_heads.png'),
         players: '2-8 Players',
         tag: 'Social',
         color: '#FFD700'
