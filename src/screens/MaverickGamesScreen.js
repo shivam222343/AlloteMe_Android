@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import MainLayout from '../components/MainLayout';
+import * as Animatable from 'react-native-animatable';
 
 import { SkeletonBox } from '../components/SkeletonLoader';
 
@@ -388,11 +389,16 @@ const MaverickGamesScreen = ({ navigation, route }) => {
             <Modal
                 visible={showInfoModal}
                 transparent={true}
-                animationType="slide"
+                animationType="fade"
                 onRequestClose={() => setShowInfoModal(false)}
             >
                 <View style={styles.infoModalOverlay}>
-                    <View style={styles.infoModalContent}>
+                    <Animatable.View
+                        animation="slideInUp"
+                        duration={400}
+                        useNativeDriver
+                        style={styles.infoModalContent}
+                    >
                         <View style={styles.infoModalHeader}>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.infoModalTitle}>{info.title}</Text>
@@ -454,7 +460,7 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                         >
                             <Text style={styles.gotItText}>Got it!</Text>
                         </TouchableOpacity>
-                    </View>
+                    </Animatable.View>
                 </View>
             </Modal>
         );
@@ -622,7 +628,12 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                             activeOpacity={1}
                             onPress={() => setShowLobbyModal(false)}
                         />
-                        <View style={styles.modalContent}>
+                        <Animatable.View
+                            animation="slideInUp"
+                            duration={400}
+                            useNativeDriver
+                            style={styles.modalContent}
+                        >
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>{selectedGame?.name}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -705,7 +716,7 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </View>
-                        </View>
+                        </Animatable.View>
                     </View>
                 </Modal>
                 {renderInstructionModal()}
