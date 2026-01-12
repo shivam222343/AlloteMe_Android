@@ -55,6 +55,56 @@ const GAMES = [
     }
 ];
 
+const GAME_INSTRUCTIONS = {
+    sketch_heads: {
+        title: 'Sketch Heads',
+        goal: 'Draw the prompt or guess what others are drawing!',
+        rules: [
+            'One player is chosen as the "Artist" for the round.',
+            'The Artist chooses a word and draws it on the canvas.',
+            'Other players type their guesses in the chat box.',
+            'Points are awarded for correct guesses and for the artist when people guess right.',
+            'Fastest guesser gets the most points!'
+        ],
+        components: [
+            { icon: 'brush', text: 'Drawing Tools: Access brush, colors, and clear canvas.', color: '#3B82F6' },
+            { icon: 'chatbox', text: 'Chat: Submit your guesses and talk to friends.', color: '#10B981' },
+            { icon: 'time', text: 'Timer: Watch the clock to ensure you guess in time.', color: '#EF4444' }
+        ]
+    },
+    code_breaker: {
+        title: 'Code Breaker',
+        goal: 'Logically crack the secret code set by the Maker!',
+        rules: [
+            'The Code Maker sets a secret sequence of items (numbers, colors, or symbols).',
+            'Breakers take turns trying to guess the correct sequence.',
+            'Clue dots help you solve the code logically over multiple attempts.',
+            'Crack it within the limited attempts to earn your points!'
+        ],
+        legend: [
+            { color: '#10B981', label: 'Green', text: 'Correct item in the correct slot.' },
+            { color: '#F59E0B', label: 'Orange', text: 'Correct item but in the wrong slot.' },
+            { color: '#6B7280', label: 'Gray', text: 'Item is not in the code at all.' }
+        ]
+    },
+    meme_match: {
+        title: 'Meme Match',
+        goal: 'Create the funniest caption for given situations!',
+        rules: [
+            'A random Situation card is shown to all players.',
+            'Everyone submits a text caption to make it as funny as possible.',
+            'Review all submissions anonymously and vote for your favorite!',
+            'The caption with the most votes wins the round.',
+            'Remember: You cannot vote for yourself!'
+        ],
+        components: [
+            { icon: 'create', text: 'Submission: Type and send your funniest punchline.', color: '#EC4899' },
+            { icon: 'checkmark-circle', text: 'Voting: Pick the best submission anonymously.', color: '#8B5CF6' },
+            { icon: 'trophy', text: 'Points: Win by making the most people laugh.', color: '#F59E0B' }
+        ]
+    }
+};
+
 const MaverickGamesScreen = ({ navigation, route }) => {
     const { user, socket, selectedClubId } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
@@ -67,13 +117,20 @@ const MaverickGamesScreen = ({ navigation, route }) => {
     const [updatingPoster, setUpdatingPoster] = useState(false);
     const [bannerUrl, setBannerUrl] = useState(null);
     const [updatingBanner, setUpdatingBanner] = useState(false);
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [infoGame, setInfoGame] = useState(null);
 
     const selectedGameRef = React.useRef(null);
+    const selectedClubIdRef = React.useRef(selectedClubId);
 
     // Sync ref with state
     useEffect(() => {
         selectedGameRef.current = selectedGame;
     }, [selectedGame]);
+
+    useEffect(() => {
+        selectedClubIdRef.current = selectedClubId;
+    }, [selectedClubId]);
 
     const loadGameConfigs = useCallback(async () => {
         try {
@@ -110,14 +167,13 @@ const MaverickGamesScreen = ({ navigation, route }) => {
     }, [loadGameConfigs]);
 
     const fetchRooms = useCallback(() => {
-        if (!socket || !selectedClubId || !selectedGame) return;
+        if (!socket || !selectedGame) return;
 
         setLoadingRooms(true);
         socket.emit('games:get_rooms', {
-            clubId: selectedClubId,
             gameType: selectedGame.id
         });
-    }, [socket, selectedClubId, selectedGame]);
+    }, [socket, selectedGame]);
 
     // Auto-fetch rooms when modal remains open
     useEffect(() => {
@@ -151,15 +207,14 @@ const MaverickGamesScreen = ({ navigation, route }) => {
 
             socket.on('games:rooms_list', (data) => {
                 const currentType = selectedGameRef.current?.id;
-                const rooms = Array.isArray(data) ? data : data.rooms;
+                const currentClubId = selectedClubIdRef.current;
+                const rooms = Array.isArray(data) ? data : (data.rooms || []);
                 const gameType = Array.isArray(data) ? null : data.gameType;
                 const incomingClubId = Array.isArray(data) ? null : data.clubId;
 
-                // Only update if it matches current selected game AND current selected club
                 const typeMatch = !gameType || gameType === currentType;
-                const clubMatch = !incomingClubId || incomingClubId === selectedClubId;
 
-                if (typeMatch && clubMatch) {
+                if (typeMatch) {
                     setActiveRooms(rooms);
                     setLoadingRooms(false);
                 }
@@ -193,9 +248,8 @@ const MaverickGamesScreen = ({ navigation, route }) => {
         setSelectedGame(game);
         setShowLobbyModal(true);
         // Trigger room fetch
-        if (socket && selectedClubId) {
+        if (socket) {
             socket.emit('games:get_rooms', {
-                clubId: selectedClubId,
                 gameType: game.id
             });
         }
@@ -324,7 +378,94 @@ const MaverickGamesScreen = ({ navigation, route }) => {
         }
     };
 
-    const GameCard = React.memo(({ item, index, handleSelectGame, handleUpdatePoster, user, updatingPoster }) => {
+
+
+    const renderInstructionModal = () => {
+        const info = infoGame ? GAME_INSTRUCTIONS[infoGame.id] : null;
+        if (!info) return null;
+
+        return (
+            <Modal
+                visible={showInfoModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowInfoModal(false)}
+            >
+                <View style={styles.infoModalOverlay}>
+                    <View style={styles.infoModalContent}>
+                        <View style={styles.infoModalHeader}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.infoModalTitle}>{info.title}</Text>
+                                <Text style={styles.infoModalGoal}>{info.goal}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowInfoModal(false)}>
+                                <Ionicons name="close-circle" size={32} color="#71717A" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.infoScroll} showsVerticalScrollIndicator={false}>
+                            <Text style={styles.infoSectionTitle}>How to Play</Text>
+                            {info.rules.map((rule, idx) => (
+                                <View key={idx} style={styles.ruleItem}>
+                                    <View style={[styles.ruleNumber, { backgroundColor: infoGame.color || '#0A66C2' }]}>
+                                        <Text style={styles.ruleNumberText}>{idx + 1}</Text>
+                                    </View>
+                                    <Text style={styles.ruleText}>{rule}</Text>
+                                </View>
+                            ))}
+
+                            {info.components && (
+                                <>
+                                    <Text style={styles.infoSectionTitle}>Game Elements</Text>
+                                    {info.components.map((comp, idx) => (
+                                        <View key={idx} style={styles.componentItem}>
+                                            <View style={[styles.componentIcon, { backgroundColor: comp.color + '20' }]}>
+                                                <Ionicons name={comp.icon} size={20} color={comp.color} />
+                                            </View>
+                                            <Text style={styles.componentText}>{comp.text}</Text>
+                                        </View>
+                                    ))}
+                                </>
+                            )}
+
+                            {info.legend && (
+                                <>
+                                    <Text style={styles.infoSectionTitle}>Clue Legend</Text>
+                                    <View style={styles.legendContainer}>
+                                        {info.legend.map((item, idx) => (
+                                            <View key={idx} style={styles.legendItem}>
+                                                <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                                                <View>
+                                                    <Text style={styles.legendLabel}>{item.label}</Text>
+                                                    <Text style={styles.legendText}>{item.text}</Text>
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </>
+                            )}
+
+                            <View style={{ height: 20 }} />
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={[styles.gotItBtn, { backgroundColor: infoGame.color || '#0A66C2' }]}
+                            onPress={() => setShowInfoModal(false)}
+                        >
+                            <Text style={styles.gotItText}>Got it!</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        );
+    };
+
+    const handleShowInfo = (game) => {
+        setInfoGame(game);
+        setShowInfoModal(true);
+    };
+
+    const GameCard = React.memo(({ item, index, handleSelectGame, handleUpdatePoster, user, updatingPoster, handleShowInfo }) => {
         const [imageLoading, setImageLoading] = useState(true);
         const [imageError, setImageError] = useState(false);
 
@@ -362,9 +503,17 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                         style={styles.cardOverlay}
                     >
                         <View style={styles.cardContent}>
-                            <View style={styles.playerInfo}>
-                                <Ionicons name="people" size={12} color="#FFF" />
-                                <Text style={styles.playersText}>{item.players}</Text>
+                            <View style={styles.cardBottomRow}>
+                                <View style={styles.playerInfo}>
+                                    <Ionicons name="people" size={12} color="#FFF" />
+                                    <Text style={styles.playersText}>{item.players}</Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={styles.infoIconBtn}
+                                    onPress={() => handleShowInfo(item)}
+                                >
+                                    <Ionicons name="information-circle-outline" size={20} color="#FFF" />
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </LinearGradient>
@@ -386,6 +535,7 @@ const MaverickGamesScreen = ({ navigation, route }) => {
             handleUpdatePoster={handleUpdatePoster}
             user={user}
             updatingPoster={updatingPoster}
+            handleShowInfo={handleShowInfo}
         />
     );
 
@@ -476,6 +626,9 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>{selectedGame?.name}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                    <TouchableOpacity onPress={() => handleShowInfo(selectedGame)}>
+                                        <Ionicons name="information-circle-outline" size={22} color="#0A66C2" />
+                                    </TouchableOpacity>
                                     <TouchableOpacity onPress={fetchRooms}>
                                         <Ionicons name="refresh" size={22} color="#0A66C2" />
                                     </TouchableOpacity>
@@ -555,12 +708,143 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                         </View>
                     </View>
                 </Modal>
+                {renderInstructionModal()}
             </View>
         </MainLayout>
     );
 };
 
 const styles = StyleSheet.create({
+    cardBottomRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+    },
+    infoIconBtn: {
+        padding: 4,
+    },
+    infoModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'flex-end',
+    },
+    infoModalContent: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        padding: 24,
+        maxHeight: '85%',
+    },
+    infoModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 8,
+    },
+    infoModalTitle: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#1F2937',
+    },
+    infoModalGoal: {
+        fontSize: 16,
+        color: '#6B7280',
+        marginTop: 4,
+    },
+    infoScroll: {
+        flex: 1,
+    },
+    infoSectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#374151',
+        marginTop: 24,
+        marginBottom: 16,
+    },
+    ruleItem: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+        gap: 12,
+    },
+    ruleNumber: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+    },
+    ruleNumberText: {
+        color: '#FFF',
+        fontWeight: '700',
+        fontSize: 12,
+    },
+    ruleText: {
+        flex: 1,
+        fontSize: 15,
+        color: '#4B5563',
+        lineHeight: 22,
+    },
+    componentItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 12,
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 16,
+    },
+    componentIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    componentText: {
+        flex: 1,
+        fontSize: 14,
+        color: '#4B5563',
+        fontWeight: '500',
+    },
+    legendContainer: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 20,
+        padding: 16,
+    },
+    legendItem: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
+    legendDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        marginTop: 4,
+    },
+    legendLabel: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    legendText: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    gotItBtn: {
+        marginTop: 12,
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+    },
+    gotItText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '700',
+    },
     container: {
         flex: 1,
         backgroundColor: '#F9FAFB',

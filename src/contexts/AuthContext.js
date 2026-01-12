@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../services/api';
@@ -85,6 +86,10 @@ export const AuthProvider = ({ children }) => {
             });
 
             newSocket.on('notification:game_hosted', (data) => {
+                if (Platform.OS === 'web') {
+                    console.log('Game hosted notification (suppressed on web):', data);
+                    return;
+                }
                 Notifications.scheduleNotificationAsync({
                     content: {
                         title: data.title,

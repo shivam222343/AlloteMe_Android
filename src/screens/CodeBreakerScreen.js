@@ -106,7 +106,7 @@ const CodeBreakerScreen = ({ navigation, route }) => {
                 console.log('Game updated:', room);
                 setGameState(room);
                 setPlayers(room.players || []);
-                if (room.status === 'playing') {
+                if (room.status === 'playing' || room.state?.phase) {
                     setGameStarted(true);
                     if (room.state) {
                         const isMaker = room.state.currentCodeMaker === user._id;
@@ -118,11 +118,17 @@ const CodeBreakerScreen = ({ navigation, route }) => {
                             setShowSettings(false);
                         } else if (room.state.phase === 'picking') {
                             setRoundInProgress(false);
-                            setShowPickCode(!isMaker); // Wait, others show waiting, maker shows pick code
-                            // Actually if I'm NOT maker and it's picking, I see waiting screen
-                            // If I AM maker and it's picking, I should see pick code
+                            // If I am maker, show picking screen. If not, show waiting screen.
                             setShowPickCode(isMaker);
                             setShowSettings(false);
+
+                            // Initialize code options if I'm the maker
+                            if (isMaker && room.state.codeType) {
+                                setCodeOptions(CODE_TYPES[room.state.codeType]?.options || []);
+                                setCodeLength(room.state.codeLength || 4);
+                                // Initialize pickedCode array if it's empty or wrong length
+                                setPickedCode(prev => (prev.length === room.state.codeLength) ? prev : Array(room.state.codeLength || 4).fill(null));
+                            }
                         }
 
                         if (room.state.attempts) setAttempts(room.state.attempts);
@@ -405,7 +411,7 @@ const CodeBreakerScreen = ({ navigation, route }) => {
                 </View>
 
                 <View style={styles.optionsGrid}>
-                    {codeOptions.map((opt, idx) => (
+                    {(codeOptions && codeOptions.length > 0 ? codeOptions : CODE_TYPES[selectedCodeType]?.options || []).map((opt, idx) => (
                         <TouchableOpacity
                             key={idx}
                             style={styles.optionBtn}
@@ -493,7 +499,7 @@ const CodeBreakerScreen = ({ navigation, route }) => {
         );
     }
 
-    if (gameState.status === 'waiting' || gameState.status === 'lobby') {
+    if ((gameState.status === 'waiting' || gameState.status === 'lobby') && !gameState.state?.phase) {
         return (
             <View style={styles.container}>
                 <LinearGradient colors={['#8B5CF6', '#7C3AED']} style={styles.header}>
@@ -533,7 +539,7 @@ const CodeBreakerScreen = ({ navigation, route }) => {
             </LinearGradient>
 
             <ScrollView style={styles.content}>
-                {isCodeMaker ? (
+                {isCodeMaker && !showPickCode ? (
                     <View style={styles.codeMakerView}>
                         <Ionicons name="lock-closed" size={64} color="#8B5CF6" />
                         <Text style={styles.codeMakerTitle}>You're the Code Maker!</Text>
