@@ -23,15 +23,13 @@ export const registerForPushNotificationsAsync = async (userId) => {
     try {
         if (Platform.OS === 'web') return null;
 
-        // Check for Expo Go
+        // Check for Expo Go (warn but don't block)
         if (isExpoGo) {
             console.warn(
-                '📢 Notifications: Remote push notifications are NOT supported in Expo Go for SDK 54.\n' +
-                'Please use a Development Build (npx expo run:android) to test actual push delivery.'
+                '📢 Notifications: You are running in Expo Go.\n' +
+                'Push notifications may not work properly. Use a Development Build or Production APK for full FCM support.'
             );
-            // We can still try to get a token, but it will likely fail or return a dummy one
-            // In SDK 54, getDevicePushTokenAsync will definitely throw/fail in Expo Go
-            return null;
+            // Continue anyway - let the actual token fetch determine if it works
         }
 
         // Check if running on physical device
@@ -55,13 +53,27 @@ export const registerForPushNotificationsAsync = async (userId) => {
         }
 
         // Get Native Device push token (FCM)
-        const tokenData = await Notifications.getDevicePushTokenAsync();
-        const token = tokenData.data;
-        console.log('Expo Push Token:', token);
+        let token = null;
+        try {
+            const tokenData = await Notifications.getDevicePushTokenAsync();
+            token = tokenData.data;
+            console.log('✅ FCM Push Token obtained:', token);
+        } catch (tokenError) {
+            console.error('❌ Failed to get FCM token:', tokenError.message);
+            if (isExpoGo) {
+                console.warn('This is expected in Expo Go. Build a development build or APK to get a real FCM token.');
+            }
+            // Don't return null yet - we can still set up notification categories
+        }
 
-        // Update token in backend
+        // Update token in backend if we got one
         if (userId && token) {
-            await authAPI.updateFCMToken(token);
+            try {
+                await authAPI.updateFCMToken(token);
+                console.log('✅ FCM token updated in backend');
+            } catch (backendError) {
+                console.error('❌ Failed to update FCM token in backend:', backendError.message);
+            }
         }
 
         // Setup notification categories
@@ -79,7 +91,7 @@ export const registerForPushNotificationsAsync = async (userId) => {
 
         return token;
     } catch (error) {
-        console.error('Error registering for push notifications:', error);
+        console.error('❌ Error in registerForPushNotificationsAsync:', error);
         return null;
     }
 };
