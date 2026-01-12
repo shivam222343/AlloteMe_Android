@@ -189,6 +189,32 @@ const MeetingsScreen = ({ navigation }) => {
         }
     };
 
+    const handleDeleteMeeting = (meetingId) => {
+        Alert.alert(
+            'Delete Meeting',
+            'Are you sure you want to delete this meeting? This action cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const res = await meetingsAPI.delete(meetingId);
+                            if (res.success) {
+                                setStatusModal({ visible: true, title: 'Deleted', message: 'Meeting deleted successfully', type: 'success' });
+                                loadMeetings(selectedClub._id);
+                                setManageModalVisible(false);
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', error.message || 'Failed to delete meeting');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleClubSwipe = (direction) => {
         if (!myClubs || myClubs.length <= 1) return;
         const currentIndex = myClubs.findIndex(c => (c._id?.toString() || c._id) === (selectedClub?._id?.toString() || selectedClub?._id));
@@ -277,6 +303,7 @@ const MeetingsScreen = ({ navigation }) => {
         socket.on('meeting_created', handleRealTimeUpdate);
         socket.on('meeting_updated', handleRealTimeUpdate);
         socket.on('meeting_status_updated', handleRealTimeUpdate);
+        socket.on('meeting_deleted', handleRealTimeUpdate);
         socket.on('attendance_marked', (data) => {
             // 1. Update managingMeeting state if it is currently open
             if (managingMeeting && managingMeeting._id === data.meetingId) {
@@ -348,6 +375,7 @@ const MeetingsScreen = ({ navigation }) => {
             socket.off('meeting_created');
             socket.off('meeting_updated');
             socket.off('meeting_status_updated');
+            socket.off('meeting_deleted');
             socket.off('attendance_marked');
             socket.off('attendance_started');
             socket.off('attendance_updated_manual');
@@ -472,8 +500,15 @@ const MeetingsScreen = ({ navigation }) => {
                                                         <Text style={styles.cardTitle}>{meeting.name}</Text>
                                                         <Text style={styles.cardDate}>{new Date(meeting.date).toDateString()} | {meeting.time}</Text>
                                                     </View>
-                                                    <View style={[styles.badge, { backgroundColor: status.bg }]}>
-                                                        <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                        <View style={[styles.badge, { backgroundColor: status.bg }]}>
+                                                            <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+                                                        </View>
+                                                        {isAdmin() && (
+                                                            <TouchableOpacity onPress={() => handleDeleteMeeting(meeting._id)}>
+                                                                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                                                            </TouchableOpacity>
+                                                        )}
                                                     </View>
                                                 </View>
 

@@ -404,4 +404,13 @@ export const mediaAPI = {
     })
 };
 
+// Live Notes API
+export const notesAPI = {
+    getAll: (clubId) => api.get('/notes', { params: { clubId } }),
+    getById: (id) => api.get(`/notes/${id}`),
+    create: (data) => api.post('/notes', data),
+    update: (id, data) => api.put(`/notes/${id}`, data),
+    delete: (id) => api.delete(`/notes/${id}`),
+};
+
 export default api;

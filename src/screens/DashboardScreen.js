@@ -784,6 +784,22 @@ const DashboardScreen = ({ navigation }) => {
                     </View>
                 </Modal>
             </ScrollView>
+
+            {/* Floating Notes Button */}
+            <TouchableOpacity
+                style={styles.floatingNotesBtn}
+                onPress={() => navigation.navigate('LiveNotes')}
+                activeOpacity={0.8}
+            >
+                <LinearGradient
+                    colors={['#0A66C2', '#0E76A8']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.floatingNotesBtnGradient}
+                >
+                    <Ionicons name="document-text-outline" size={24} color="#FFFFFF" />
+                </LinearGradient>
+            </TouchableOpacity>
         </MainLayout >
     );
 };
@@ -1225,6 +1241,25 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         transform: [{ skewX: '-20deg' }],
+    },
+    floatingNotesBtn: {
+        position: 'absolute',
+        bottom: 100,
+        right: 24,
+        borderRadius: 28,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+        zIndex: 999,
+    },
+    floatingNotesBtnGradient: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 

@@ -24,7 +24,7 @@ const BottomBar = ({ navigation, currentRoute, onScanPress }) => {
         { route: 'Meetings', icon: 'calendar', iconOutline: 'calendar-outline' },
         { route: 'Scan', isSpecial: true },
         { route: 'Analytics', icon: 'stats-chart', iconOutline: 'stats-chart-outline' },
-        { route: 'Profile', icon: 'person', iconOutline: 'person-outline' },
+        { route: 'MaverickGames', icon: 'game-controller', iconOutline: 'game-controller-outline' },
     ];
 
     const handlePress = (item) => {

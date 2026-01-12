@@ -88,12 +88,11 @@ const SketchHeadsScreen = ({ navigation, route }) => {
 
     useEffect(() => {
         if (socket) {
-            // Join Room if not host
-            if (!isHost && roomId) {
+            if (roomId) {
                 socket.emit('games:join', {
                     roomId,
                     userId: user._id,
-                    userName: user.displayName
+                    userName: user.displayName || user.fullName || 'Anonymous'
                 });
             }
 
@@ -372,15 +371,15 @@ const SketchHeadsScreen = ({ navigation, route }) => {
                         <ScrollView contentContainerStyle={styles.playersContainer}>
                             {gameState.players.map((p, idx) => (
                                 <Animatable.View
-                                    key={p.userId}
+                                    key={p.userId || idx}
                                     animation="bounceIn"
                                     delay={idx * 100}
                                     style={styles.playerItem}
                                 >
                                     <View style={styles.playerAvatar}>
-                                        <Text style={styles.avatarText}>{p.userName[0]}</Text>
+                                        <Text style={styles.avatarText}>{(p.userName || 'A')[0]}</Text>
                                     </View>
-                                    <Text style={styles.playerName}>{p.userName} {p.userId === user._id && '(You)'}</Text>
+                                    <Text style={styles.playerName}>{p.userName || 'Anonymous'} {p.userId === user._id && '(You)'}</Text>
                                     {p.userId === gameState.hostId && (
                                         <Ionicons name="star" size={16} color="#EAB308" />
                                     )}

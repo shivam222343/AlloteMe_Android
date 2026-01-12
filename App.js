@@ -46,6 +46,9 @@ import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
 import AboutUsScreen from './src/screens/AboutUsScreen';
 import MaverickGamesScreen from './src/screens/MaverickGamesScreen';
 import SketchHeadsScreen from './src/screens/SketchHeadsScreen';
+import CodeBreakerScreen from './src/screens/CodeBreakerScreen';
+import MemeMatchScreen from './src/screens/MemeMatchScreen';
+import LiveNotesScreen from './src/screens/LiveNotesScreen';
 
 const Stack = createStackNavigator();
 
@@ -177,6 +180,9 @@ const AppContent = () => {
               <Stack.Screen name="AboutUs" component={AboutUsScreen} />
               <Stack.Screen name="MaverickGames" component={MaverickGamesScreen} />
               <Stack.Screen name="SketchHeads" component={SketchHeadsScreen} />
+              <Stack.Screen name="CodeBreaker" component={CodeBreakerScreen} />
+              <Stack.Screen name="MemeMatch" component={MemeMatchScreen} />
+              <Stack.Screen name="LiveNotes" component={LiveNotesScreen} />
             </>
           )}
         </Stack.Navigator>

@@ -10,6 +10,7 @@ import {
     TextInput,
     Platform,
     Image,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,172 +80,181 @@ const SignupScreen = ({ navigation }) => {
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-            <LinearGradient
-                colors={['#0A66C2', '#0E76A8']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.header}
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.container}
+        >
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.contentContainer}
+                keyboardShouldPersistTaps="handled"
             >
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-                <Image
-                    source={require('../../assets/AS.png')}
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                />
-                <Text style={styles.tagline}>Join the Community</Text>
-            </LinearGradient>
-
-            <View style={styles.formContainer}>
-                <Text style={styles.title}>Create Account</Text>
-                <Text style={styles.subtitle}>Sign up to get started</Text>
-
-                {error ? (
-                    <View style={styles.errorContainer}>
-                        <Ionicons name="alert-circle" size={20} color="#EF4444" />
-                        <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                ) : null}
-
-                {/* Name Input */}
-                <View style={styles.fieldContainer}>
-                    <Text style={styles.label}>Full Name</Text>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                        <TextInput
-                            placeholder="Enter your name"
-                            value={formData.displayName}
-                            onChangeText={(value) => handleInputChange('displayName', value)}
-                            style={styles.input}
-                            autoCapitalize="words"
-                            autoCorrect={false}
-                            placeholderTextColor="#9CA3AF"
-                        />
-                    </View>
-                </View>
-
-                {/* Email Input */}
-                <View style={styles.fieldContainer}>
-                    <Text style={styles.label}>Email Address</Text>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                        <TextInput
-                            placeholder="Enter your email"
-                            value={formData.email}
-                            onChangeText={(value) => handleInputChange('email', value)}
-                            style={styles.input}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            placeholderTextColor="#9CA3AF"
-                        />
-                    </View>
-                </View>
-
-                {/* Password Input */}
-                <View style={styles.fieldContainer}>
-                    <Text style={styles.label}>Password</Text>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                        <TextInput
-                            placeholder="Create a password"
-                            value={formData.password}
-                            onChangeText={(value) => handleInputChange('password', value)}
-                            secureTextEntry={!showPassword}
-                            style={styles.input}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            placeholderTextColor="#9CA3AF"
-                        />
-                        <TouchableOpacity
-                            onPress={() => setShowPassword(!showPassword)}
-                            style={styles.eyeIcon}
-                        >
-                            <Ionicons
-                                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                                size={20}
-                                color="#6B7280"
-                            />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Confirm Password Input */}
-                <View style={styles.fieldContainer}>
-                    <Text style={styles.label}>Confirm Password</Text>
-                    <View style={styles.inputContainer}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-                        <TextInput
-                            placeholder="Confirm your password"
-                            value={formData.confirmPassword}
-                            onChangeText={(value) => handleInputChange('confirmPassword', value)}
-                            secureTextEntry={!showConfirmPassword}
-                            style={styles.input}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            placeholderTextColor="#9CA3AF"
-                        />
-                        <TouchableOpacity
-                            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                            style={styles.eyeIcon}
-                        >
-                            <Ionicons
-                                name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                                size={20}
-                                color="#6B7280"
-                            />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Signup Button */}
-                <TouchableOpacity
-                    onPress={handleSignup}
-                    disabled={loading}
-                    style={styles.signupButtonContainer}
+                <LinearGradient
+                    colors={['#0A66C2', '#0E76A8']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.header}
                 >
-                    <LinearGradient
-                        colors={['#0A66C2', '#0E76A8']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.signupButton}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.signupButtonText}>Sign Up</Text>
-                        )}
-                    </LinearGradient>
-                </TouchableOpacity>
-
-                {/* Divider */}
-                <View style={styles.divider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>OR</Text>
-                    <View style={styles.dividerLine} />
-                </View>
-
-                {/* Google Sign Up Button (Visual only) */}
-                <TouchableOpacity
-                    style={[styles.googleButton, { opacity: 0.7 }]}
-                    onPress={() => alert('Google Sign Up coming soon to backend!')}
-                    disabled={loading}
-                >
-                    <Ionicons name="logo-google" size={20} color="#DB4437" />
-                    <Text style={styles.googleButtonText}>Continue with Google</Text>
-                </TouchableOpacity>
-
-                {/* Login Link */}
-                <View style={styles.loginContainer}>
-                    <Text style={styles.loginText}>Already have an account? </Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                        <Text style={styles.loginLink}>Sign In</Text>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
+                    <Image
+                        source={require('../../assets/AS.png')}
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                    />
+                    <Text style={styles.tagline}>Join the Community</Text>
+                </LinearGradient>
+
+                <View style={styles.formContainer}>
+                    <Text style={styles.title}>Create Account</Text>
+                    <Text style={styles.subtitle}>Sign up to get started</Text>
+
+                    {error ? (
+                        <View style={styles.errorContainer}>
+                            <Ionicons name="alert-circle" size={20} color="#EF4444" />
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                    ) : null}
+
+                    {/* Name Input */}
+                    <View style={styles.fieldContainer}>
+                        <Text style={styles.label}>Full Name</Text>
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="person-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                            <TextInput
+                                placeholder="Enter your name"
+                                value={formData.displayName}
+                                onChangeText={(value) => handleInputChange('displayName', value)}
+                                style={styles.input}
+                                autoCapitalize="words"
+                                autoCorrect={false}
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+                    </View>
+
+                    {/* Email Input */}
+                    <View style={styles.fieldContainer}>
+                        <Text style={styles.label}>Email Address</Text>
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="mail-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                            <TextInput
+                                placeholder="Enter your email"
+                                value={formData.email}
+                                onChangeText={(value) => handleInputChange('email', value)}
+                                style={styles.input}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                placeholderTextColor="#9CA3AF"
+                            />
+                        </View>
+                    </View>
+
+                    {/* Password Input */}
+                    <View style={styles.fieldContainer}>
+                        <Text style={styles.label}>Password</Text>
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                            <TextInput
+                                placeholder="Create a password"
+                                value={formData.password}
+                                onChangeText={(value) => handleInputChange('password', value)}
+                                secureTextEntry={!showPassword}
+                                style={styles.input}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                placeholderTextColor="#9CA3AF"
+                            />
+                            <TouchableOpacity
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons
+                                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                    size={20}
+                                    color="#6B7280"
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Confirm Password Input */}
+                    <View style={styles.fieldContainer}>
+                        <Text style={styles.label}>Confirm Password</Text>
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="lock-closed-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+                            <TextInput
+                                placeholder="Confirm your password"
+                                value={formData.confirmPassword}
+                                onChangeText={(value) => handleInputChange('confirmPassword', value)}
+                                secureTextEntry={!showConfirmPassword}
+                                style={styles.input}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                placeholderTextColor="#9CA3AF"
+                            />
+                            <TouchableOpacity
+                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                style={styles.eyeIcon}
+                            >
+                                <Ionicons
+                                    name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                                    size={20}
+                                    color="#6B7280"
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Signup Button */}
+                    <TouchableOpacity
+                        onPress={handleSignup}
+                        disabled={loading}
+                        style={styles.signupButtonContainer}
+                    >
+                        <LinearGradient
+                            colors={['#0A66C2', '#0E76A8']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.signupButton}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.signupButtonText}>Sign Up</Text>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    {/* Divider */}
+                    <View style={styles.divider}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.dividerText}>OR</Text>
+                        <View style={styles.dividerLine} />
+                    </View>
+
+                    {/* Google Sign Up Button (Visual only) */}
+                    <TouchableOpacity
+                        style={[styles.googleButton, { opacity: 0.7 }]}
+                        onPress={() => alert('Google Sign Up coming soon to backend!')}
+                        disabled={loading}
+                    >
+                        <Ionicons name="logo-google" size={20} color="#DB4437" />
+                        <Text style={styles.googleButtonText}>Continue with Google</Text>
+                    </TouchableOpacity>
+
+                    {/* Login Link */}
+                    <View style={styles.loginContainer}>
+                        <Text style={styles.loginText}>Already have an account? </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                            <Text style={styles.loginLink}>Sign In</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -281,14 +291,13 @@ const styles = StyleSheet.create({
         color: '#D1E5FF',
     },
     formContainer: {
-        flex: 1,
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
         marginTop: -20,
         paddingHorizontal: 24,
         paddingTop: 32,
-        paddingBottom: 24,
+        paddingBottom: 40, // More padding for bottom scroll
     },
     title: {
         fontSize: 28,

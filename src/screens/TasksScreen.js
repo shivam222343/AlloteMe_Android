@@ -37,7 +37,7 @@ const TasksScreen = ({ navigation }) => {
     const [meetings, setMeetings] = useState({ upcoming: [], past: [] });
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState('pending');
+    const [activeTab, setActiveTab] = useState('my-tasks');
     // Initialize with global state to prevent flickering
     const [selectedFilterClub, setSelectedFilterClub] = useState(selectedClubId || 'all');
 
@@ -86,11 +86,35 @@ const TasksScreen = ({ navigation }) => {
 
     useEffect(() => {
         if (!socket) return;
+
+        // Handle task updates
         socket.on('task_update', (updatedTask) => {
-            setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t));
+            setTasks(prev => {
+                const exists = prev.find(t => t._id === updatedTask._id);
+                if (exists) {
+                    return prev.map(t => t._id === updatedTask._id ? updatedTask : t);
+                } else {
+                    // New task created, add it to the list
+                    return [updatedTask, ...prev];
+                }
+            });
         });
-        return () => socket.off('task_update');
-    }, [socket]);
+
+        // Handle task deletion
+        socket.on('task_deleted', (data) => {
+            setTasks(prev => prev.filter(t => t._id !== data.taskId));
+        });
+
+        // Join all club rooms for tasks
+        clubs.forEach(club => {
+            socket.emit('club:join', club._id);
+        });
+
+        return () => {
+            socket.off('task_update');
+            socket.off('task_deleted');
+        };
+    }, [socket, clubs]);
 
     // Sync with global club selection when it changes from other screens
     useEffect(() => {
@@ -416,30 +440,36 @@ const TasksScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.taskFooter}>
-                    <View style={styles.statusBadge}>
-                        <Text style={styles.statusLabel}>My Status: </Text>
-                        <Text style={[styles.statusValue, { color: getStatusColor(myStatus) }]}>
-                            {myStatus.toUpperCase().replace('-', ' ')}
-                        </Text>
-                    </View>
+                    {myAssignment ? (
+                        <>
+                            <View style={styles.statusBadge}>
+                                <Text style={styles.statusLabel}>My Status: </Text>
+                                <Text style={[styles.statusValue, { color: getStatusColor(myStatus) }]}>
+                                    {myStatus.toUpperCase().replace('-', ' ')}
+                                </Text>
+                            </View>
 
-                    <View style={styles.actionRow}>
-                        {myStatus === 'pending' ? (
-                            <TouchableOpacity
-                                style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
-                                onPress={() => updateStatus(item._id, 'completed')}
-                            >
-                                <Text style={styles.actionBtnText}>Done</Text>
-                            </TouchableOpacity>
-                        ) : myStatus === 'completed' ? (
-                            <TouchableOpacity
-                                style={[styles.actionBtn, { backgroundColor: '#6B7280' }]}
-                                onPress={() => updateStatus(item._id, 'pending')}
-                            >
-                                <Text style={styles.actionBtnText}>Reopen</Text>
-                            </TouchableOpacity>
-                        ) : null}
-                    </View>
+                            <View style={styles.actionRow}>
+                                {myStatus === 'pending' ? (
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
+                                        onPress={() => updateStatus(item._id, 'completed')}
+                                    >
+                                        <Text style={styles.actionBtnText}>Done</Text>
+                                    </TouchableOpacity>
+                                ) : myStatus === 'completed' ? (
+                                    <TouchableOpacity
+                                        style={[styles.actionBtn, { backgroundColor: '#6B7280' }]}
+                                        onPress={() => updateStatus(item._id, 'pending')}
+                                    >
+                                        <Text style={styles.actionBtnText}>Reopen</Text>
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+                        </>
+                    ) : (
+                        <Text style={styles.notAssignedText}>Not assigned to you</Text>
+                    )}
                 </View>
             </View>
         );
@@ -465,11 +495,18 @@ const TasksScreen = ({ navigation }) => {
     const filteredTasks = (tasks || []).filter(t => {
         // Tab Filter (Status)
         const myAssignment = (t?.assignedTo || []).find(a => (a.user?._id || a.user) === user?._id);
-        const status = myAssignment ? myAssignment.status : 'pending';
+        const status = myAssignment ? myAssignment.status : null;
 
         let matchesTab = true;
-        if (activeTab === 'pending') matchesTab = status === 'pending';
-        else if (activeTab === 'completed') matchesTab = status === 'completed';
+        if (activeTab === 'my-tasks') {
+            // Show only tasks assigned to me
+            matchesTab = !!myAssignment;
+        } else if (activeTab === 'pending') {
+            matchesTab = status === 'pending';
+        } else if (activeTab === 'completed') {
+            matchesTab = status === 'completed';
+        }
+        // 'all' tab shows all tasks
 
         // Club Filter
         let matchesClub = true;
@@ -478,7 +515,7 @@ const TasksScreen = ({ navigation }) => {
         }
 
         return matchesTab && matchesClub;
-    });
+    }).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)); // Default sort by due date
 
     const getAnalytics = () => {
         const myPending = tasks.filter(t => {
@@ -541,18 +578,20 @@ const TasksScreen = ({ navigation }) => {
                     </ScrollView>
                 </View>
 
-                <View style={styles.tabs}>
-                    {['pending', 'completed', 'all'].map(tab => (
-                        <TouchableOpacity
-                            key={tab}
-                            style={[styles.tab, activeTab === tab && styles.activeTab]}
-                            onPress={() => setActiveTab(tab)}
-                        >
-                            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                                {tab.toUpperCase()}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                <View style={styles.tabsContainer}>
+                    <View style={styles.tabs}>
+                        {['my-tasks', 'pending', 'completed', 'all'].map(tab => (
+                            <TouchableOpacity
+                                key={tab}
+                                style={[styles.tab, activeTab === tab && styles.activeTab]}
+                                onPress={() => setActiveTab(tab)}
+                            >
+                                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                                    {tab === 'my-tasks' ? 'MY TASKS' : tab.toUpperCase()}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
 
                 <PanGestureHandler
@@ -770,7 +809,7 @@ const TasksScreen = ({ navigation }) => {
                     title="Task Attachment"
                 />
             </View>
-        </MainLayout>
+        </MainLayout >
     );
 };
 
@@ -839,11 +878,26 @@ const styles = StyleSheet.create({
     filterChipTextActive: {
         color: '#FFF',
     },
-    tabs: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 8 },
+    tabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#FFF',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    tabs: { flexDirection: 'row', flex: 1 },
     tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
     activeTab: { backgroundColor: '#E8F2FF' },
-    tabText: { fontSize: 13, fontWeight: '700', color: '#6B7280' },
+    tabText: { fontSize: 11, fontWeight: '700', color: '#6B7280' },
     activeTabText: { color: '#0A66C2' },
+    notAssignedText: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        fontStyle: 'italic',
+    },
     listContent: { padding: 16 },
     taskCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2 },
     priorityTag: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 12 },

@@ -20,7 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import MainLayout from '../components/MainLayout';
-import * as Animatable from 'react-native-animatable';
+
+import { SkeletonBox } from '../components/SkeletonLoader';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +34,24 @@ const GAMES = [
         players: '2-8 Players',
         tag: 'Social',
         color: '#FFD700'
+    },
+    {
+        id: 'code_breaker',
+        name: 'Code Breaker',
+        description: 'Crack the secret code before time runs out!',
+        image: require('../../assets/games/sketch_heads.png'), // Temporary - replace with code_breaker.png
+        players: '2-6 Players',
+        tag: 'Logic',
+        color: '#8B5CF6'
+    },
+    {
+        id: 'meme_match',
+        name: 'Meme Match',
+        description: 'Caption contest - make your friends laugh!',
+        image: require('../../assets/games/sketch_heads.png'), // Temporary - replace with meme_match.png
+        players: '2-8 Players',
+        tag: 'Humor',
+        color: '#EC4899'
     }
 ];
 
@@ -46,6 +65,8 @@ const MaverickGamesScreen = ({ navigation, route }) => {
     const [selectedRounds, setSelectedRounds] = useState(3);
     const [availableGames, setAvailableGames] = useState(GAMES);
     const [updatingPoster, setUpdatingPoster] = useState(false);
+    const [bannerUrl, setBannerUrl] = useState(null);
+    const [updatingBanner, setUpdatingBanner] = useState(false);
 
     const selectedGameRef = React.useRef(null);
 
@@ -72,6 +93,12 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                     return g;
                 });
                 setAvailableGames(merged);
+
+                // Handle banner config
+                const bannerConfig = res.data.find(c => c.gameId === 'banner');
+                if (bannerConfig && bannerConfig.posterUrl) {
+                    setBannerUrl(bannerConfig.posterUrl);
+                }
             }
         } catch (error) {
             console.log('Error loading game configs:', error);
@@ -114,14 +141,25 @@ const MaverickGamesScreen = ({ navigation, route }) => {
     }, [route?.params]);
 
     useEffect(() => {
+        if (socket && selectedClubId) {
+            socket.emit('club:join', selectedClubId);
+        }
+    }, [socket, selectedClubId]);
+
+    useEffect(() => {
         if (socket) {
+
             socket.on('games:rooms_list', (data) => {
                 const currentType = selectedGameRef.current?.id;
-                // Only update if it matches current selected game, or if we got a raw array (legacy)
                 const rooms = Array.isArray(data) ? data : data.rooms;
                 const gameType = Array.isArray(data) ? null : data.gameType;
+                const incomingClubId = Array.isArray(data) ? null : data.clubId;
 
-                if (!gameType || gameType === currentType) {
+                // Only update if it matches current selected game AND current selected club
+                const typeMatch = !gameType || gameType === currentType;
+                const clubMatch = !incomingClubId || incomingClubId === selectedClubId;
+
+                if (typeMatch && clubMatch) {
                     setActiveRooms(rooms);
                     setLoadingRooms(false);
                 }
@@ -129,7 +167,19 @@ const MaverickGamesScreen = ({ navigation, route }) => {
 
             socket.on('games:host_success', (roomId) => {
                 setShowLobbyModal(false);
-                navigation.navigate('SketchHeads', { roomId, isHost: true });
+                const gameType = selectedGameRef.current?.id;
+
+                // Navigate to appropriate game screen
+                if (gameType === 'code_breaker') {
+                    navigation.navigate('CodeBreaker', { roomId, isHost: true });
+                } else if (gameType === 'meme_match') {
+                    navigation.navigate('MemeMatch', { roomId, isHost: true });
+                } else if (gameType === 'sketch_heads') {
+                    navigation.navigate('SketchHeads', { roomId, isHost: true });
+                } else {
+                    // Default to SketchHeads for now
+                    navigation.navigate('SketchHeads', { roomId, isHost: true });
+                }
             });
 
             return () => {
@@ -158,42 +208,53 @@ const MaverickGamesScreen = ({ navigation, route }) => {
             clubId: selectedClubId,
             gameType: selectedGame.id,
             userId: user._id,
-            userName: user.displayName,
+            userName: user.displayName || user.fullName || 'Anonymous',
             totalRounds: selectedRounds
         });
     };
 
     const handleJoinRoom = (roomId) => {
         setShowLobbyModal(false);
-        navigation.navigate('SketchHeads', { roomId, isHost: false });
+        const gameType = selectedGame?.id;
+
+        // Navigate to appropriate game screen
+        if (gameType === 'code_breaker') {
+            navigation.navigate('CodeBreaker', { roomId, isHost: false });
+        } else if (gameType === 'meme_match') {
+            navigation.navigate('MemeMatch', { roomId, isHost: false });
+        } else if (gameType === 'sketch_heads') {
+            navigation.navigate('SketchHeads', { roomId, isHost: false });
+        } else {
+            // Default to SketchHeads for now
+            navigation.navigate('SketchHeads', { roomId, isHost: false });
+        }
     };
 
     const handleUpdatePoster = async (game) => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: ['images'],
                 allowsEditing: true, // Enables cropping
-                aspect: [16, 9], // Game card aspect ratio
-                quality: 0.8,
+                // No aspect ratio - freehand crop
+                quality: 0.3, // Lower quality for smaller file size on Android
+                base64: true, // Enable base64 for Android compatibility
             });
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 setUpdatingPoster(true);
                 const asset = result.assets[0];
-                const formData = new FormData();
 
-                const uri = asset.uri;
-                const fileName = asset.fileName || uri.split('/').pop() || 'poster.jpg';
-                const fileType = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+                // Prepare base64 image data (like GalleryScreen)
+                const base64Img = asset.base64
+                    ? `data:image/jpeg;base64,${asset.base64}`
+                    : asset.uri;
 
-                formData.append('file', {
-                    uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
-                    name: fileName,
-                    type: fileType,
-                });
-                formData.append('type', 'gallery');
+                const uploadPayload = {
+                    image: base64Img,
+                    type: 'gallery',
+                };
 
-                const uploadRes = await mediaAPI.upload(formData);
+                const uploadRes = await mediaAPI.uploadBase64(uploadPayload);
                 if (uploadRes.success) {
                     await adminAPI.updateGameConfig({
                         gameId: game.id,
@@ -206,57 +267,154 @@ const MaverickGamesScreen = ({ navigation, route }) => {
             }
         } catch (error) {
             console.error('Update poster error:', error);
-            Alert.alert('Error', 'Failed to update poster');
+            Alert.alert('Error', `Failed to update poster: ${error.message || 'Unknown error'}`);
         } finally {
             setUpdatingPoster(false);
         }
     };
 
-    const renderGameCard = ({ item, index }) => (
-        <Animatable.View
-            animation="fadeInUp"
-            delay={index * 100}
-            style={styles.gameCardContainer}
-        >
-            <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => handleSelectGame(item)}
-                style={styles.gameCard}
+    const handleUpdateBanner = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 0.3,
+                base64: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setUpdatingBanner(true);
+                const asset = result.assets[0];
+
+                const base64Img = asset.base64
+                    ? `data:image/jpeg;base64,${asset.base64}`
+                    : asset.uri;
+
+                const uploadPayload = {
+                    image: base64Img,
+                    type: 'gallery',
+                };
+
+                const uploadRes = await mediaAPI.uploadBase64(uploadPayload);
+                if (uploadRes.success) {
+                    console.log('[Banner] Upload success, updating config...', uploadRes.data.url);
+                    const updateRes = await adminAPI.updateGameConfig({
+                        gameId: 'banner',
+                        name: 'Mavericks Games Banner',
+                        posterUrl: uploadRes.data.url
+                    });
+
+                    if (updateRes.success) {
+                        console.log('[Banner] Config updated successfully');
+                        setBannerUrl(uploadRes.data.url);
+                        loadGameConfigs(); // Refresh to ensure it's synced
+                        Alert.alert('Success', 'Banner updated successfully!');
+                    } else {
+                        throw new Error(updateRes.message || 'Failed to update game config');
+                    }
+                } else {
+                    throw new Error(uploadRes.message || 'Upload failed');
+                }
+            }
+        } catch (error) {
+            console.error('Update banner error:', error);
+            Alert.alert('Error', `Failed to update banner: ${error.message || 'Unknown error'}`);
+        } finally {
+            setUpdatingBanner(false);
+        }
+    };
+
+    const GameCard = React.memo(({ item, index, handleSelectGame, handleUpdatePoster, user, updatingPoster }) => {
+        const [imageLoading, setImageLoading] = useState(true);
+        const [imageError, setImageError] = useState(false);
+
+        return (
+            <View
+                style={styles.gameCardContainer}
             >
-                <Image source={item.image} style={styles.gameImage} resizeMode="cover" />
-                <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.8)']}
-                    style={styles.cardOverlay}
+                <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => handleSelectGame(item)}
+                    onLongPress={() => user?.role === 'admin' ? handleUpdatePoster(item) : null}
+                    style={styles.gameCard}
                 >
-                    <View style={styles.cardContent}>
-                        <View style={styles.cardHeaderRow}>
-                            <View style={styles.tagContainer}>
-                                <Text style={styles.tagText}>{item.tag}</Text>
+                    {imageLoading && !imageError && (
+                        <SkeletonBox
+                            width="100%"
+                            height="100%"
+                            borderRadius={24}
+                            style={StyleSheet.absoluteFillObject}
+                        />
+                    )}
+                    <Image
+                        key={`game-${item.id}`}
+                        source={item.image}
+                        style={[styles.gameImage, imageLoading && { opacity: 0 }]}
+                        resizeMode="cover"
+                        onLoad={() => setImageLoading(false)}
+                        onError={() => {
+                            setImageLoading(false);
+                            setImageError(true);
+                        }}
+                    />
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.5)']}
+                        style={styles.cardOverlay}
+                    >
+                        <View style={styles.cardContent}>
+                            <View style={styles.playerInfo}>
+                                <Ionicons name="people" size={12} color="#FFF" />
+                                <Text style={styles.playersText}>{item.players}</Text>
                             </View>
-                            {user?.role === 'admin' && (
-                                <TouchableOpacity
-                                    style={styles.adminEditBtn}
-                                    onPress={() => handleUpdatePoster(item)}
-                                    disabled={updatingPoster}
-                                >
-                                    {updatingPoster ? (
-                                        <ActivityIndicator size="small" color="#FFF" />
-                                    ) : (
-                                        <Ionicons name="camera" size={18} color="#FFF" />
-                                    )}
-                                </TouchableOpacity>
-                            )}
                         </View>
-                        <Text style={styles.gameTitle}>{item.name}</Text>
-                        <Text style={styles.gameDescription}>{item.description}</Text>
-                        <View style={styles.cardFooter}>
-                            <Ionicons name="people" size={14} color="#D1D5DB" />
-                            <Text style={styles.playersText}>{item.players}</Text>
-                        </View>
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
+        );
+    }, (prevProps, nextProps) => {
+        // Only re-render if these specific props change
+        return prevProps.item.id === nextProps.item.id &&
+            prevProps.item.image === nextProps.item.image &&
+            prevProps.updatingPoster === nextProps.updatingPoster;
+    });
+
+    const renderGameCard = ({ item, index }) => (
+        <GameCard
+            item={item}
+            index={index}
+            handleSelectGame={handleSelectGame}
+            handleUpdatePoster={handleUpdatePoster}
+            user={user}
+            updatingPoster={updatingPoster}
+        />
+    );
+
+    const renderHeader = () => (
+        <View>
+            {/* Game Banner */}
+            <TouchableOpacity
+                activeOpacity={user?.role === 'admin' ? 0.8 : 1}
+                onLongPress={user?.role === 'admin' ? handleUpdateBanner : null}
+                style={styles.bannerContainer}
+                disabled={user?.role !== 'admin'}
+            >
+                {updatingBanner && (
+                    <View style={styles.bannerOverlay}>
+                        <ActivityIndicator size="large" color="#FFF" />
                     </View>
-                </LinearGradient>
+                )}
+                <Image
+                    source={bannerUrl ? { uri: bannerUrl } : require('../../assets/games/sketch_heads.png')}
+                    style={styles.bannerImage}
+                    resizeMode="cover"
+                />
             </TouchableOpacity>
-        </Animatable.View>
+
+            {/* Featured Game */}
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Available Games</Text>
+            </View>
+        </View>
     );
 
     return (
@@ -268,7 +426,8 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                         <Text style={styles.uploadingText}>Updating Game Poster...</Text>
                     </View>
                 )}
-                {/* Search & Welcome */}
+
+                {/* Sticky Search & Welcome */}
                 <View style={styles.headerSection}>
                     <Text style={styles.welcomeText}>Unleash the Chaos, {user?.displayName?.split(' ')[0]}! 🎮</Text>
                     <View style={styles.searchBar}>
@@ -283,16 +442,14 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                     </View>
                 </View>
 
-                {/* Featured Game */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Available Games</Text>
-                </View>
-
                 <FlatList
+                    ListHeaderComponent={renderHeader}
                     data={availableGames.filter(g => g.name.toLowerCase().includes(searchQuery.toLowerCase()))}
                     renderItem={renderGameCard}
                     keyExtractor={item => item.id}
+                    numColumns={2}
                     contentContainerStyle={styles.gameList}
+                    columnWrapperStyle={styles.gameRow}
                     showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
@@ -412,6 +569,23 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#FFF',
     },
+    bannerContainer: {
+        width: '100%',
+        height: 150,
+        marginBottom: 10,
+        overflow: 'hidden',
+    },
+    bannerImage: {
+        width: '100%',
+        height: '100%',
+    },
+    bannerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
     welcomeText: {
         fontSize: 18,
         fontWeight: '700',
@@ -444,27 +618,34 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     gameList: {
-        padding: 15,
+        padding: 10,
+    },
+    gameRow: {
+        justifyContent: 'space-between',
+        paddingHorizontal: 5,
     },
     gameCardContainer: {
-        marginBottom: 20,
-        borderRadius: 24,
+        flex: 1,
+        marginHorizontal: 5,
+        marginBottom: 15,
+        borderRadius: 16,
         overflow: 'hidden',
+        maxWidth: (width - 40) / 2,
         ...Platform.select({
             ios: {
                 shadowColor: '#000',
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.2,
-                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
             },
             android: {
-                elevation: 8,
+                elevation: 6,
             }
         })
     },
     gameCard: {
         width: '100%',
-        height: 220,
+        height: 240,
         backgroundColor: '#000',
     },
     gameImage: {
@@ -475,7 +656,19 @@ const styles = StyleSheet.create({
     cardOverlay: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'flex-end',
-        padding: 20,
+        padding: 12,
+    },
+    cardContent: {
+        alignItems: 'flex-end',
+    },
+    playerInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
     },
     tagContainer: {
         alignSelf: 'flex-start',
@@ -487,7 +680,7 @@ const styles = StyleSheet.create({
     },
     tagText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: 'bold',
     },
     cardHeaderRow: {
@@ -497,6 +690,9 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     adminEditBtn: {
+        position: 'absolute',
+        top: -200,
+        right: 0,
         backgroundColor: 'rgba(0,0,0,0.5)',
         width: 36,
         height: 36,
@@ -519,24 +715,28 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     gameTitle: {
-        fontSize: 28,
+        fontSize: 22,
         fontWeight: '800',
         color: '#FFFFFF',
-        marginBottom: 4,
+        textAlign: 'center',
+        textShadowColor: 'rgba(0, 0, 0, 0.75)',
+        textShadowOffset: { width: 0, height: 2 },
+        textShadowRadius: 4,
     },
     gameDescription: {
-        fontSize: 14,
+        fontSize: 11,
         color: '#E5E7EB',
-        marginBottom: 12,
+        marginBottom: 8,
+        lineHeight: 14,
     },
     cardFooter: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     playersText: {
-        fontSize: 12,
-        color: '#D1D5DB',
-        marginLeft: 6,
+        fontSize: 10,
+        color: '#FFF',
+        fontWeight: '600',
     },
     emptyContainer: {
         alignItems: 'center',
@@ -607,14 +807,20 @@ const styles = StyleSheet.create({
         color: '#6B7280',
     },
     joinBtn: {
-        backgroundColor: '#EBF5FF',
+        backgroundColor: '#10B981',
         paddingHorizontal: 20,
-        paddingVertical: 8,
+        paddingVertical: 10,
         borderRadius: 12,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     joinBtnText: {
-        color: '#0A66C2',
+        color: '#FFF',
         fontWeight: '700',
+        fontSize: 14,
     },
     noRooms: {
         padding: 40,
