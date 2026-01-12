@@ -45,18 +45,26 @@ const MemeMatchScreen = ({ navigation, route }) => {
     const resultsTimerRef = useRef(null);
 
     const handleLeaveGame = () => {
-        if (phase !== 'waiting') {
-            Alert.alert(
-                "Leave Game?",
-                "Are you sure you want to leave? Your progress will be lost.",
-                [
-                    { text: "Stay", style: "cancel" },
-                    { text: "Leave", style: "destructive", onPress: () => navigation.goBack() }
-                ]
-            );
-        } else {
-            navigation.goBack();
-        }
+        const title = isHost ? "End Game for Everyone?" : "Leave Game?";
+        const message = isHost
+            ? "You are the host. If you leave, the game room will be closed for all players. Are you sure?"
+            : "Are you sure you want to leave? Your progress will be lost.";
+
+        Alert.alert(
+            title,
+            message,
+            [
+                { text: "Stay", style: "cancel" },
+                {
+                    text: isHost ? "End Game" : "Leave",
+                    style: "destructive",
+                    onPress: () => {
+                        if (socket) socket.emit('games:leave', roomId);
+                        navigation.goBack();
+                    }
+                }
+            ]
+        );
     };
 
     useEffect(() => {

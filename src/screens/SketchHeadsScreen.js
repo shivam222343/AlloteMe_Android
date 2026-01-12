@@ -14,6 +14,7 @@ import {
     ActivityIndicator,
     Modal,
     StatusBar,
+    BackHandler,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
@@ -195,10 +196,24 @@ const SketchHeadsScreen = ({ navigation, route }) => {
                 socket.off('game:turn_end');
                 socket.off('game:over');
                 socket.off('game:error');
-                socket.emit('games:leave', roomId || gameState?.roomId);
+                socket.emit('games:leave', roomId || (gameState && gameState.roomId));
             };
         }
     }, [socket, roomId]);
+
+    useEffect(() => {
+        const backAction = () => {
+            handleLeaveGame();
+            return true;
+        };
+
+        const backHandler = BackHandler.addEventListener(
+            "hardwareBackPress",
+            backAction
+        );
+
+        return () => backHandler.remove();
+    }, []);
 
     // Drawing Handlers
     const onGestureEvent = (event) => {
@@ -355,7 +370,7 @@ const SketchHeadsScreen = ({ navigation, route }) => {
         return (
             <View style={styles.container}>
                 <View style={[styles.header, { backgroundColor: '#F3F4F6' }]}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <TouchableOpacity onPress={handleLeaveGame}>
                         <Ionicons name="close" size={28} color="#1F2937" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Game Lobby</Text>
@@ -907,9 +922,11 @@ const SketchHeadsScreen = ({ navigation, route }) => {
                     <View style={styles.confirmModalOverlay}>
                         <View style={styles.confirmModal}>
                             <Ionicons name="warning" size={60} color="#EF4444" />
-                            <Text style={styles.confirmTitle}>Leave Game?</Text>
+                            <Text style={styles.confirmTitle}>{isHost ? "End Game for Everyone?" : "Leave Game?"}</Text>
                             <Text style={styles.confirmMessage}>
-                                Are you sure you want to leave? The game is still in progress.
+                                {isHost
+                                    ? "You are the host. If you leave, the game room will be closed for all players. Are you sure?"
+                                    : "Are you sure you want to leave? Your progress will be lost."}
                             </Text>
                             <View style={styles.confirmButtons}>
                                 <TouchableOpacity
