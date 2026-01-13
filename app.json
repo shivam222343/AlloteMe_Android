@@ -92,9 +92,6 @@
         {
           "icon": "./assets/AS.png",
           "color": "#0A66C2",
-          "sounds": [
-            "./assets/notification.wav"
-          ],
           "mode": "production",
           "androidMode": "default",
           "androidCollapsedTitle": "#{unread_notifications} new notifications"
