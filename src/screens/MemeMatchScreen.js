@@ -25,21 +25,19 @@ const MemeMatchScreen = ({ navigation, route }) => {
     const { roomId, isHost } = route.params;
     const { user, socket } = useAuth();
 
-    // Game State
-    const [situation, setSituation] = useState('');
-    const [caption, setCaption] = useState('');
-    const [submissions, setSubmissions] = useState([]);
-    const [phase, setPhase] = useState('waiting'); // waiting, submitting, voting, results
-    const [timeRemaining, setTimeRemaining] = useState(60);
-    const [hasSubmitted, setHasSubmitted] = useState(false);
-    const [hasVoted, setHasVoted] = useState(false);
-    const [selectedSubmission, setSelectedSubmission] = useState(null);
+    // Game State - Quiz Version
+    const [dialogue, setDialogue] = useState('');
+    const [language, setLanguage] = useState('');
+    const [options, setOptions] = useState([]);
+    const [selectedAnswer, setSelectedAnswer] = useState(null);
+    const [hasAnswered, setHasAnswered] = useState(false);
+    const [phase, setPhase] = useState('waiting'); // waiting, answering, results
+    const [timeRemaining, setTimeRemaining] = useState(30);
     const [roundResults, setRoundResults] = useState(null);
     const [showResults, setShowResults] = useState(false);
     const [currentRound, setCurrentRound] = useState(1);
     const [totalRounds, setTotalRounds] = useState(3);
-    const [submissionCount, setSubmissionCount] = useState({ submitted: 0, total: 0 });
-    const [voteCount, setVoteCount] = useState({ voted: 0, total: 0 });
+    const [answerCount, setAnswerCount] = useState({ answered: 0, total: 0 });
     const [players, setPlayers] = useState([]);
     const [gameState, setGameState] = useState(null);
     const resultsTimerRef = useRef(null);
@@ -60,7 +58,7 @@ const MemeMatchScreen = ({ navigation, route }) => {
                     style: "destructive",
                     onPress: () => {
                         if (socket) socket.emit('games:leave', roomId);
-                        navigation.goBack();
+                        navigation.navigate('MaverickGames');
                     }
                 }
             ]
@@ -96,37 +94,42 @@ const MemeMatchScreen = ({ navigation, route }) => {
             socket.on('game:update', (room) => {
                 setGameState(room);
                 setPlayers(room.players || []);
+
+                // Auto-sync phase and data from backend state to prevent getting stuck
+                if (room.state) {
+                    if (room.state.phase) setPhase(room.state.phase);
+                    if (room.state.currentDialogue) setDialogue(room.state.currentDialogue);
+                    if (room.state.language) setLanguage(room.state.language);
+                    if (room.state.options) setOptions(room.state.options);
+                    if (room.state.currentRound) setCurrentRound(room.state.currentRound);
+                    if (room.state.timeRemaining !== undefined) setTimeRemaining(room.state.timeRemaining);
+
+                    // Sync results if in results phase
+                    if (room.state.phase === 'results' && !showResults) {
+                        // Results are usually sent via round_end with more detail, 
+                        // but we can at least show the modal if missing
+                    }
+                }
             });
 
             socket.on('game:error', (data) => {
                 Alert.alert('Game Error', data.message);
             });
 
-            socket.on('memematch:situation', (data) => {
-                setSituation(data.situation);
+            socket.on('memematch:question', (data) => {
+                setDialogue(data.dialogue);
+                setLanguage(data.language);
+                setOptions(data.options);
                 setCurrentRound(data.round);
                 setTotalRounds(data.totalRounds);
                 setTimeRemaining(data.timeLimit);
-                setPhase('submitting');
-                setHasSubmitted(false);
-                setCaption('');
-                setSubmissions([]);
+                setPhase('answering');
+                setHasAnswered(false);
+                setSelectedAnswer(null);
             });
 
-            socket.on('memematch:submission_count', (data) => {
-                setSubmissionCount(data);
-            });
-
-            socket.on('memematch:voting_start', (data) => {
-                setSubmissions(data.submissions);
-                setPhase('voting');
-                setTimeRemaining(data.timeLimit);
-                setHasVoted(false);
-                setSelectedSubmission(null);
-            });
-
-            socket.on('memematch:vote_count', (data) => {
-                setVoteCount(data);
+            socket.on('memematch:answer_count', (data) => {
+                setAnswerCount(data);
             });
 
             socket.on('memematch:time_update', (time) => {
@@ -141,11 +144,11 @@ const MemeMatchScreen = ({ navigation, route }) => {
                 // Clear any existing timer
                 if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
 
-                // Auto-close in 5 seconds
+                // Auto-close in 8 seconds (matching backend timeout)
                 resultsTimerRef.current = setTimeout(() => {
                     setShowResults(false);
                     resultsTimerRef.current = null;
-                }, 5000);
+                }, 8000);
             });
 
             socket.on('memematch:next_round', (data) => {
@@ -178,10 +181,8 @@ const MemeMatchScreen = ({ navigation, route }) => {
             });
 
             return () => {
-                socket.off('memematch:situation');
-                socket.off('memematch:submission_count');
-                socket.off('memematch:voting_start');
-                socket.off('memematch:vote_count');
+                socket.off('memematch:question');
+                socket.off('memematch:answer_count');
                 socket.off('memematch:time_update');
                 socket.off('memematch:round_end');
                 socket.off('memematch:next_round');
@@ -191,118 +192,75 @@ const MemeMatchScreen = ({ navigation, route }) => {
         }
     }, [socket, roomId]);
 
-    const handleSubmitCaption = () => {
-        if (caption.trim().length === 0) return;
+    const handleSelectAnswer = (answer) => {
+        if (hasAnswered) return;
 
-        socket.emit('memematch:submit', {
+        socket.emit('memematch:answer', {
             roomId,
             userId: user._id,
             userName: user.displayName,
-            caption: caption.trim()
+            answer
         });
 
-        setHasSubmitted(true);
+        setSelectedAnswer(answer);
+        setHasAnswered(true);
     };
 
-    const handleVote = (submissionId) => {
-        if (hasVoted) return;
-
-        socket.emit('memematch:vote', {
-            roomId,
-            userId: user._id,
-            submissionId
-        });
-
-        setSelectedSubmission(submissionId);
-        setHasVoted(true);
-    };
-
-    const renderSubmittingPhase = () => (
+    const renderAnsweringPhase = () => (
         <View style={styles.phaseContainer}>
-            <Animatable.View animation="fadeInDown" style={styles.situationCard}>
-                <Text style={styles.situationLabel}>Situation:</Text>
-                <Text style={styles.situationText}>{situation}</Text>
+            <Animatable.View animation="fadeInDown" style={styles.dialogueCard}>
+                <View style={styles.languageBadge}>
+                    <Text style={styles.languageBadgeText}>{language}</Text>
+                </View>
+                <Text style={styles.dialogueLabel}>Identify the movie for this dialogue:</Text>
+                <Text style={styles.dialogueText}>"{dialogue}"</Text>
             </Animatable.View>
 
-            <View style={styles.captionInputSection}>
-                <Text style={styles.inputLabel}>Your Caption:</Text>
-                <TextInput
-                    style={styles.captionInput}
-                    placeholder="Type your funny caption here..."
-                    placeholderTextColor="#9CA3AF"
-                    value={caption}
-                    onChangeText={setCaption}
-                    maxLength={100}
-                    multiline
-                    editable={!hasSubmitted}
-                />
-                <Text style={styles.charCount}>{caption.length}/100</Text>
-
-                <TouchableOpacity
-                    style={[styles.submitBtn, (hasSubmitted || caption.trim().length === 0) && styles.btnDisabled]}
-                    onPress={handleSubmitCaption}
-                    disabled={hasSubmitted || caption.trim().length === 0}
-                >
-                    <LinearGradient
-                        colors={hasSubmitted ? ['#10B981', '#059669'] : ['#EC4899', '#DB2777']}
-                        style={styles.submitBtnGradient}
-                    >
-                        <Ionicons
-                            name={hasSubmitted ? "checkmark-circle" : "send"}
-                            size={20}
-                            color="#FFF"
-                        />
-                        <Text style={styles.submitBtnText}>
-                            {hasSubmitted ? 'Submitted!' : 'Submit Caption'}
-                        </Text>
-                    </LinearGradient>
-                </TouchableOpacity>
-
-                <View style={styles.statusBar}>
-                    <Text style={styles.statusText}>
-                        {submissionCount.submitted}/{submissionCount.total} players submitted
-                    </Text>
-                </View>
-            </View>
-        </View>
-    );
-
-    const renderVotingPhase = () => (
-        <View style={styles.phaseContainer}>
-            <Text style={styles.phaseTitle}>Vote for the Funniest!</Text>
-            <Text style={styles.phaseSubtitle}>{situation}</Text>
-
-            <ScrollView style={styles.submissionsList}>
-                {submissions.map((sub, index) => (
+            <View style={styles.optionsContainer}>
+                {options.map((option, index) => (
                     <Animatable.View
-                        key={sub.submissionId}
+                        key={index}
                         animation="fadeInUp"
                         delay={index * 100}
                     >
                         <TouchableOpacity
                             style={[
-                                styles.submissionCard,
-                                selectedSubmission === sub.submissionId && styles.submissionCardSelected
+                                styles.optionBtn,
+                                selectedAnswer === option && styles.optionBtnSelected,
+                                hasAnswered && selectedAnswer !== option && styles.optionBtnDisabled
                             ]}
-                            onPress={() => handleVote(sub.submissionId)}
-                            disabled={hasVoted}
+                            onPress={() => handleSelectAnswer(option)}
+                            disabled={hasAnswered}
                         >
-                            <View style={styles.submissionHeader}>
-                                <Text style={styles.submissionNumber}>#{index + 1}</Text>
-                                {selectedSubmission === sub.submissionId && (
-                                    <Ionicons name="checkmark-circle" size={24} color="#EC4899" />
-                                )}
+                            <View style={styles.optionLetter}>
+                                <Text style={[
+                                    styles.optionLetterText,
+                                    selectedAnswer === option && styles.optionLetterTextSelected
+                                ]}>
+                                    {String.fromCharCode(65 + index)}
+                                </Text>
                             </View>
-                            <Text style={styles.submissionCaption}>{sub.caption}</Text>
+                            <Text style={[
+                                styles.optionText,
+                                selectedAnswer === option && styles.optionTextSelected
+                            ]}>
+                                {option}
+                            </Text>
+                            {selectedAnswer === option && (
+                                <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                            )}
                         </TouchableOpacity>
                     </Animatable.View>
                 ))}
-            </ScrollView>
+            </View>
 
             <View style={styles.statusBar}>
                 <Text style={styles.statusText}>
-                    {voteCount.voted}/{voteCount.total} players voted
+                    {answerCount.answered}/{answerCount.total} players answered
                 </Text>
+                {hasAnswered && (
+                    <Text style={styles.waitingForOthers}>Waiting for other players...</Text>
+                )}
             </View>
         </View>
     );
@@ -405,8 +363,7 @@ const MemeMatchScreen = ({ navigation, route }) => {
                         <Text style={styles.waitingText}>Preparing next round...</Text>
                     </View>
                 )}
-                {phase === 'submitting' && renderSubmittingPhase()}
-                {phase === 'voting' && renderVotingPhase()}
+                {phase === 'answering' && renderAnsweringPhase()}
             </ScrollView>
 
             {/* Results Modal */}
@@ -419,35 +376,49 @@ const MemeMatchScreen = ({ navigation, route }) => {
                         >
                             <Ionicons name="close" size={24} color="#9CA3AF" />
                         </TouchableOpacity>
-                        <Text style={styles.resultsTitle}>Round Results!</Text>
+
+                        <View style={styles.resultsHeader}>
+                            <Text style={styles.correctLabel}>Correct Answer:</Text>
+                            <Text style={styles.correctMovieName}>{roundResults?.correctMovie}</Text>
+                            <Text style={styles.resultDialogue}>"{roundResults?.dialogue}"</Text>
+                        </View>
+
+                        <Text style={styles.resultsTitle}>Round Summary</Text>
 
                         <ScrollView style={styles.resultsList}>
-                            {roundResults?.submissions?.slice(0, 3).map((sub, index) => (
-                                <View key={sub.submissionId} style={styles.resultCard}>
-                                    <View style={styles.resultRank}>
-                                        <Text style={styles.resultRankText}>#{index + 1}</Text>
+                            {roundResults?.playerAnswers?.map((ans, index) => (
+                                <View key={index} style={styles.resultCard}>
+                                    <View style={[
+                                        styles.answerStatus,
+                                        { backgroundColor: ans.isCorrect ? '#10B981' : '#EF4444' }
+                                    ]}>
+                                        <Ionicons
+                                            name={ans.isCorrect ? "checkmark" : "close"}
+                                            size={20}
+                                            color="#FFF"
+                                        />
                                     </View>
                                     <View style={styles.resultContent}>
-                                        <Text style={styles.resultAuthor}>{sub.userName}</Text>
-                                        <Text style={styles.resultCaption}>{sub.caption}</Text>
-                                        <View style={styles.resultVotes}>
-                                            <Ionicons name="heart" size={16} color="#EC4899" />
-                                            <Text style={styles.resultVoteCount}>
-                                                {sub.voteCount} vote{sub.voteCount !== 1 ? 's' : ''}
-                                            </Text>
-                                        </View>
+                                        <Text style={styles.resultAuthor}>{ans.userName}</Text>
+                                        <Text style={styles.resultAnswer}>Answered: {ans.answer || 'No answer'}</Text>
+                                        {ans.isCorrect && (
+                                            <Text style={styles.pointsEarned}>+{ans.points} pts (Speed Bonus included)</Text>
+                                        )}
                                     </View>
                                 </View>
                             ))}
                         </ScrollView>
 
                         <View style={styles.leaderboard}>
-                            <Text style={styles.leaderboardTitle}>Scores</Text>
-                            {roundResults?.scores?.slice(0, 3).map((score, index) => (
-                                <View key={score.userId} style={styles.scoreRow}>
+                            <Text style={styles.leaderboardTitle}>Current Standings</Text>
+                            {roundResults?.scores?.slice(0, 5).map((score, index) => (
+                                <View key={score.userId || index} style={styles.scoreRow}>
                                     <Text style={styles.scoreRank}>#{index + 1}</Text>
                                     <Text style={styles.scoreName}>{score.userName}</Text>
-                                    <Text style={styles.scoreValue}>{score.score} pts</Text>
+                                    <View style={styles.scoreContainer}>
+                                        <Text style={styles.roundPoints}>+{score.roundScore}</Text>
+                                        <Text style={styles.scoreValue}>{score.score} total</Text>
+                                    </View>
                                 </View>
                             ))}
                         </View>
@@ -622,77 +593,93 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 20,
     },
-    situationCard: {
+    dialogueCard: {
         backgroundColor: '#FFF',
-        borderRadius: 16,
+        borderRadius: 20,
         padding: 24,
         marginBottom: 24,
-        borderWidth: 2,
-        borderColor: '#EC4899',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
     },
-    situationLabel: {
+    languageBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#FCE7F3',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    languageBadgeText: {
+        color: '#EC4899',
+        fontSize: 12,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    dialogueLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#EC4899',
+        color: '#6B7280',
         marginBottom: 8,
     },
-    situationText: {
-        fontSize: 20,
+    dialogueText: {
+        fontSize: 22,
         fontWeight: '700',
         color: '#1F2937',
-        lineHeight: 28,
+        lineHeight: 30,
+        fontStyle: 'italic',
     },
-    captionInputSection: {
+    optionsContainer: {
+        gap: 12,
+    },
+    optionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: '#FFF',
         borderRadius: 16,
-        padding: 20,
+        padding: 18,
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
     },
-    inputLabel: {
+    optionBtnSelected: {
+        borderColor: '#EC4899',
+        backgroundColor: '#EC4899',
+    },
+    optionBtnDisabled: {
+        opacity: 0.6,
+    },
+    optionLetter: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#F3F4F6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+    },
+    optionLetterText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#6B7280',
+    },
+    optionLetterTextSelected: {
+        color: '#EC4899',
+    },
+    optionText: {
+        flex: 1,
         fontSize: 16,
         fontWeight: '600',
         color: '#374151',
-        marginBottom: 12,
     },
-    captionInput: {
-        backgroundColor: '#F3F4F6',
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 16,
-        color: '#1F2937',
-        minHeight: 100,
-        textAlignVertical: 'top',
-    },
-    charCount: {
-        fontSize: 12,
-        color: '#9CA3AF',
-        textAlign: 'right',
-        marginTop: 8,
-    },
-    submitBtn: {
-        marginTop: 16,
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    submitBtnGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        gap: 8,
-    },
-    submitBtnText: {
+    optionTextSelected: {
         color: '#FFF',
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    btnDisabled: {
-        opacity: 0.5,
     },
     statusBar: {
-        marginTop: 16,
-        padding: 12,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 8,
+        marginTop: 24,
         alignItems: 'center',
     },
     statusText: {
@@ -700,112 +687,69 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         fontWeight: '600',
     },
-    submissionsList: {
-        maxHeight: 500,
-    },
-    submissionCard: {
-        backgroundColor: '#FFF',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        borderWidth: 2,
-        borderColor: '#E5E7EB',
-    },
-    submissionCardSelected: {
-        borderColor: '#EC4899',
-        backgroundColor: '#FEF2F8',
-    },
-    submissionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    submissionNumber: {
+    waitingForOthers: {
+        marginTop: 8,
         fontSize: 14,
-        fontWeight: '700',
         color: '#EC4899',
-    },
-    submissionCaption: {
-        fontSize: 16,
-        color: '#1F2937',
-        lineHeight: 22,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    resultsModal: {
-        backgroundColor: '#FFF',
-        borderRadius: 24,
-        padding: 24,
-        width: '90%',
-        maxHeight: '80%',
-    },
-    modalCloseBtn: {
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        zIndex: 10,
-        padding: 4,
-    },
-    resultsTitle: {
-        fontSize: 24,
         fontWeight: '700',
+    },
+    resultsHeader: {
+        alignItems: 'center',
+        marginBottom: 20,
+        paddingBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    correctLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#10B981',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    correctMovieName: {
+        fontSize: 24,
+        fontWeight: '800',
         color: '#1F2937',
         textAlign: 'center',
-        marginBottom: 20,
+        marginBottom: 8,
     },
-    resultsList: {
-        maxHeight: 300,
-        marginBottom: 20,
+    resultDialogue: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontStyle: 'italic',
+        textAlign: 'center',
     },
-    resultCard: {
-        flexDirection: 'row',
-        backgroundColor: '#F9FAFB',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 12,
-    },
-    resultRank: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#EC4899',
+    answerStatus: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
     },
-    resultRankText: {
-        color: '#FFF',
+    resultAnswer: {
+        fontSize: 13,
+        color: '#6B7280',
+    },
+    pointsEarned: {
+        fontSize: 12,
         fontWeight: '700',
-        fontSize: 16,
+        color: '#10B981',
+        marginTop: 2,
     },
-    resultContent: {
-        flex: 1,
+    scoreContainer: {
+        alignItems: 'flex-end',
     },
-    resultAuthor: {
+    roundPoints: {
+        fontSize: 12,
+        color: '#10B981',
+        fontWeight: '700',
+    },
+    scoreValue: {
         fontSize: 14,
         fontWeight: '700',
         color: '#1F2937',
-        marginBottom: 4,
-    },
-    resultCaption: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginBottom: 8,
-    },
-    resultVotes: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    resultVoteCount: {
-        fontSize: 12,
-        color: '#EC4899',
-        fontWeight: '600',
     },
     leaderboard: {
         borderTopWidth: 1,
@@ -837,11 +781,6 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         color: '#374151',
-    },
-    scoreValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1F2937',
     },
 });
 

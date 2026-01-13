@@ -196,7 +196,7 @@ const AdminScreen = ({ navigation }) => {
                 setStatusModal({ visible: true, title: 'Error', message: res.message || 'Failed to create club.', type: 'error' });
             }
         } catch (error) {
-            const msg = error.response?.data?.message || 'An unexpected error occurred.';
+            const msg = error.message || 'An unexpected error occurred.';
             setStatusModal({ visible: true, title: 'Error', message: msg, type: 'error' });
         } finally {
             setLoading(false);
@@ -219,7 +219,7 @@ const AdminScreen = ({ navigation }) => {
                 setStatusModal({ visible: true, title: 'Failed', message: res.message || 'Could not add member.', type: 'error' });
             }
         } catch (error) {
-            const msg = error.response?.data?.message || 'An unexpected error occurred.';
+            const msg = error.message || 'An unexpected error occurred.';
             setStatusModal({ visible: true, title: 'Error', message: msg, type: 'error' });
         } finally {
             setLoading(false);
@@ -287,7 +287,7 @@ const AdminScreen = ({ navigation }) => {
                 setStatusModal({ visible: true, title: 'Error', message: res.message || 'Failed to update role.', type: 'error' });
             }
         } catch (error) {
-            const msg = error.response?.data?.message || 'An unexpected error occurred.';
+            const msg = error.message || 'An unexpected error occurred.';
             setStatusModal({ visible: true, title: 'Error', message: msg, type: 'error' });
         }
     };
@@ -427,7 +427,7 @@ const AdminScreen = ({ navigation }) => {
                 await loadData();
             }
         } catch (error) {
-            const msg = error.response?.data?.message || error.message || 'Failed to delete club.';
+            const msg = error.message || 'Failed to delete club.';
             setStatusModal({ visible: true, title: 'Deletion Failed', message: msg, type: 'error' });
         } finally {
             setLoading(false);

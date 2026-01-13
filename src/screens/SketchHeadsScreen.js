@@ -625,11 +625,17 @@ const SketchHeadsScreen = ({ navigation, route }) => {
                                     <View style={styles.guessAvatar}>
                                         <Text style={styles.guessAvatarText}>{guess.userName[0]}</Text>
                                     </View>
-                                    <Text style={styles.guessName}>{guess.userName}</Text>
+                                    <Text style={[
+                                        styles.guessName,
+                                        guess.veryClose && { color: '#F59E0B' }
+                                    ]}>
+                                        {guess.userName}
+                                        {guess.veryClose && ' (very close)'}
+                                    </Text>
                                     <Ionicons
-                                        name={guess.isCorrect ? "checkmark-circle" : "close-circle"}
+                                        name={guess.isCorrect ? "checkmark-circle" : guess.veryClose ? "alert-circle" : "close-circle"}
                                         size={20}
-                                        color={guess.isCorrect ? "#10B981" : "#EF4444"}
+                                        color={guess.isCorrect ? "#10B981" : guess.veryClose ? "#F59E0B" : "#EF4444"}
                                     />
                                     {guess.isCorrect && (
                                         <Text style={styles.guessPoints}>+{guess.points}</Text>

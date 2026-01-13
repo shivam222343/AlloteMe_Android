@@ -4,14 +4,28 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform, Alert } from 'react-native';
 import { authAPI, messagesAPI, groupChatAPI } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as TaskManager from 'expo-task-manager';
 
-// Configure notification handler
+const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
+
+// Configure notification handler - CRITICAL for background notifications
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
+        priority: Notifications.AndroidNotificationPriority.MAX,
     }),
+});
+
+// Register background task for handling notifications when app is killed
+TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error, executionInfo }) => {
+    if (error) {
+        console.error('Background notification task error:', error);
+        return;
+    }
+    console.log('Received a notification in the background!', data);
+    // Notification will be displayed automatically by the system
 });
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -86,7 +100,19 @@ export const registerForPushNotificationsAsync = async (userId) => {
                 importance: Notifications.AndroidImportance.MAX,
                 vibrationPattern: [0, 250, 250, 250],
                 lightColor: '#0A66C2',
+                sound: 'default',
+                enableVibrate: true,
+                showBadge: true,
             });
+
+            // Register background notification task
+            try {
+                await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+                console.log('✅ Background notification task registered');
+            } catch (taskError) {
+                console.warn('⚠️ Background task registration failed:', taskError.message);
+                // This is non-critical - notifications will still work in foreground/background
+            }
         }
 
         return token;

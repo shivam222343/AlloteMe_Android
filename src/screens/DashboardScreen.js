@@ -1244,7 +1244,7 @@ const styles = StyleSheet.create({
     },
     floatingNotesBtn: {
         position: 'absolute',
-        bottom: 100,
+        bottom: 125,
         right: 24,
         borderRadius: 28,
         shadowColor: '#000',

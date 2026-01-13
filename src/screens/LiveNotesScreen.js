@@ -67,6 +67,32 @@ const COLOR_PALETTE = [
     { label: 'Orange', value: '#F59E0B' },
     { label: 'Pink', value: '#EC4899' },
     { label: 'Gray', value: '#6B7280' },
+    { label: 'Bright Blue', value: '#3B82F6' },
+    { label: 'Bright Green', value: '#10B981' },
+    { label: 'Bright Red', value: '#F87171' },
+    { label: 'Yellow', value: '#FBBF24' },
+];
+
+const FONT_SIZES = [
+    { label: 'Small', value: '1', size: 12 },
+    { label: 'Normal', value: '3', size: 16 },
+    { label: 'Medium', value: '4', size: 18 },
+    { label: 'Large', value: '5', size: 24 },
+    { label: 'Huge', value: '7', size: 36 },
+];
+
+const FONT_FAMILIES = [
+    { label: 'System', value: '-apple-system, sans-serif' },
+    { label: 'Serif', value: 'Georgia, serif' },
+    { label: 'Monospace', value: 'monospace' },
+    { label: 'Cursive', value: 'cursive' },
+];
+
+const LINE_SPACINGS = [
+    { label: '1.0', value: '1' },
+    { label: '1.15', value: '1.15' },
+    { label: '1.5', value: '1.5' },
+    { label: '2.0', value: '2' },
 ];
 
 const LiveNotesScreen = ({ navigation }) => {
@@ -81,6 +107,28 @@ const LiveNotesScreen = ({ navigation }) => {
     const [typingCollaborators, setTypingCollaborators] = useState({});
     const [showCollabModal, setShowCollabModal] = useState(false);
     const [showColorPicker, setShowColorPicker] = useState(false);
+    const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+    const [showLinkModal, setShowLinkModal] = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
+    const [showFontSizePicker, setShowFontSizePicker] = useState(false);
+    const [showFontFamilyPicker, setShowFontFamilyPicker] = useState(false);
+    const [showLineSpacingPicker, setShowLineSpacingPicker] = useState(false);
+    const [showHeadingPicker, setShowHeadingPicker] = useState(false);
+
+    const [editorState, setEditorState] = useState({
+        bold: false,
+        italic: false,
+        underline: false,
+        strikethrough: false,
+        align: 'left',
+        bullet: false,
+        ordered: false,
+        color: '#1F2937',
+        highlight: 'transparent',
+        fontSize: '3',
+        fontFamily: 'System',
+        heading: '0'
+    });
 
     // Meeting Selection for Sharing
     const [meetings, setMeetings] = useState([]);
@@ -96,11 +144,19 @@ const LiveNotesScreen = ({ navigation }) => {
     const richText = useRef();
     const [noteTitle, setNoteTitle] = useState('');
     const [isPublic, setIsPublic] = useState(false);
-    const [editorState, setEditorState] = useState({ bold: false, italic: false, underline: false, align: 'left', bullet: false, ordered: false, color: '#1F2937' });
+
     const lastContentRef = useRef('');
     const typingTimeout = useRef(null);
     const saveTimeout = useRef(null);
+    const isUndoRedoAction = useRef(false);
+
     const [webContent, setWebContent] = useState('');
+    const [showClubPicker, setShowClubPicker] = useState(false);
+    const [noteClubId, setNoteClubId] = useState(null);
+
+    // Web-only undo/redo stacks
+    const [undoStack, setUndoStack] = useState([]);
+    const [redoStack, setRedoStack] = useState([]);
 
     // Load initial list
     useEffect(() => {
@@ -148,15 +204,34 @@ const LiveNotesScreen = ({ navigation }) => {
                 if (data.updatedBy !== user._id) {
                     if (data.title !== undefined) setNoteTitle(data.title);
                     if (data.isPublic !== undefined) setIsPublic(data.isPublic);
+                    if (data.clubId !== undefined) setNoteClubId(data.clubId);
 
                     if (data.content !== undefined && data.content !== lastContentRef.current) {
-                        if (__DEV__) console.log('[Socket] Received change:', data.content.substring(0, 50));
+                        isUndoRedoAction.current = true; // Prevent remote changes from being added to undo stack
                         lastContentRef.current = data.content;
                         if (Platform.OS === 'web') {
                             setWebContent(htmlToPlain(data.content));
                         } else if (richText.current) {
                             richText.current.setContentHTML(data.content);
                         }
+                    }
+                }
+            });
+
+            socket.on('note:op_received', (data) => {
+                if (data.updatedBy !== user._id && activeNote?._id === data.noteId) {
+                    const { delta } = data;
+                    if (delta.type === 'content_change' && delta.html !== lastContentRef.current) {
+                        isUndoRedoAction.current = true; // Prevent remote ops from being added to undo stack
+                        lastContentRef.current = delta.html;
+                        if (Platform.OS === 'web') {
+                            setWebContent(htmlToPlain(delta.html));
+                        } else if (richText.current) {
+                            richText.current.setContentHTML(delta.html);
+                        }
+                    } else if (delta.type === 'format') {
+                        // Apply formatting ops if possible (pell doesn't apply remote format actions easily without selection sync)
+                        // For now we rely on the subsequent content_change or full update to sync formatting
                     }
                 }
             });
@@ -218,6 +293,7 @@ const LiveNotesScreen = ({ navigation }) => {
         setActiveNote(note);
         setNoteTitle(note.title);
         setIsPublic(note.isPublic);
+        setNoteClubId(note.clubId?._id || note.clubId);
         lastContentRef.current = note.content || '';
         if (Platform.OS === 'web') setWebContent(htmlToPlain(note.content || ''));
     };
@@ -225,6 +301,7 @@ const LiveNotesScreen = ({ navigation }) => {
     const closeNote = () => {
         setActiveNote(null);
         setNoteTitle('');
+        setNoteClubId(null);
         setNoteCollaborators([]);
         setTypingCollaborators({});
         loadNotes();
@@ -239,41 +316,163 @@ const LiveNotesScreen = ({ navigation }) => {
         });
     }, [socket, activeNote]);
 
-    const onEditorChange = (content) => {
-        // Guard against internal library updates that send objects or other types
-        let html = typeof content === 'string' ? content : (content?.nativeEvent?.text || lastContentRef.current);
+    // Web undo/redo handlers
+    const handleUndo = useCallback(() => {
+        if (Platform.OS !== 'web' || undoStack.length === 0) return;
 
-        // If on Web, the input is plain text from TextInput, we must convert to HTML for consistency
-        if (Platform.OS === 'web') {
-            html = plainToHtml(html);
+        isUndoRedoAction.current = true;
+        const previousContent = undoStack[undoStack.length - 1];
+        setRedoStack(prev => [webContent, ...prev].slice(0, 50));
+        setUndoStack(prev => prev.slice(0, -1));
+        setWebContent(htmlToPlain(previousContent));
+        onEditorChange(htmlToPlain(previousContent));
+    }, [undoStack, webContent]);
+
+    const handleRedo = useCallback(() => {
+        if (Platform.OS !== 'web' || redoStack.length === 0) return;
+
+        isUndoRedoAction.current = true;
+        const nextContent = redoStack[0];
+        setUndoStack(prev => [...prev, plainToHtml(webContent)].slice(-50));
+        setRedoStack(prev => prev.slice(1));
+        setWebContent(htmlToPlain(nextContent));
+        onEditorChange(htmlToPlain(nextContent));
+    }, [redoStack, webContent]);
+
+    // Web formatting handler
+    const handleWebFormatting = useCallback((format, value) => {
+        if (Platform.OS !== 'web') return;
+
+        const textarea = document.activeElement;
+        if (!textarea || textarea.tagName !== 'TEXTAREA') return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = webContent.substring(start, end);
+
+        if (!selectedText && !['bullet', 'numbered'].includes(format)) return;
+
+        let formattedText = selectedText;
+
+        switch (format) {
+            case 'bold':
+                formattedText = `<b>${selectedText}</b>`;
+                break;
+            case 'italic':
+                formattedText = `<i>${selectedText}</i>`;
+                break;
+            case 'underline':
+                formattedText = `<u>${selectedText}</u>`;
+                break;
+            case 'strikethrough':
+                formattedText = `<s>${selectedText}</s>`;
+                break;
+            case 'color':
+                formattedText = `<span style="color: ${value}">${selectedText}</span>`;
+                setShowColorPicker(false);
+                break;
+            case 'highlight':
+                formattedText = `<span style="background-color: ${value}">${selectedText}</span>`;
+                setShowHighlightPicker(false);
+                break;
+            case 'bullet':
+                const lines = webContent.split('\n');
+                const lineIndex = webContent.substring(0, start).split('\n').length - 1;
+                lines[lineIndex] = '• ' + lines[lineIndex];
+                const newContent = lines.join('\n');
+                setWebContent(newContent);
+                onEditorChange(newContent);
+                return;
+            case 'numbered':
+                const numLines = webContent.split('\n');
+                const numLineIndex = webContent.substring(0, start).split('\n').length - 1;
+                numLines[numLineIndex] = '1. ' + numLines[numLineIndex];
+                const numContent = numLines.join('\n');
+                setWebContent(numContent);
+                onEditorChange(numContent);
+                return;
+            default:
+                return;
         }
 
-        if (__DEV__) console.log('[Editor] Change:', html.substring(0, 50));
+        const newContent = webContent.substring(0, start) + formattedText + webContent.substring(end);
+        setWebContent(newContent);
+        onEditorChange(newContent);
+
+        // Restore cursor position
+        setTimeout(() => {
+            textarea.selectionStart = start;
+            textarea.selectionEnd = start + formattedText.length;
+        }, 0);
+    }, [webContent]);
+
+    // Keyboard shortcuts for web undo/redo
+    useEffect(() => {
+        if (Platform.OS !== 'web' || !activeNote) return;
+
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                handleUndo();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                handleRedo();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [activeNote, handleUndo, handleRedo]);
+
+    const onEditorChange = (content) => {
+        let html = typeof content === 'string' ? content : (content?.nativeEvent?.text || lastContentRef.current);
+
+        if (Platform.OS === 'web') {
+            html = plainToHtml(html);
+
+            // Add to undo stack only if this is a user-initiated change (not undo/redo or remote)
+            if (!isUndoRedoAction.current && html !== lastContentRef.current) {
+                setUndoStack(prev => [...prev, lastContentRef.current].slice(-50));
+                setRedoStack([]);
+            }
+            isUndoRedoAction.current = false;
+        }
+
+        if (html === lastContentRef.current) return;
         lastContentRef.current = html;
 
         if (socket && activeNote) {
             socket.emit('note:typing', { noteId: activeNote._id, isTyping: true });
+
+            // Operational Broadcast
+            socket.emit('note:op', {
+                noteId: activeNote._id,
+                delta: { type: 'content_change', html },
+                title: noteTitle,
+                isPublic: isPublic,
+                clubId: noteClubId,
+                plainTextSnippet: htmlToPlain(html).substring(0, 100)
+            });
+
             if (typingTimeout.current) clearTimeout(typingTimeout.current);
             typingTimeout.current = setTimeout(() => {
                 socket.emit('note:typing', { noteId: activeNote._id, isTyping: false });
             }, 2000);
         }
 
-        handleRemoteUpdate({ content: html });
-
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         saveTimeout.current = setTimeout(async () => {
             try {
-                const currentTitle = noteTitle; // Capture latest title in closure
                 await notesAPI.update(activeNote._id, {
-                    title: currentTitle,
+                    title: noteTitle,
                     content: html,
-                    isPublic: isPublic
+                    isPublic: isPublic,
+                    clubId: noteClubId
                 });
             } catch (error) {
                 console.error('Auto-save error:', error);
             }
-        }, 3000);
+        }, 5000);
     };
 
     const handleTitleChange = (val) => {
@@ -305,80 +504,137 @@ const LiveNotesScreen = ({ navigation }) => {
 
         const newVal = !isPublic;
         setIsPublic(newVal);
-        handleRemoteUpdate({ isPublic: newVal });
+
+        // If making public and no club is selected, suggest selecting one
+        if (newVal && !noteClubId && selectedClubId && selectedClubId !== 'all') {
+            setNoteClubId(selectedClubId);
+            handleRemoteUpdate({ isPublic: newVal, clubId: selectedClubId });
+        } else {
+            handleRemoteUpdate({ isPublic: newVal });
+        }
 
         try {
             await notesAPI.update(activeNote._id, {
                 title: noteTitle,
                 content: lastContentRef.current,
-                isPublic: newVal
+                isPublic: newVal,
+                clubId: newVal && !noteClubId && selectedClubId !== 'all' ? selectedClubId : noteClubId
             });
-            if (__DEV__) console.log('[Privacy] Toggled to:', newVal);
         } catch (error) {
             console.error('Toggle public error:', error);
             setIsPublic(!newVal); // Rollback
         }
     };
 
+    const handleClubSelect = async (clubId) => {
+        const isOwner = activeNote && String(activeNote.userId?._id || activeNote.userId) === String(user?._id);
+        if (!isOwner) return;
+
+        setNoteClubId(clubId);
+        setShowClubPicker(false);
+        handleRemoteUpdate({ clubId });
+
+        try {
+            await notesAPI.update(activeNote._id, {
+                title: noteTitle,
+                content: lastContentRef.current,
+                clubId: clubId,
+                isPublic: isPublic
+            });
+        } catch (error) {
+            console.error('Club update error:', error);
+        }
+    };
+
     const handleAction = (action, value) => {
         const isOwner = activeNote && String(activeNote.userId?._id || activeNote.userId) === String(user?._id);
         const canEdit = isOwner || isPublic;
-
-        if (__DEV__) console.log('[Toolbar] Action:', action, 'canEdit:', canEdit);
         if (!canEdit) return;
 
         if (Platform.OS === 'web') return;
-        if (!richText.current) {
-            console.warn('[Toolbar] Editor ref not ready');
-            return;
-        }
+        if (!richText.current) return;
 
-        // Always focus first to ensure the WebView receives the command
         try {
-            richText.current.focusContentEditor();
+            // Apply operational feedback to UI immediately
+            if (action === 'color') {
+                richText.current.sendAction(actions.foreColor, value);
+                setEditorState(prev => ({ ...prev, color: value }));
+                setShowColorPicker(false);
+            } else if (action === 'fontSize') {
+                richText.current.sendAction(actions.fontSize, value);
+                setEditorState(prev => ({ ...prev, fontSize: value }));
+                setShowFontSizePicker(false);
+            } else if (action === 'fontName') {
+                richText.current.sendAction(actions.fontName, value);
+                setEditorState(prev => ({ ...prev, fontFamily: value }));
+                setShowFontFamilyPicker(false);
+            } else if (action === 'highlight') {
+                richText.current.sendAction(actions.hiliteColor, value);
+                setEditorState(prev => ({ ...prev, highlight: value }));
+                setShowHighlightPicker(false);
+            } else if (action === 'link') {
+                if (value) {
+                    richText.current.insertLink(value);
+                    setLinkUrl('');
+                    setShowLinkModal(false);
+                } else {
+                    setShowLinkModal(true);
+                }
+            } else if (action === actions.undo) {
+                richText.current.sendAction(actions.undo);
+            } else if (action === actions.redo) {
+                richText.current.sendAction(actions.redo);
+            } else if (action === 'heading') {
+                richText.current.sendAction(actions.heading1 + (parseInt(value) - 1), '');
+                setShowHeadingPicker(false);
+            } else if (action === 'strikethrough') {
+                richText.current.sendAction(actions.setStrikethrough);
+            } else if (action === 'indent') {
+                richText.current.sendAction(actions.indent);
+            } else if (action === 'outdent') {
+                richText.current.sendAction(actions.outdent);
+            } else if (action === 'clearFormatting') {
+                richText.current.sendAction(actions.removeFormat);
+            } else if (action === 'lineHeight') {
+                // Custom CSS injection via HTML wrapper (requires JS bridge or content wrapping)
+                richText.current.insertHTML(`<div style="line-height: ${value}">${lastContentRef.current}</div>`);
+                setShowLineSpacingPicker(false);
+            } else if (action === 'quote') {
+                richText.current.sendAction(actions.blockquote);
+            } else if (action === 'code') {
+                richText.current.sendAction(actions.code);
+            } else if (action === 'checkbox') {
+                richText.current.insertHTML('<input type="checkbox" /> ');
+            } else {
+                richText.current.sendAction(action, value);
+            }
 
-            // Small delay to ensure focus is set before executing command
-            setTimeout(() => {
+            // CRITICAL: Capture and broadcast the updated HTML after formatting
+            // Small delay to allow the editor to update its internal state
+            setTimeout(async () => {
                 try {
-                    if (action === 'color') {
-                        richText.current.setForeColor(value);
-                        setEditorState(prev => ({ ...prev, color: value }));
-                        setShowColorPicker(false);
-                    } else if (action === 'highlight') {
-                        richText.current.setHiliteColor(value);
-                        setShowColorPicker(false);
-                    } else if (action === 'arrow' || action === 'dash') {
-                        richText.current.insertHTML(value);
-                    } else if (action === actions.setBold) {
-                        richText.current.setBold();
-                    } else if (action === actions.setItalic) {
-                        richText.current.setItalic();
-                    } else if (action === actions.setUnderline) {
-                        richText.current.setUnderline();
-                    } else if (action === actions.insertBulletsList) {
-                        richText.current.insertBulletsList();
-                    } else if (action === actions.insertOrderedList) {
-                        richText.current.insertOrderedList();
-                    } else if (action === actions.alignLeft) {
-                        richText.current.setJustifyLeft();
-                    } else if (action === actions.alignCenter) {
-                        richText.current.setJustifyCenter();
-                    } else if (action === actions.alignRight) {
-                        richText.current.setJustifyRight();
-                    } else if (action === actions.alignFull) {
-                        richText.current.setJustifyFull();
-                    } else if (action === actions.undo) {
-                        richText.current.undo();
-                    } else if (action === actions.redo) {
-                        richText.current.redo();
-                    } else {
-                        // Fallback for any other actions
-                        richText.current.sendAction(action, value);
+                    const html = await richText.current?.getContentHtml();
+                    if (html && html !== lastContentRef.current) {
+                        lastContentRef.current = html;
+
+                        // Broadcast the formatted content to other collaborators
+                        if (socket && activeNote) {
+                            socket.emit('note:op', {
+                                noteId: activeNote._id,
+                                delta: { type: 'content_change', html },
+                                title: noteTitle,
+                                isPublic: isPublic,
+                                clubId: noteClubId,
+                                plainTextSnippet: htmlToPlain(html).substring(0, 100),
+                                updatedBy: user._id
+                            });
+                        }
                     }
                 } catch (err) {
-                    console.error('[Toolbar] Command execution error:', err);
+                    console.error('[Toolbar] Failed to get content after formatting:', err);
                 }
-            }, 100);
+            }, 150);
+
         } catch (error) {
             console.error('[Toolbar] Action error:', error);
         }
@@ -386,25 +642,18 @@ const LiveNotesScreen = ({ navigation }) => {
 
     const handleStatusChange = (status) => {
         if (!status) return;
-        if (__DEV__) console.log('[Editor] Status:', status);
-
-        let statusArray = [];
-        if (Array.isArray(status)) {
-            statusArray = status;
-        } else if (typeof status === 'string') {
-            statusArray = status.split(',');
-        }
-
-        const lowStatus = statusArray.map(s => String(s).toLowerCase().trim());
+        const lowStatus = Array.isArray(status) ? status.map(s => String(s).toLowerCase().trim()) : [String(status).toLowerCase()];
 
         setEditorState(prev => ({
             ...prev,
-            bold: lowStatus.includes('bold') || lowStatus.includes('setbold'),
-            italic: lowStatus.includes('italic') || lowStatus.includes('setitalic'),
-            underline: lowStatus.includes('underline') || lowStatus.includes('setunderline'),
-            bullet: lowStatus.includes('unorderedlist') || lowStatus.includes('bullets') || lowStatus.includes('insertbulletslist'),
-            ordered: lowStatus.includes('orderedlist') || lowStatus.includes('ordered') || lowStatus.includes('insertorderedlist'),
-            align: lowStatus.find(s => s.startsWith('justify'))?.replace('justify', '').toLowerCase() || 'left'
+            bold: lowStatus.includes('bold'),
+            italic: lowStatus.includes('italic'),
+            underline: lowStatus.includes('underline'),
+            strikethrough: lowStatus.includes('strikethrough'),
+            bullet: lowStatus.includes('unorderedlist'),
+            ordered: lowStatus.includes('orderedlist'),
+            align: lowStatus.find(s => s.startsWith('justify'))?.replace('justify', '').toLowerCase() || 'left',
+            heading: lowStatus.find(s => s.startsWith('h'))?.charAt(1) || '0'
         }));
     };
 
@@ -685,22 +934,60 @@ const LiveNotesScreen = ({ navigation }) => {
                     <ToolbarButton action={actions.undo} icon="undo" library={MaterialIcons} />
                     <ToolbarButton action={actions.redo} icon="redo" library={MaterialIcons} />
                     <View style={styles.toolbarDivider} />
+
+                    <TouchableOpacity onPress={() => setShowHeadingPicker(true)} style={styles.toolbarBtn}>
+                        <MaterialCommunityIcons name="format-header-pound" size={22} color={editorState.heading !== '0' ? "#0A66C2" : "#4B5563"} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => setShowFontSizePicker(true)} style={styles.toolbarBtn}>
+                        <MaterialCommunityIcons name="format-size" size={22} color="#4B5563" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => setShowFontFamilyPicker(true)} style={styles.toolbarBtn}>
+                        <MaterialIcons name="font-download" size={22} color="#4B5563" />
+                    </TouchableOpacity>
+
+                    <View style={styles.toolbarDivider} />
                     <ToolbarButton action={actions.setBold} icon="format-bold" library={MaterialIcons} />
                     <ToolbarButton action={actions.setItalic} icon="format-italic" library={MaterialIcons} />
                     <ToolbarButton action={actions.setUnderline} icon="format-underlined" library={MaterialIcons} />
+                    <ToolbarButton action="strikethrough" icon="format-strikethrough" library={MaterialIcons} />
+
                     <TouchableOpacity onPress={() => setShowColorPicker(true)} style={styles.toolbarBtn}>
-                        <MaterialIcons name="format-color-text" size={22} color="#4B5563" />
+                        <MaterialIcons name="format-color-text" size={22} color={editorState.color} />
                     </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => setShowHighlightPicker(true)} style={styles.toolbarBtn}>
+                        <MaterialIcons name="format-color-fill" size={22} color={editorState.highlight !== 'transparent' ? editorState.highlight : "#4B5563"} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => handleAction('link')} style={styles.toolbarBtn}>
+                        <MaterialIcons name="link" size={22} color="#4B5563" />
+                    </TouchableOpacity>
+
                     <View style={styles.toolbarDivider} />
                     <ToolbarButton action={actions.insertBulletsList} icon="format-list-bulleted" library={MaterialIcons} />
                     <ToolbarButton action={actions.insertOrderedList} icon="format-list-numbered" library={MaterialIcons} />
-                    <ToolbarButton action="arrow" icon="arrow-right-bold" library={MaterialCommunityIcons} value=" → " />
-                    <ToolbarButton action="dash" icon="minus" library={MaterialCommunityIcons} value=" — " />
+                    <ToolbarButton action="checkbox" icon="checkbox-marked-outline" library={MaterialCommunityIcons} />
+
+                    <View style={styles.toolbarDivider} />
+                    <ToolbarButton action="outdent" icon="format-indent-decrease" library={MaterialIcons} />
+                    <ToolbarButton action="indent" icon="format-indent-increase" library={MaterialIcons} />
+
                     <View style={styles.toolbarDivider} />
                     <ToolbarButton action={actions.alignLeft} icon="format-align-left" library={MaterialIcons} />
                     <ToolbarButton action={actions.alignCenter} icon="format-align-center" library={MaterialIcons} />
                     <ToolbarButton action={actions.alignRight} icon="format-align-right" library={MaterialIcons} />
-                    <ToolbarButton action={actions.alignFull} icon="format-align-justify" library={MaterialIcons} />
+
+                    <View style={styles.toolbarDivider} />
+                    <ToolbarButton action="quote" icon="format-quote-close" library={MaterialCommunityIcons} />
+                    <ToolbarButton action="code" icon="code-braces" library={MaterialCommunityIcons} />
+                    <TouchableOpacity onPress={() => setShowLineSpacingPicker(true)} style={styles.toolbarBtn}>
+                        <MaterialCommunityIcons name="format-line-spacing" size={22} color="#4B5563" />
+                    </TouchableOpacity>
+
+                    <View style={styles.toolbarDivider} />
+                    <ToolbarButton action="clearFormatting" icon="format-clear" library={MaterialIcons} />
                 </ScrollView>
             </View>
         );
@@ -722,12 +1009,13 @@ const LiveNotesScreen = ({ navigation }) => {
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.avatarScroll}>
                             {displayedCollabs.map(c => (
                                 <TouchableOpacity key={c._id} style={styles.avatarWrapper} onPress={() => setShowCollabModal(true)}>
-                                    {c.profilePicture ? <Image source={{ uri: c.profilePicture }} style={styles.tinyAvatar} /> : (
-                                        <View style={[styles.tinyAvatar, { backgroundColor: '#0A66C2', justifyContent: 'center', alignItems: 'center' }]}>
-                                            <Text style={styles.tinyAvatarText}>{c.displayName?.charAt(0)}</Text>
-                                        </View>
-                                    )}
-                                    {typingCollaborators[c._id]?.isTyping && <View style={styles.typingDot} />}
+                                    <View style={[styles.avatarContainer, typingCollaborators[c._id]?.isTyping && styles.avatarTyping]}>
+                                        {c.profilePicture ? <Image source={{ uri: c.profilePicture }} style={styles.tinyAvatar} /> : (
+                                            <View style={[styles.tinyAvatar, { backgroundColor: '#0A66C2', justifyContent: 'center', alignItems: 'center' }]}>
+                                                <Text style={styles.tinyAvatarText}>{c.displayName?.charAt(0)}</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 </TouchableOpacity>
                             ))}
                             {extraCollabs > 0 && (
@@ -736,19 +1024,69 @@ const LiveNotesScreen = ({ navigation }) => {
                                 </TouchableOpacity>
                             )}
                         </ScrollView>
-                        {typingList.length > 0 && (
-                            <Text style={styles.typingIndicatorText} numberOfLines={1}>
-                                {typingList.length === 1 ? `${typingList[0].displayName} is typing...` : `${typingList.length} people typing...`}
-                            </Text>
-                        )}
                     </View>
                     <TouchableOpacity onPress={() => setShowExportMenu(true)} style={styles.shareBtn}>
-                        <Ionicons name="download-outline" size={22} color="#0A66C2" />
+                        <Ionicons name="document-text-outline" size={22} color="#0A66C2" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleShare} style={styles.shareBtn}><Ionicons name="share-social-outline" size={22} color="#0A66C2" /></TouchableOpacity>
                 </View>
 
                 {Platform.OS !== 'web' && <CustomToolbar />}
+                {Platform.OS === 'web' && (
+                    <View style={styles.customToolbarContainer}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarContent}>
+                            <TouchableOpacity
+                                onPress={handleUndo}
+                                disabled={undoStack.length === 0}
+                                style={[styles.toolbarBtn, undoStack.length === 0 && { opacity: 0.3 }]}
+                            >
+                                <MaterialIcons name="undo" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleRedo}
+                                disabled={redoStack.length === 0}
+                                style={[styles.toolbarBtn, redoStack.length === 0 && { opacity: 0.3 }]}
+                            >
+                                <MaterialIcons name="redo" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+                            <View style={styles.toolbarDivider} />
+
+                            <TouchableOpacity onPress={() => handleWebFormatting('bold')} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-bold" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleWebFormatting('italic')} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-italic" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleWebFormatting('underline')} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-underlined" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleWebFormatting('strikethrough')} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-strikethrough" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => setShowColorPicker(true)} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-color-text" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => setShowHighlightPicker(true)} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-color-fill" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+
+                            <View style={styles.toolbarDivider} />
+                            <TouchableOpacity onPress={() => handleWebFormatting('bullet')} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-list-bulleted" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleWebFormatting('numbered')} style={styles.toolbarBtn}>
+                                <MaterialIcons name="format-list-numbered" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+
+                            <View style={styles.toolbarDivider} />
+                            <TouchableOpacity onPress={() => setShowLinkModal(true)} style={styles.toolbarBtn}>
+                                <MaterialIcons name="link" size={22} color="#4B5563" />
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                )}
 
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -771,6 +1109,15 @@ const LiveNotesScreen = ({ navigation }) => {
                             >
                                 <Ionicons name={isPublic ? 'people' : 'lock-closed'} size={12} color="#FFF" />
                                 <Text style={styles.statusBadgeText}>{isPublic ? 'Public' : 'Personal'}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => isOwner && setShowClubPicker(true)}
+                                style={[styles.statusBadge, { backgroundColor: '#E0F2FE', marginLeft: 8 }]}
+                            >
+                                <Ionicons name="business" size={12} color="#0A66C2" />
+                                <Text style={[styles.statusBadgeText, { color: '#0A66C2' }]}>
+                                    {noteClubId ? (user?.clubsJoined?.find(c => (c.clubId?._id || c.clubId) === noteClubId)?.clubId?.name || 'Club') : 'Select Club'}
+                                </Text>
                             </TouchableOpacity>
                         </View>
                         <View style={styles.titleSeparator} />
@@ -809,6 +1156,41 @@ const LiveNotesScreen = ({ navigation }) => {
                     </View>
                 </KeyboardAvoidingView>
 
+                {/* Club Picker Modal */}
+                <Modal visible={showClubPicker} transparent animationType="slide" onRequestClose={() => setShowClubPicker(false)}>
+                    <View style={styles.modalOverlay}>
+                        <TouchableOpacity style={styles.modalBackdrop} onPress={() => setShowClubPicker(false)} />
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Select Sharing Club</Text>
+                                <TouchableOpacity onPress={() => setShowClubPicker(false)}><Ionicons name="close" size={24} color="#6B7280" /></TouchableOpacity>
+                            </View>
+                            <FlatList
+                                data={user?.clubsJoined || []}
+                                keyExtractor={item => (item.clubId?._id || item.clubId).toString()}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={[styles.clubSelectItem, noteClubId === (item.clubId?._id || item.clubId) && { borderColor: '#0A66C2', backgroundColor: '#F0F9FF' }]}
+                                        onPress={() => handleClubSelect(item.clubId?._id || item.clubId)}
+                                    >
+                                        <View style={styles.clubSelectIcon}>
+                                            <Ionicons name="business" size={20} color="#0A66C2" />
+                                        </View>
+                                        <Text style={styles.clubItemName}>{item.clubId?.name || 'Unnamed Club'}</Text>
+                                        {noteClubId === (item.clubId?._id || item.clubId) && <Ionicons name="checkmark-circle" size={20} color="#0A66C2" />}
+                                    </TouchableOpacity>
+                                )}
+                                ListHeaderComponent={
+                                    <TouchableOpacity style={styles.skipBtn} onPress={() => handleClubSelect(null)}>
+                                        <Text style={styles.skipBtnText}>Remove Club (Make Private)</Text>
+                                    </TouchableOpacity>
+                                }
+                                contentContainerStyle={{ padding: 20 }}
+                            />
+                        </View>
+                    </View>
+                </Modal>
+
                 {/* Modals moved inside renderEditor for correct scoping */}
                 <Modal visible={showColorPicker} transparent animationType="fade" onRequestClose={() => setShowColorPicker(false)}>
                     <View style={styles.colorPickerOverlay}>
@@ -820,7 +1202,7 @@ const LiveNotesScreen = ({ navigation }) => {
                                     <TouchableOpacity
                                         key={c.value}
                                         style={[styles.colorOption, { backgroundColor: c.value }]}
-                                        onPress={() => handleAction('color', c.value)}
+                                        onPress={() => Platform.OS === 'web' ? handleWebFormatting('color', c.value) : handleAction('color', c.value)}
                                     >
                                         {editorState.color === c.value && <Ionicons name="checkmark" size={16} color="#FFF" />}
                                     </TouchableOpacity>
@@ -829,6 +1211,120 @@ const LiveNotesScreen = ({ navigation }) => {
                             <TouchableOpacity onPress={() => setShowColorPicker(false)} style={styles.colorPickerClose}>
                                 <Text style={styles.colorPickerCloseText}>Close</Text>
                             </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Highlight Picker */}
+                <Modal visible={showHighlightPicker} transparent animationType="fade" onRequestClose={() => setShowHighlightPicker(false)}>
+                    <View style={styles.colorPickerOverlay}>
+                        <TouchableOpacity style={styles.colorPickerBackdrop} onPress={() => setShowHighlightPicker(false)} />
+                        <View style={styles.colorPickerCard}>
+                            <Text style={styles.colorPickerTitle}>Highlight Color</Text>
+                            <View style={styles.colorGrid}>
+                                <TouchableOpacity
+                                    style={[styles.colorOption, { backgroundColor: '#FFF' }]}
+                                    onPress={() => Platform.OS === 'web' ? handleWebFormatting('highlight', 'transparent') : handleAction('highlight', 'transparent')}
+                                >
+                                    <Ionicons name="close" size={16} color="#6B7280" />
+                                </TouchableOpacity>
+                                {COLOR_PALETTE.slice(1).map(c => (
+                                    <TouchableOpacity
+                                        key={c.value}
+                                        style={[styles.colorOption, { backgroundColor: c.value }]}
+                                        onPress={() => Platform.OS === 'web' ? handleWebFormatting('highlight', c.value) : handleAction('highlight', c.value)}
+                                    >
+                                        {editorState.highlight === c.value && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Link Modal */}
+                <Modal visible={showLinkModal} transparent animationType="slide" onRequestClose={() => setShowLinkModal(false)}>
+                    <View style={styles.modalOverlay}>
+                        <TouchableOpacity style={styles.modalBackdrop} onPress={() => setShowLinkModal(false)} />
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Insert Hyperlink</Text>
+                                <TouchableOpacity onPress={() => setShowLinkModal(false)}><Ionicons name="close" size={24} color="#6B7280" /></TouchableOpacity>
+                            </View>
+                            <View style={{ padding: 20 }}>
+                                <TextInput
+                                    style={[styles.searchInput, { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', marginBottom: 20, marginHorizontal: 0, color: '#0A66C2' }]}
+                                    value={linkUrl}
+                                    onChangeText={setLinkUrl}
+                                    placeholder="https://example.com"
+                                    placeholderTextColor="#9CA3AF"
+                                    autoFocus
+                                />
+                                <TouchableOpacity style={styles.skipBtn} onPress={() => handleAction('link', linkUrl)}>
+                                    <Text style={styles.skipBtnText}>Insert Link</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+                <Modal visible={showFontSizePicker} transparent animationType="fade" onRequestClose={() => setShowFontSizePicker(false)}>
+                    <View style={styles.colorPickerOverlay}>
+                        <TouchableOpacity style={styles.colorPickerBackdrop} onPress={() => setShowFontSizePicker(false)} />
+                        <View style={styles.colorPickerCard}>
+                            <Text style={styles.colorPickerTitle}>Font Size</Text>
+                            {FONT_SIZES.map(f => (
+                                <TouchableOpacity key={f.value} style={styles.pickerItem} onPress={() => handleAction('fontSize', f.value)}>
+                                    <Text style={{ fontSize: f.size }}>{f.label}</Text>
+                                    {editorState.fontSize === f.value && <Ionicons name="checkmark" size={18} color="#0A66C2" />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Font Family Picker */}
+                <Modal visible={showFontFamilyPicker} transparent animationType="fade" onRequestClose={() => setShowFontFamilyPicker(false)}>
+                    <View style={styles.colorPickerOverlay}>
+                        <TouchableOpacity style={styles.colorPickerBackdrop} onPress={() => setShowFontFamilyPicker(false)} />
+                        <View style={styles.colorPickerCard}>
+                            <Text style={styles.colorPickerTitle}>Font Family</Text>
+                            {FONT_FAMILIES.map(f => (
+                                <TouchableOpacity key={f.value} style={styles.pickerItem} onPress={() => handleAction('fontName', f.value)}>
+                                    <Text style={{ fontFamily: Platform.OS === 'ios' ? 'System' : f.label }}>{f.label}</Text>
+                                    {editorState.fontFamily === f.value && <Ionicons name="checkmark" size={18} color="#0A66C2" />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Heading Picker */}
+                <Modal visible={showHeadingPicker} transparent animationType="fade" onRequestClose={() => setShowHeadingPicker(false)}>
+                    <View style={styles.colorPickerOverlay}>
+                        <TouchableOpacity style={styles.colorPickerBackdrop} onPress={() => setShowHeadingPicker(false)} />
+                        <View style={styles.colorPickerCard}>
+                            <Text style={styles.colorPickerTitle}>Text Style</Text>
+                            {['Paragraph', 'Heading 1', 'Heading 2', 'Heading 3', 'Heading 4', 'Heading 5', 'Heading 6'].map((h, i) => (
+                                <TouchableOpacity key={h} style={styles.pickerItem} onPress={() => handleAction('heading', i)}>
+                                    <Text style={{ fontSize: i === 0 ? 16 : 24 - i, fontWeight: i === 0 ? 'normal' : 'bold' }}>{h}</Text>
+                                    {((parseInt(editorState.heading) === i)) && <Ionicons name="checkmark" size={18} color="#0A66C2" />}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Line Spacing Picker */}
+                <Modal visible={showLineSpacingPicker} transparent animationType="fade" onRequestClose={() => setShowLineSpacingPicker(false)}>
+                    <View style={styles.colorPickerOverlay}>
+                        <TouchableOpacity style={styles.colorPickerBackdrop} onPress={() => setShowLineSpacingPicker(false)} />
+                        <View style={styles.colorPickerCard}>
+                            <Text style={styles.colorPickerTitle}>Line Spacing</Text>
+                            {LINE_SPACINGS.map(l => (
+                                <TouchableOpacity key={l.value} style={styles.pickerItem} onPress={() => handleAction('lineHeight', l.value)}>
+                                    <Text>{l.label}</Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
                     </View>
                 </Modal>
@@ -1066,12 +1562,12 @@ const styles = StyleSheet.create({
     presenceBar: { flex: 1, paddingHorizontal: 10 },
     avatarScroll: { flexDirection: 'row' },
     avatarWrapper: { position: 'relative', marginRight: -8 },
+    avatarContainer: { borderRadius: 18, padding: 2, backgroundColor: 'transparent' },
+    avatarTyping: { borderWidth: 2, borderRadius: 50, borderColor: '#0A66C2', backgroundColor: '#FFF' },
     tinyAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#FFF' },
     tinyAvatarText: { color: '#FFF', fontSize: 12, fontWeight: '700', textAlign: 'center' },
-    typingDot: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#FFF' },
     extraBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', marginLeft: 12, borderWidth: 2, borderColor: '#FFF' },
     extraText: { fontSize: 10, fontWeight: '700', color: '#6B7280' },
-    typingIndicatorText: { fontSize: 10, color: '#6B7280', marginTop: 2 },
     shareBtn: { padding: 8 },
 
     // Custom Toolbar
@@ -1173,7 +1669,9 @@ const styles = StyleSheet.create({
     colorGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15 },
     colorOption: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#F3F4F6' },
     colorPickerClose: { marginTop: 30, paddingVertical: 10, paddingHorizontal: 30, borderRadius: 20, backgroundColor: '#F3F4F6' },
-    colorPickerCloseText: { fontSize: 14, fontWeight: '700', color: '#6B7280' }
+    colorPickerCloseText: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
+    pickerItem: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    webToolbarHint: { fontSize: 11, color: '#9CA3AF', fontStyle: 'italic', marginLeft: 10, alignSelf: 'center' }
 });
 
 export default LiveNotesScreen;

@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/padded_icon.png",
     "userInterfaceStyle": "automatic",
-    "extra": {
-      "eas": {
-        "projectId": "872e808d-3c23-4ed2-8e41-a31ae6c283a7"
-      }
-    },
     "splash": {
       "image": "./assets/AS.png",
       "resizeMode": "contain",
@@ -48,7 +43,11 @@
         "WRITE_EXTERNAL_STORAGE",
         "RECORD_AUDIO",
         "NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.VIBRATE"
       ],
       "notification": {
         "icon": "./assets/AS.png",
@@ -92,10 +91,31 @@
         "expo-notifications",
         {
           "icon": "./assets/AS.png",
-          "color": "#0A66C2"
+          "color": "#0A66C2",
+          "sounds": [
+            "./assets/notification.wav"
+          ],
+          "mode": "production",
+          "androidMode": "default",
+          "androidCollapsedTitle": "#{unread_notifications} new notifications"
         }
       ]
     ],
-    "owner": "shivamdombe23"
+    "notification": {
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new notifications"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "230af709-19e3-4328-8402-fb6f7e61f394"
+      }
+    }
+  },
+  "owner": "shivamdombe232",
+  "extra": {
+    "eas": {
+      "projectId": "230af709-19e3-4328-8402-fb6f7e61f394"
+    }
   }
 }
