@@ -258,11 +258,16 @@ const MeetingsScreen = ({ navigation }) => {
 
     const getMeetingStatus = (meeting) => {
         const myStatus = meeting.attendees.find(a => (a.userId?._id || a.userId) === user._id);
-        if (myStatus && myStatus.status === 'present') return { label: 'Present', color: '#22C55E', bg: '#DCFCE7' };
-        if (meeting.status === 'canceled' || meeting.status === 'cancelled') return { label: 'Canceled', color: '#EF4444', bg: '#FEE2E2' };
-        if (meeting.status === 'upcoming') return { label: 'Upcoming', color: '#0A66C2', bg: '#E0F2FE' };
-        if (meeting.status === 'completed') return { label: 'Completed', color: '#6B7280', bg: '#F3F4F6' };
-        if (meeting.status === 'ongoing') return { label: 'Live', color: '#EF4444', bg: '#FEE2E2' };
+        const myAbsence = meeting.absenceRequests?.find(a => (a.userId?._id || a.userId || a) === user._id && a.status === 'approved');
+
+        if (myStatus && myStatus.status === 'present') return { label: 'Present', color: '#166534', bg: '#DCFCE7' };
+        if (myStatus && myStatus.status === 'late') return { label: 'Late', color: '#92400E', bg: '#FEF3C7' };
+        if (myAbsence) return { label: 'Excused', color: '#7E22CE', bg: '#F3E8FF' };
+
+        if (meeting.status === 'canceled' || meeting.status === 'cancelled') return { label: 'Canceled', color: '#B91C1C', bg: '#FEE2E2' };
+        if (meeting.status === 'ongoing') return { label: 'Live', color: '#059669', bg: '#ECFDF5' };
+        if (meeting.status === 'completed') return { label: 'Completed', color: '#1F2937', bg: '#F3F4F6' };
+        if (meeting.status === 'upcoming') return { label: 'Upcoming', color: '#0369A1', bg: '#E0F2FE' };
         return { label: meeting.status, color: '#6B7280', bg: '#F3F4F6' };
     };
 

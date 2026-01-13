@@ -90,18 +90,18 @@ const GAME_INSTRUCTIONS = {
     },
     meme_match: {
         title: 'Meme Match',
-        goal: 'Create the funniest caption for given situations!',
+        goal: 'Identify the correct movie for the given dialogue!',
         rules: [
-            'A random Situation card is shown to all players.',
-            'Everyone submits a text caption to make it as funny as possible.',
-            'Review all submissions anonymously and vote for your favorite!',
-            'The caption with the most votes wins the round.',
-            'Remember: You cannot vote for yourself!'
+            'A random dialogue from a Bollywood or Hollywood movie is shown.',
+            'Choose the correct movie from 4 multiple-choice options.',
+            'Points are awarded for correct answers.',
+            'Bonus points are given for speed (the faster you answer, the more you earn!).',
+            'Compete with friends to see who is the ultimate movie buff!'
         ],
         components: [
-            { icon: 'create', text: 'Submission: Type and send your funniest punchline.', color: '#EC4899' },
-            { icon: 'checkmark-circle', text: 'Voting: Pick the best submission anonymously.', color: '#8B5CF6' },
-            { icon: 'trophy', text: 'Points: Win by making the most people laugh.', color: '#F59E0B' }
+            { icon: 'film', text: 'Dialogue: Read the famous movie lines carefully.', color: '#EC4899' },
+            { icon: 'stopwatch', text: 'Speed Bonus: Answer quickly to get up to 500 bonus points.', color: '#8B5CF6' },
+            { icon: 'trophy', text: 'Leaderboard: Climb the ranks by being both fast and accurate.', color: '#F59E0B' }
         ]
     }
 };

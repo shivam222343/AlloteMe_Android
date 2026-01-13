@@ -40,7 +40,9 @@ const MemeMatchScreen = ({ navigation, route }) => {
     const [answerCount, setAnswerCount] = useState({ answered: 0, total: 0 });
     const [players, setPlayers] = useState([]);
     const [gameState, setGameState] = useState(null);
+    const [isGameOver, setIsGameOver] = useState(false);
     const resultsTimerRef = useRef(null);
+    const gameOverRedirectTimerRef = useRef(null);
 
     const handleLeaveGame = () => {
         const title = isHost ? "End Game for Everyone?" : "Leave Game?";
@@ -126,6 +128,7 @@ const MemeMatchScreen = ({ navigation, route }) => {
                 setPhase('answering');
                 setHasAnswered(false);
                 setSelectedAnswer(null);
+                setAnswerCount({ answered: 0, total: data.totalPlayers || players.length });
             });
 
             socket.on('memematch:answer_count', (data) => {
@@ -140,15 +143,16 @@ const MemeMatchScreen = ({ navigation, route }) => {
                 setRoundResults(data);
                 setShowResults(true);
                 setPhase('results');
+                setIsGameOver(false);
 
                 // Clear any existing timer
                 if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
 
-                // Auto-close in 8 seconds (matching backend timeout)
+                // Auto-close in 5 seconds (matching backend timeout)
                 resultsTimerRef.current = setTimeout(() => {
                     setShowResults(false);
                     resultsTimerRef.current = null;
-                }, 8000);
+                }, 5000);
             });
 
             socket.on('memematch:next_round', (data) => {
@@ -166,16 +170,14 @@ const MemeMatchScreen = ({ navigation, route }) => {
             socket.on('memematch:game_over', (data) => {
                 setRoundResults(data);
                 setShowResults(true);
+                setIsGameOver(true);
+                setPhase('results');
 
                 if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
 
-                // Auto-close in 10 seconds for game over
-                resultsTimerRef.current = setTimeout(() => {
+                // Auto-close in 30 seconds for game over
+                gameOverRedirectTimerRef.current = setTimeout(() => {
                     setShowResults(false);
-                    resultsTimerRef.current = null;
-                }, 10000);
-
-                setTimeout(() => {
                     navigation.navigate('MaverickGames');
                 }, 30000);
             });
@@ -367,61 +369,111 @@ const MemeMatchScreen = ({ navigation, route }) => {
             </ScrollView>
 
             {/* Results Modal */}
-            <Modal visible={showResults} transparent animationType="fade">
+            <Modal visible={showResults} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
-                    <Animatable.View animation="zoomIn" style={styles.resultsModal}>
+                    <Animatable.View animation="slideInUp" style={[styles.resultsModal, isGameOver && styles.gameOverModal]}>
                         <TouchableOpacity
                             style={styles.modalCloseBtn}
-                            onPress={() => setShowResults(false)}
+                            onPress={() => {
+                                setShowResults(false);
+                                if (isGameOver) navigation.navigate('MaverickGames');
+                            }}
                         >
-                            <Ionicons name="close" size={24} color="#9CA3AF" />
+                            <Ionicons name="close" size={28} color="#1F2937" />
                         </TouchableOpacity>
 
-                        <View style={styles.resultsHeader}>
-                            <Text style={styles.correctLabel}>Correct Answer:</Text>
-                            <Text style={styles.correctMovieName}>{roundResults?.correctMovie}</Text>
-                            <Text style={styles.resultDialogue}>"{roundResults?.dialogue}"</Text>
-                        </View>
+                        {isGameOver ? (
+                            <View style={styles.gameOverContainer}>
+                                <Animatable.View animation="bounceIn" style={styles.winnerSection}>
+                                    <Ionicons name="trophy" size={80} color="#FFD700" />
+                                    <Text style={styles.congratsText}>GAME OVER!</Text>
+                                    <Text style={styles.winnerName}>{roundResults?.winner?.userName} WINS!</Text>
+                                </Animatable.View>
 
-                        <Text style={styles.resultsTitle}>Round Summary</Text>
+                                <Text style={[styles.leaderboardTitle, { marginTop: 30 }]}>Final Leaderboard</Text>
+                                <ScrollView style={styles.finalLeaderboardList}>
+                                    {roundResults?.leaderboard?.map((score, index) => (
+                                        <Animatable.View
+                                            key={index}
+                                            animation="fadeInLeft"
+                                            delay={index * 150}
+                                            style={[styles.scoreRow, index === 0 && styles.winnerRow]}
+                                        >
+                                            <View style={styles.rankContainer}>
+                                                {index === 0 ? (
+                                                    <Ionicons name="ribbon" size={24} color="#FFD700" />
+                                                ) : (
+                                                    <Text style={styles.scoreRank}>#{index + 1}</Text>
+                                                )}
+                                            </View>
+                                            <Text style={styles.scoreName}>{score.userName}</Text>
+                                            <Text style={styles.scoreValue}>{score.score} pts</Text>
+                                        </Animatable.View>
+                                    ))}
+                                </ScrollView>
 
-                        <ScrollView style={styles.resultsList}>
-                            {roundResults?.playerAnswers?.map((ans, index) => (
-                                <View key={index} style={styles.resultCard}>
-                                    <View style={[
-                                        styles.answerStatus,
-                                        { backgroundColor: ans.isCorrect ? '#10B981' : '#EF4444' }
-                                    ]}>
-                                        <Ionicons
-                                            name={ans.isCorrect ? "checkmark" : "close"}
-                                            size={20}
-                                            color="#FFF"
-                                        />
+                                <TouchableOpacity
+                                    style={styles.exitBtn}
+                                    onPress={() => navigation.navigate('MaverickGames')}
+                                >
+                                    <Text style={styles.exitBtnText}>Exit to Lobby</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <>
+                                <View style={styles.resultsHeader}>
+                                    <View style={styles.revealedBadge}>
+                                        <Text style={styles.revealedText}>ROUND OVER</Text>
                                     </View>
-                                    <View style={styles.resultContent}>
-                                        <Text style={styles.resultAuthor}>{ans.userName}</Text>
-                                        <Text style={styles.resultAnswer}>Answered: {ans.answer || 'No answer'}</Text>
-                                        {ans.isCorrect && (
-                                            <Text style={styles.pointsEarned}>+{ans.points} pts (Speed Bonus included)</Text>
-                                        )}
-                                    </View>
+                                    <Text style={styles.correctLabel}>Correct Movie:</Text>
+                                    <Text style={styles.correctMovieName}>{roundResults?.correctMovie}</Text>
+                                    <Text style={styles.resultDialogue}>"{roundResults?.dialogue}"</Text>
                                 </View>
-                            ))}
-                        </ScrollView>
 
-                        <View style={styles.leaderboard}>
-                            <Text style={styles.leaderboardTitle}>Current Standings</Text>
-                            {roundResults?.scores?.slice(0, 5).map((score, index) => (
-                                <View key={score.userId || index} style={styles.scoreRow}>
-                                    <Text style={styles.scoreRank}>#{index + 1}</Text>
-                                    <Text style={styles.scoreName}>{score.userName}</Text>
-                                    <View style={styles.scoreContainer}>
-                                        <Text style={styles.roundPoints}>+{score.roundScore}</Text>
-                                        <Text style={styles.scoreValue}>{score.score} total</Text>
-                                    </View>
+                                <Text style={styles.resultsTitle}>Who Got it Right?</Text>
+
+                                <ScrollView style={styles.resultsList}>
+                                    {roundResults?.playerAnswers?.map((ans, index) => (
+                                        <View key={index} style={styles.resultCard}>
+                                            <View style={[
+                                                styles.answerStatus,
+                                                { backgroundColor: ans.isCorrect ? '#10B981' : '#EF4444' }
+                                            ]}>
+                                                <Ionicons
+                                                    name={ans.isCorrect ? "checkmark" : "close"}
+                                                    size={20}
+                                                    color="#FFF"
+                                                />
+                                            </View>
+                                            <View style={styles.resultContent}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Text style={styles.resultAuthor}>{ans.userName}</Text>
+                                                    {ans.isCorrect && (
+                                                        <Text style={styles.pointsEarned}>+{ans.points}</Text>
+                                                    )}
+                                                </View>
+                                                <Text style={styles.resultAnswer} numberOfLines={1}>
+                                                    Answered: {ans.answer || 'No answer'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+
+                                <View style={styles.leaderboard}>
+                                    <Text style={styles.leaderboardTitle}>Current Standings</Text>
+                                    {roundResults?.scores?.slice(0, 3).map((score, index) => (
+                                        <View key={score.userId || index} style={styles.scoreRow}>
+                                            <Text style={styles.scoreRank}>#{index + 1}</Text>
+                                            <Text style={styles.scoreName}>{score.userName}</Text>
+                                            <View style={styles.scoreContainer}>
+                                                <Text style={styles.scoreValue}>{score.score}</Text>
+                                            </View>
+                                        </View>
+                                    ))}
                                 </View>
-                            ))}
-                        </View>
+                            </>
+                        )}
                     </Animatable.View>
                 </View>
             </Modal>
@@ -693,94 +745,198 @@ const styles = StyleSheet.create({
         color: '#EC4899',
         fontWeight: '700',
     },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        justifyContent: 'flex-end',
+    },
+    resultsModal: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        padding: 24,
+        paddingTop: 40,
+        maxHeight: '90%',
+    },
+    gameOverModal: {
+        height: '95%',
+        backgroundColor: '#F9FAFB',
+    },
+    modalCloseBtn: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 10,
+    },
     resultsHeader: {
         alignItems: 'center',
-        marginBottom: 20,
-        paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        marginBottom: 24,
+    },
+    revealedBadge: {
+        backgroundColor: '#FCE7F3',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    revealedText: {
+        color: '#EC4899',
+        fontSize: 12,
+        fontWeight: '800',
     },
     correctLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#10B981',
-        textTransform: 'uppercase',
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
         marginBottom: 4,
     },
     correctMovieName: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#1F2937',
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#EC4899',
         textAlign: 'center',
-        marginBottom: 8,
     },
     resultDialogue: {
-        fontSize: 14,
-        color: '#6B7280',
+        fontSize: 16,
+        color: '#374151',
         fontStyle: 'italic',
         textAlign: 'center',
+        marginTop: 8,
+        opacity: 0.8,
+    },
+    resultsTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 16,
+    },
+    resultsList: {
+        maxHeight: 250,
+        marginBottom: 20,
+    },
+    resultCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        borderRadius: 16,
+        padding: 12,
+        marginBottom: 10,
     },
     answerStatus: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
     },
+    resultContent: {
+        flex: 1,
+    },
+    resultAuthor: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
     resultAnswer: {
         fontSize: 13,
         color: '#6B7280',
-    },
-    pointsEarned: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#10B981',
         marginTop: 2,
     },
-    scoreContainer: {
-        alignItems: 'flex-end',
-    },
-    roundPoints: {
-        fontSize: 12,
-        color: '#10B981',
-        fontWeight: '700',
-    },
-    scoreValue: {
+    pointsEarned: {
         fontSize: 14,
-        fontWeight: '700',
-        color: '#1F2937',
+        fontWeight: '800',
+        color: '#10B981',
     },
     leaderboard: {
-        borderTopWidth: 1,
-        borderTopColor: '#E5E7EB',
-        paddingTop: 16,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
     leaderboardTitle: {
         fontSize: 18,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#1F2937',
-        marginBottom: 12,
         textAlign: 'center',
+        marginBottom: 16,
     },
     scoreRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#F9FAFB',
-        borderRadius: 8,
-        marginBottom: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+    },
+    rankContainer: {
+        width: 36,
     },
     scoreRank: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 15,
+        fontWeight: '800',
         color: '#EC4899',
-        width: 40,
     },
     scoreName: {
         flex: 1,
         fontSize: 16,
+        fontWeight: '600',
         color: '#374151',
+    },
+    scoreContainer: {
+        alignItems: 'flex-end',
+    },
+    scoreValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    // Game Over Specific
+    gameOverContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    winnerSection: {
+        alignItems: 'center',
+        marginTop: 20,
+    },
+    congratsText: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#6B7280',
+        marginTop: 16,
+        letterSpacing: 2,
+    },
+    winnerName: {
+        fontSize: 36,
+        fontWeight: '900',
+        color: '#EC4899',
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    finalLeaderboardList: {
+        width: '100%',
+        marginTop: 10,
+    },
+    winnerRow: {
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1,
+        borderColor: '#FEF3C7',
+    },
+    exitBtn: {
+        backgroundColor: '#EC4899',
+        width: '100%',
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        marginTop: 20,
+        marginBottom: 20,
+    },
+    exitBtnText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '700',
     },
 });
 

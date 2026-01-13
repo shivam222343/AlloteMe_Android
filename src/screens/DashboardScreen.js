@@ -634,7 +634,10 @@ const DashboardScreen = ({ navigation }) => {
                                                             backgroundColor:
                                                                 meeting.attendanceStatus === 'Attended' ? '#DCFCE7' :
                                                                     meeting.attendanceStatus === 'Not Attended' ? '#FEE2E2' :
-                                                                        meeting.attendanceStatus === 'Upcoming' ? '#E0F2FE' : '#F1F5F9'
+                                                                        meeting.attendanceStatus === 'Upcoming' ? '#E0F2FE' :
+                                                                            meeting.attendanceStatus === 'Live' ? '#ECFDF5' :
+                                                                                meeting.attendanceStatus === 'Excused' ? '#F3E8FF' :
+                                                                                    meeting.attendanceStatus === 'Missed' ? '#FFF1F2' : '#F1F5F9'
                                                         }
                                                     ]}>
                                                         <Text style={[
@@ -643,7 +646,10 @@ const DashboardScreen = ({ navigation }) => {
                                                                 color:
                                                                     meeting.attendanceStatus === 'Attended' ? '#166534' :
                                                                         meeting.attendanceStatus === 'Not Attended' ? '#991B1B' :
-                                                                            meeting.attendanceStatus === 'Upcoming' ? '#075985' : '#64748B'
+                                                                            meeting.attendanceStatus === 'Upcoming' ? '#075985' :
+                                                                                meeting.attendanceStatus === 'Live' ? '#059669' :
+                                                                                    meeting.attendanceStatus === 'Excused' ? '#7E22CE' :
+                                                                                        meeting.attendanceStatus === 'Missed' ? '#E11D48' : '#64748B'
                                                             }
                                                         ]}>
                                                             {meeting.attendanceStatus}
