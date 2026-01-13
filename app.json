@@ -105,14 +105,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "230af709-19e3-4328-8402-fb6f7e61f394"
+        "projectId": "c17b5aac-9e6c-4e09-ae8f-9309e8f25b22"
       }
-    }
-  },
-  "owner": "shivamdombe232",
-  "extra": {
-    "eas": {
-      "projectId": "230af709-19e3-4328-8402-fb6f7e61f394"
-    }
+    },
+    "owner": "shivamdombe"
   }
 }
