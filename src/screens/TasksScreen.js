@@ -59,6 +59,9 @@ const TasksScreen = ({ navigation }) => {
     const [showUploadModal, setShowUploadModal] = useState(false);
     const { startWebUpload } = useWebUpload();
 
+    // Edit Task States
+    const [editingTaskId, setEditingTaskId] = useState(null);
+
     const isAdmin = user?.role === 'admin' || user?.role === 'subadmin';
 
     const fetchInitialData = async () => {
@@ -189,10 +192,22 @@ const TasksScreen = ({ navigation }) => {
         }
         try {
             setCreateLoading(true);
-            const res = await tasksAPI.create(newTask);
+            const res = editingTaskId
+                ? await tasksAPI.update(editingTaskId, {
+                    ...newTask,
+                    assignedTo: newTask.assignedTo // Backend handles re-mapping
+                })
+                : await tasksAPI.create(newTask);
+
             if (res.success) {
-                setTasks([res.data, ...tasks]);
+                if (editingTaskId) {
+                    setTasks(prev => prev.map(t => t._id === editingTaskId ? res.data : t));
+                } else {
+                    setTasks([res.data, ...tasks]);
+                }
+
                 setCreateModalVisible(false);
+                setEditingTaskId(null);
                 setNewTask({
                     title: '',
                     description: '',
@@ -203,13 +218,35 @@ const TasksScreen = ({ navigation }) => {
                     meetingId: '',
                     attachments: []
                 });
-                Alert.alert('Success', 'Task created successfully!');
+                Alert.alert('Success', `Task ${editingTaskId ? 'updated' : 'created'} successfully!`);
             }
         } catch (error) {
-            Alert.alert('Error', error.message || 'Failed to create task');
+            Alert.alert('Error', error.message || `Failed to ${editingTaskId ? 'update' : 'create'} task`);
         } finally {
             setCreateLoading(false);
         }
+    };
+
+    const openEditTask = async (task) => {
+        setEditingTaskId(task._id);
+        setNewTask({
+            title: task.title,
+            description: task.description,
+            clubId: task.clubId?._id || task.clubId,
+            assignedTo: task.assignedTo.map(a => a.user?._id || a.user),
+            dueDate: new Date(task.dueDate),
+            priority: task.priority,
+            meetingId: task.meetingId?._id || task.meetingId,
+            attachments: task.attachments || []
+        });
+
+        // Fetch club data for members and meetings
+        await handleClubSelect(task.clubId?._id || task.clubId);
+
+        // Ensure the selected meeting from the task is in the state if it was old/past
+        // (handleClubSelect fetches upcoming, but we might need to manually ensure the current one is visible)
+
+        setCreateModalVisible(true);
     };
 
     const handleNativePick = async () => {
@@ -379,9 +416,14 @@ const TasksScreen = ({ navigation }) => {
                 <View style={styles.taskHeader}>
                     <Text style={styles.taskTitle}>{item.title}</Text>
                     {isAdmin && (
-                        <TouchableOpacity onPress={() => deleteTask(item._id)}>
-                            <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 15 }}>
+                            <TouchableOpacity onPress={() => openEditTask(item)}>
+                                <Ionicons name="pencil-outline" size={20} color="#0A66C2" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => deleteTask(item._id)}>
+                                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
 
@@ -645,8 +687,16 @@ const TasksScreen = ({ navigation }) => {
                 <Modal visible={createModalVisible} animationType="slide">
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>New Task</Text>
-                            <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
+                            <Text style={styles.modalTitle}>{editingTaskId ? 'Edit Task' : 'New Task'}</Text>
+                            <TouchableOpacity onPress={() => {
+                                setCreateModalVisible(false);
+                                setEditingTaskId(null);
+                                setNewTask({
+                                    title: '', description: '', clubId: '', assignedTo: [],
+                                    dueDate: new Date(Date.now() + 86400000), priority: 'medium',
+                                    meetingId: '', attachments: []
+                                });
+                            }}>
                                 <Ionicons name="close" size={24} color="#000" />
                             </TouchableOpacity>
                         </View>
@@ -777,7 +827,7 @@ const TasksScreen = ({ navigation }) => {
                                         onPress={handleCreateTask}
                                         disabled={createLoading}
                                     >
-                                        {createLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.createBtnText}>Create Task</Text>}
+                                        {createLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.createBtnText}>{editingTaskId ? 'Update Task' : 'Create Task'}</Text>}
                                     </TouchableOpacity>
                                 </Animatable.View>
                             ) : (

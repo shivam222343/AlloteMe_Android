@@ -1,272 +1,230 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { Platform, Alert } from 'react-native';
-import { authAPI, messagesAPI, groupChatAPI } from './api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as TaskManager from 'expo-task-manager';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import api from './api';
 
-const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
-
-// Configure notification handler - CRITICAL for background notifications
+// Configure how notifications should be handled when app is in foreground
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
-        priority: Notifications.AndroidNotificationPriority.MAX,
     }),
 });
 
-// Register background task for handling notifications when app is killed
-TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, ({ data, error, executionInfo }) => {
-    if (error) {
-        console.error('Background notification task error:', error);
-        return;
-    }
-    console.log('Received a notification in the background!', data);
-    // Notification will be displayed automatically by the system
-});
-
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
 /**
- * Register user for push notifications and update token in backend
+ * Register for push notifications and get FCM token
+ * @returns {Promise<string|null>} FCM token or null if registration failed
  */
-export const registerForPushNotificationsAsync = async (userId) => {
+export const registerForPushNotifications = async () => {
     try {
-        if (Platform.OS === 'web') return null;
-
-        // Check for Expo Go (warn but don't block)
-        if (isExpoGo) {
-            console.warn(
-                '📢 Notifications: You are running in Expo Go.\n' +
-                'Push notifications may not work properly. Use a Development Build or Production APK for full FCM support.'
-            );
-            // Continue anyway - let the actual token fetch determine if it works
-        }
-
-        // Check if running on physical device
+        // Check if device is physical (push notifications don't work on simulators)
         if (!Device.isDevice) {
-            console.log('Must use physical device for Push Notifications');
+            console.log('⚠️ Push notifications only work on physical devices');
             return null;
         }
 
-        // Request permissions
+        // Check existing permissions
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
 
+        // Request permissions if not granted
         if (existingStatus !== 'granted') {
             const { status } = await Notifications.requestPermissionsAsync();
             finalStatus = status;
         }
 
+        // If permission denied, return null
         if (finalStatus !== 'granted') {
-            console.log('Failed to get push token for push notification!');
+            console.log('❌ Push notification permission denied');
             return null;
         }
 
-        // Get Native Device push token (FCM)
-        let token = null;
-        try {
-            const tokenData = await Notifications.getDevicePushTokenAsync();
-            token = tokenData.data;
-            console.log('✅ FCM Push Token obtained:', token);
-        } catch (tokenError) {
-            console.error('❌ Failed to get FCM token:', tokenError.message);
-            if (isExpoGo) {
-                console.warn('This is expected in Expo Go. Build a development build or APK to get a real FCM token.');
-            }
-            // Don't return null yet - we can still set up notification categories
-        }
+        // Get FCM token
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId: Constants.expoConfig?.extra?.eas?.projectId,
+        });
 
-        // Update token in backend if we got one
-        if (userId && token) {
-            try {
-                await authAPI.updateFCMToken(token);
-                console.log('✅ FCM token updated in backend');
-            } catch (backendError) {
-                console.error('❌ Failed to update FCM token in backend:', backendError.message);
-            }
-        }
-
-        // Setup notification categories
-        await initNotificationCategories();
+        const token = tokenData.data;
+        console.log('✅ FCM Token obtained:', token);
 
         // Configure notification channel for Android
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
-                name: 'default',
+                name: 'Default',
                 importance: Notifications.AndroidImportance.MAX,
                 vibrationPattern: [0, 250, 250, 250],
                 lightColor: '#0A66C2',
                 sound: 'default',
-                enableVibrate: true,
-                showBadge: true,
             });
-
-            // Register background notification task
-            try {
-                await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
-                console.log('✅ Background notification task registered');
-            } catch (taskError) {
-                console.warn('⚠️ Background task registration failed:', taskError.message);
-                // This is non-critical - notifications will still work in foreground/background
-            }
         }
 
         return token;
+    } catch (error) {
+        console.error('❌ Error registering for push notifications:', error);
+        return null;
+    }
+};
+
+/**
+ * Save FCM token to backend
+ * @param {string} token - FCM token
+ * @returns {Promise<boolean>} Success status
+ */
+export const saveFCMTokenToBackend = async (token) => {
+    try {
+        await api.put('/users/fcm-token', { fcmToken: token });
+        console.log('✅ FCM token saved to backend');
+        return true;
+    } catch (error) {
+        console.error('❌ Error saving FCM token to backend:', error);
+        return false;
+    }
+};
+
+/**
+ * Remove FCM token from backend (on logout)
+ * @returns {Promise<boolean>} Success status
+ */
+export const removeFCMTokenFromBackend = async () => {
+    try {
+        await api.delete('/users/fcm-token');
+        console.log('✅ FCM token removed from backend');
+        return true;
+    } catch (error) {
+        console.error('❌ Error removing FCM token from backend:', error);
+        return false;
+    }
+};
+
+/**
+ * Setup notification listeners
+ * @param {Function} onNotificationReceived - Callback when notification is received
+ * @param {Function} onNotificationTapped - Callback when notification is tapped
+ * @returns {Object} Subscription objects to clean up later
+ */
+export const setupNotificationListeners = (onNotificationReceived, onNotificationTapped) => {
+    // Listener for notifications received while app is in foreground
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+        console.log('📬 Notification received:', notification);
+        if (onNotificationReceived) {
+            onNotificationReceived(notification);
+        }
+    });
+
+    // Listener for when user taps on notification
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log('👆 Notification tapped:', response);
+        if (onNotificationTapped) {
+            onNotificationTapped(response);
+        }
+    });
+
+    return {
+        notificationListener,
+        responseListener,
+    };
+};
+
+/**
+ * Clean up notification listeners
+ * @param {Object} subscriptions - Subscription objects from setupNotificationListeners
+ */
+export const cleanupNotificationListeners = (subscriptions) => {
+    if (subscriptions.notificationListener) {
+        Notifications.removeNotificationSubscription(subscriptions.notificationListener);
+    }
+    if (subscriptions.responseListener) {
+        Notifications.removeNotificationSubscription(subscriptions.responseListener);
+    }
+};
+
+/**
+ * Schedule a local notification (for testing or offline scenarios)
+ * @param {Object} notification - Notification content
+ */
+export const scheduleLocalNotification = async (notification) => {
+    try {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: notification.title,
+                body: notification.body,
+                data: notification.data || {},
+                sound: 'default',
+            },
+            trigger: null, // Show immediately
+        });
+        console.log('✅ Local notification scheduled');
+    } catch (error) {
+        console.error('❌ Error scheduling local notification:', error);
+    }
+};
+
+/**
+ * Get notification badge count
+ * @returns {Promise<number>} Badge count
+ */
+export const getBadgeCount = async () => {
+    try {
+        const count = await Notifications.getBadgeCountAsync();
+        return count;
+    } catch (error) {
+        console.error('❌ Error getting badge count:', error);
+        return 0;
+    }
+};
+
+/**
+ * Set notification badge count
+ * @param {number} count - Badge count
+ */
+export const setBadgeCount = async (count) => {
+    try {
+        await Notifications.setBadgeCountAsync(count);
+        console.log(`✅ Badge count set to ${count}`);
+    } catch (error) {
+        console.error('❌ Error setting badge count:', error);
+    }
+};
+
+/**
+ * Clear all notifications
+ */
+export const clearAllNotifications = async () => {
+    try {
+        await Notifications.dismissAllNotificationsAsync();
+        await setBadgeCount(0);
+        console.log('✅ All notifications cleared');
+    } catch (error) {
+        console.error('❌ Error clearing notifications:', error);
+    }
+};
+
+/**
+ * Register for push notifications and save token to backend (wrapper for AuthContext)
+ * @param {string} userId - User ID (for logging purposes)
+ * @returns {Promise<string|null>} FCM token or null if registration failed
+ */
+export const registerForPushNotificationsAsync = async (userId) => {
+    try {
+        console.log(`📱 Registering push notifications for user: ${userId}`);
+
+        // Get FCM token
+        const token = await registerForPushNotifications();
+
+        if (token) {
+            // Save to backend
+            await saveFCMTokenToBackend(token);
+            console.log('✅ Push notifications fully registered and saved');
+            return token;
+        } else {
+            console.log('⚠️ Could not obtain FCM token');
+            return null;
+        }
     } catch (error) {
         console.error('❌ Error in registerForPushNotificationsAsync:', error);
         return null;
     }
 };
 
-/**
- * Initialize notification categories for Quick Reply
- */
-export const initNotificationCategories = async () => {
-    if (Platform.OS === 'web') return;
-
-    await Notifications.setNotificationCategoryAsync('chat-reply', [
-        {
-            identifier: 'reply',
-            buttonTitle: 'Reply',
-            options: {
-                opensAppToForeground: false,
-            },
-            textInput: {
-                placeholder: 'Type your reply...',
-                submitButtonTitle: 'Send',
-            },
-        },
-    ]);
-    console.log('✅ Notification Category "chat-reply" initialized');
-};
-
-/**
- * Handle notification clicks (Navigate to relevant screen)
- */
-export const handleNotificationResponse = async (response, navigation) => {
-    if (!response) return;
-
-    console.log('Notification Response Received:', response);
-
-    // Handle Quick Reply (Action)
-    if (response.actionIdentifier === 'reply') {
-        const replyText = response.userText;
-        const data = response.notification.request.content.data;
-
-        if (replyText && data) {
-            await handleBackgroundReply(data, replyText);
-            return;
-        }
-    }
-
-    // Handle Navigation
-    const data = response.notification.request.content.data;
-
-    if (data?.screen) {
-        try {
-            const params = typeof data.params === 'string' ? JSON.parse(data.params) : data.params;
-            navigation.navigate(data.screen, params || {});
-        } catch (e) {
-            console.error('Error parsing notification params:', e);
-            navigation.navigate(data.screen);
-        }
-        return;
-    }
-
-    // Specific Redirections based on type or data
-    if (data?.type === 'new_message' || data?.senderId) {
-        navigation.navigate('Chat', {
-            otherUser: {
-                _id: data.senderId,
-                displayName: data.senderName
-            }
-        });
-    } else if (data?.type === 'meeting_created' || data?.meetingId) {
-        navigation.navigate('Calendar', {
-            selectedMeetingId: data.meetingId,
-            clubId: data.clubId
-        });
-    } else if (data?.type === 'task_assigned' || data?.taskId) {
-        navigation.navigate('Tasks', {
-            focusTaskId: data.taskId
-        });
-    } else if (data?.clubId) {
-        navigation.navigate('Chat', {
-            isGroupChat: true,
-            clubId: data.clubId,
-            clubName: data.clubName
-        });
-    } else {
-        navigation.navigate('Dashboard');
-    }
-};
-
-/**
- * Handle background reply without opening the app fully
- */
-export const handleBackgroundReply = async (data, text) => {
-    try {
-        console.log('Processing background reply:', text);
-        if (data.clubId) {
-            // Group Chat Reply
-            await groupChatAPI.sendMessage(data.clubId, { content: text, type: 'text' });
-        } else if (data.senderId) {
-            // Individual Chat Reply
-            await messagesAPI.send({ receiverId: data.senderId, content: text, type: 'text' });
-        }
-        console.log('✅ Background reply sent successfully');
-
-        // Show success local notification
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: 'Reply Sent',
-                body: `Your message to ${data.senderName || 'the group'} has been delivered.`,
-            },
-            trigger: null,
-        });
-    } catch (error) {
-        console.error('Failed to send background reply:', error);
-    }
-};
-
-/**
- * Setup notification listeners
- */
-export const setupNotificationListeners = (navigation) => {
-    if (Platform.OS === 'web') return;
-
-    // Listen for notification responses (when user taps notification)
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
-        handleNotificationResponse(response, navigation);
-    });
-
-    // Listen for notifications received while app is in foreground
-    const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
-        console.log('Notification received in foreground:', notification);
-        // Notification will be displayed automatically by the handler
-    });
-
-    return () => {
-        responseSubscription.remove();
-        receivedSubscription.remove();
-    };
-};
-
-/**
- * Send a local notification (for testing)
- */
-export const sendLocalNotification = async (title, body, data = {}) => {
-    await Notifications.scheduleNotificationAsync({
-        content: {
-            title,
-            body,
-            data,
-            categoryIdentifier: 'chat-reply',
-        },
-        trigger: null, // null means immediate
-    });
-};

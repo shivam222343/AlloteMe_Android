@@ -409,7 +409,11 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView style={styles.infoScroll} showsVerticalScrollIndicator={false}>
+                        <ScrollView
+                            style={styles.infoScroll}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled={true}
+                        >
                             <Text style={styles.infoSectionTitle}>How to Play</Text>
                             {info.rules.map((rule, idx) => (
                                 <View key={idx} style={styles.ruleItem}>
@@ -451,7 +455,7 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                                 </>
                             )}
 
-                            <View style={{ height: 20 }} />
+                            <View style={{ height: 100 }} />
                         </ScrollView>
 
                         <TouchableOpacity
@@ -516,7 +520,10 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                                 </View>
                                 <TouchableOpacity
                                     style={styles.infoIconBtn}
-                                    onPress={() => handleShowInfo(item)}
+                                    onPress={(e) => {
+                                        e?.stopPropagation?.();
+                                        handleShowInfo(item);
+                                    }}
                                 >
                                     <Ionicons name="information-circle-outline" size={20} color="#FFF" />
                                 </TouchableOpacity>
@@ -746,6 +753,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 32,
         padding: 24,
         maxHeight: '85%',
+        height: '85%',
     },
     infoModalHeader: {
         flexDirection: 'row',
@@ -764,7 +772,8 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     infoScroll: {
-        flex: 1,
+        flexGrow: 0,
+        flexShrink: 1,
     },
     infoSectionTitle: {
         fontSize: 18,

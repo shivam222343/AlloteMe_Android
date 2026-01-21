@@ -8,7 +8,7 @@ import {
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
-import { handleNotificationResponse, setupNotificationListeners } from './src/services/NotificationService';
+import { setupNotificationListeners, cleanupNotificationListeners } from './src/services/NotificationService';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ProfileCompletionModal from './src/components/ProfileCompletionModal';
@@ -49,6 +49,9 @@ import SketchHeadsScreen from './src/screens/SketchHeadsScreen';
 import CodeBreakerScreen from './src/screens/CodeBreakerScreen';
 import MemeMatchScreen from './src/screens/MemeMatchScreen';
 import LiveNotesScreen from './src/screens/LiveNotesScreen';
+import EventsScreen from './src/screens/EventsScreen';
+import EventDetailScreen from './src/screens/EventDetailScreen';
+import EventResourcesScreen from './src/screens/EventResourcesScreen';
 
 const Stack = createStackNavigator();
 
@@ -103,12 +106,23 @@ const AppContent = () => {
   useEffect(() => {
     // Setup FCM listeners
     if (navigationRef.current) {
-      const unsubscribe = setupNotificationListeners(navigationRef.current);
+      const subscriptions = setupNotificationListeners(
+        null, // onNotificationReceived (foreground) - currently handled in AuthContext or globally
+        (response) => {
+          // handleNotificationTapped
+          const data = response.notification.request.content.data;
+          console.log('Notification tapped with data:', data);
+          if (data && data.screen) {
+            navigationRef.current?.navigate(data.screen, data.params);
+          }
+        }
+      );
+
       return () => {
-        if (unsubscribe) unsubscribe();
+        cleanupNotificationListeners(subscriptions);
       };
     }
-  }, [navigationRef.current]);
+  }, [navigationRef?.current]);
 
   const handleProfileComplete = async (profileData) => {
     try {
@@ -183,6 +197,9 @@ const AppContent = () => {
               <Stack.Screen name="CodeBreaker" component={CodeBreakerScreen} />
               <Stack.Screen name="MemeMatch" component={MemeMatchScreen} />
               <Stack.Screen name="LiveNotes" component={LiveNotesScreen} />
+              <Stack.Screen name="Events" component={EventsScreen} />
+              <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+              <Stack.Screen name="EventResources" component={EventResourcesScreen} />
             </>
           )}
         </Stack.Navigator>

@@ -213,7 +213,7 @@ const AdminScreen = ({ navigation }) => {
             // Trim whitespace from ID to fix 400 error
             const res = await clubsAPI.addMember(selectedClubId, memberMaverickId.trim());
             if (res.success) {
-                setStatusModal({ visible: true, title: 'Member Added', message: 'User successfully added to the club.', type: 'success' });
+                setStatusModal({ visible: true, title: 'Success!', message: res.message || 'User successfully joined the club.', type: 'success' });
                 setMemberMaverickId('');
             } else {
                 setStatusModal({ visible: true, title: 'Failed', message: res.message || 'Could not add member.', type: 'error' });

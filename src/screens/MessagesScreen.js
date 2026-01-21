@@ -625,6 +625,13 @@ const MessagesScreen = ({ navigation }) => {
         }, [])
     );
 
+    // Re-fetch everything when user's club list changes (e.g. joined via admin)
+    useEffect(() => {
+        if (user?.clubsJoined) {
+            fetchData();
+        }
+    }, [user?.clubsJoined]);
+
     useEffect(() => {
         fetchClubMembers(selectedClub);
         // Also refresh snaps when club changes

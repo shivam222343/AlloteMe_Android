@@ -49,6 +49,7 @@ const SketchHeadsScreen = ({ navigation, route }) => {
 
     // Refs
     const currentPathRef = useRef([]);
+    const gameOverTimerRef = useRef(null);
 
     // Drawing tools state
     const [selectedColor, setSelectedColor] = useState('#000000');
@@ -171,7 +172,8 @@ const SketchHeadsScreen = ({ navigation, route }) => {
                 setShowTurnResult(true);
 
                 // Auto-close and redirect after 30 seconds
-                setTimeout(() => {
+                if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
+                gameOverTimerRef.current = setTimeout(() => {
                     setShowTurnResult(false);
                     setTimeout(() => {
                         navigation.navigate('MaverickGames');
@@ -191,12 +193,16 @@ const SketchHeadsScreen = ({ navigation, route }) => {
                 socket.off('game:hint_update');
                 socket.off('game:draw_update');
                 socket.off('game:canvas_cleared');
+                socket.off('game:paths_synced');
+                socket.off('game:canvas_color_update');
                 socket.off('game:time_update');
                 socket.off('game:guess_update');
                 socket.off('game:turn_end');
                 socket.off('game:over');
                 socket.off('game:error');
                 socket.emit('games:leave', roomId || (gameState && gameState.roomId));
+
+                if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
             };
         }
     }, [socket, roomId]);
@@ -213,7 +219,7 @@ const SketchHeadsScreen = ({ navigation, route }) => {
         );
 
         return () => backHandler.remove();
-    }, []);
+    }, [gameState]);
 
     // Drawing Handlers
     const onGestureEvent = (event) => {
@@ -353,7 +359,7 @@ const SketchHeadsScreen = ({ navigation, route }) => {
 
     const confirmLeaveGame = () => {
         setShowLeaveConfirm(false);
-        navigation.goBack();
+        navigation.navigate('MaverickGames');
     };
 
     if (!gameState) {
@@ -420,6 +426,39 @@ const SketchHeadsScreen = ({ navigation, route }) => {
                         </View>
                     )}
                 </View>
+
+                {/* Leave Confirmation Modal */}
+                <Modal
+                    visible={showLeaveConfirm}
+                    transparent={true}
+                    animationType="fade"
+                >
+                    <View style={styles.confirmModalOverlay}>
+                        <View style={styles.confirmModal}>
+                            <Ionicons name="warning" size={60} color="#EF4444" />
+                            <Text style={styles.confirmTitle}>{isHost ? "End Game for Everyone?" : "Leave Game?"}</Text>
+                            <Text style={styles.confirmMessage}>
+                                {isHost
+                                    ? "You are the host. If you leave, the game room will be closed for all players. Are you sure?"
+                                    : "Are you sure you want to leave? Your progress will be lost."}
+                            </Text>
+                            <View style={styles.confirmButtons}>
+                                <TouchableOpacity
+                                    style={styles.confirmBtnCancel}
+                                    onPress={() => setShowLeaveConfirm(false)}
+                                >
+                                    <Text style={styles.confirmBtnCancelText}>Stay</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.confirmBtnLeave}
+                                    onPress={confirmLeaveGame}
+                                >
+                                    <Text style={styles.confirmBtnLeaveText}>Leave</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </View>
         );
     }
@@ -429,37 +468,40 @@ const SketchHeadsScreen = ({ navigation, route }) => {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.container}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 40}
-            >
-                {/* Game Header */}
-                <View style={styles.gameHeader}>
-                    <View style={styles.timerBox}>
-                        <Ionicons name="time-outline" size={18} color={timeRemaining < 10 ? '#EF4444' : '#0A66C2'} />
-                        <Text style={[styles.timerText, timeRemaining < 10 && { color: '#EF4444' }]}>{timeRemaining}s</Text>
-                    </View>
-
-                    <View style={styles.roundInfo}>
-                        <Text style={styles.roundText}>Round {turnInfo.round} - Turn {turnInfo.turn}/{turnInfo.totalTurns}</Text>
-                        <Text style={styles.hintText}>
-                            {isMyTurn ? (currentWord || '_ _ _') : (hint || '_ _ _')}
-                        </Text>
-                    </View>
-
-
-                    <View style={styles.headerButtons}>
-                        <TouchableOpacity onPress={() => setShowPlayersList(true)} style={styles.headerIconBtn}>
-                            <Ionicons name="people" size={24} color="#0A66C2" />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleLeaveGame} style={styles.headerIconBtn}>
-                            <Ionicons name="exit-outline" size={24} color="#EF4444" />
-                        </TouchableOpacity>
-                    </View>
+            {/* Game Header - Outside KeyboardAvoidingView to keep it fixed */}
+            <View style={styles.gameHeader}>
+                <View style={styles.timerBox}>
+                    <Ionicons name="time-outline" size={18} color={timeRemaining < 10 ? '#EF4444' : '#0A66C2'} />
+                    <Text style={[styles.timerText, timeRemaining < 10 && { color: '#EF4444' }]}>{timeRemaining}s</Text>
                 </View>
 
-                <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.roundInfo}>
+                    <Text style={styles.roundText}>Round {turnInfo.round} - Turn {turnInfo.turn}/{turnInfo.totalTurns}</Text>
+                    <Text style={styles.hintText}>
+                        {isMyTurn ? (currentWord || '_ _ _') : (hint || '_ _ _')}
+                    </Text>
+                </View>
+
+                <View style={styles.headerButtons}>
+                    <TouchableOpacity onPress={() => setShowPlayersList(true)} style={styles.headerIconBtn}>
+                        <Ionicons name="people" size={24} color="#0A66C2" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleLeaveGame} style={styles.headerIconBtn}>
+                        <Ionicons name="exit-outline" size={24} color="#EF4444" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            >
+                <ScrollView
+                    style={{ flex: 1 }}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ flexGrow: 1 }}
+                >
                     {/* Canvas Area */}
                     <View style={styles.canvasWrapper}>
                         {isMyTurn && !showWordSelection && (
@@ -977,10 +1019,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        height: 70,
+        minHeight: Platform.OS === 'ios' ? 70 : (StatusBar.currentHeight || 0) + 60,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F4F6',
-        paddingTop: Platform.OS === 'ios' ? 40 : 10,
+        paddingTop: Platform.OS === 'ios' ? 40 : (StatusBar.currentHeight || 0) + 10,
+        paddingBottom: 10,
     },
     headerTitle: {
         fontSize: 18,
@@ -997,6 +1040,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
         paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 10,
+        zIndex: 50, // Keep header above everything
     },
     timerBox: {
         flexDirection: 'row',
@@ -1226,7 +1270,7 @@ const styles = StyleSheet.create({
     inputArea: {
         flexDirection: 'row',
         padding: 16,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 12,
         backgroundColor: '#FFF',
         borderTopWidth: 1,
         borderTopColor: '#F3F4F6',

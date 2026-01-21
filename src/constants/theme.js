@@ -285,10 +285,10 @@ const IS_LOCAL = false; // Set to true to use local backend
 export const API_CONFIG = {
     BASE_URL: IS_LOCAL
         ? `http://${LOCAL_IP}:5000/api`
-        : 'https://mavericks-android-backend-1.onrender.com/api',
+        : 'https://mavericks-android-backend-neyu.onrender.com/api',
     SOCKET_URL: IS_LOCAL
         ? `http://${LOCAL_IP}:5000`
-        : 'https://mavericks-android-backend-1.onrender.com',
+        : 'https://mavericks-android-backend-neyu.onrender.com',
     GROQ_API_KEY: 'gsk_YOUR_GROQ_API_KEY_HERE', // Add your Groq API key here
     TIMEOUT: 300000, // 5 minutes for large media uploads
 };

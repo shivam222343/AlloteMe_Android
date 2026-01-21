@@ -82,27 +82,13 @@ const MembersScreen = ({ navigation }) => {
                 const filteredClubs = res.data.filter(club => joinedClubIds.includes(club._id.toString()));
 
                 setClubs(filteredClubs);
-
-                // Sync with global club selection
-                if (selectedClubId && selectedClubId !== 'all') {
-                    const globalClub = filteredClubs.find(c => c._id === selectedClubId);
-                    if (globalClub) {
-                        setSelectedClub(globalClub);
-                    } else if (filteredClubs.length > 0) {
-                        setSelectedClub(filteredClubs[0]);
-                        updateSelectedClub(filteredClubs[0]._id);
-                    }
-                } else if (filteredClubs.length > 0 && !selectedClub) {
-                    setSelectedClub(filteredClubs[0]);
-                    updateSelectedClub(filteredClubs[0]._id);
-                }
             }
         } catch (error) {
             console.error('Error fetching clubs:', error);
         } finally {
             setLoading(false);
         }
-    }, [selectedClub, user.clubsJoined]);
+    }, [user?.clubsJoined]);
 
     const fetchMembers = useCallback(async () => {
         if (!selectedClub) return;
@@ -121,18 +107,29 @@ const MembersScreen = ({ navigation }) => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [user?.clubsJoined, fetchData]);
 
     useEffect(() => {
         fetchMembers();
     }, [selectedClub, fetchMembers]);
 
-    // Sync with global club selection when it changes from other screens
+    // Initial club selection and sync with global club selection
     useEffect(() => {
-        if (selectedClubId && selectedClubId !== 'all' && clubs.length > 0) {
-            const globalClub = clubs.find(c => c._id === selectedClubId);
-            if (globalClub && (!selectedClub || selectedClub._id !== globalClub._id)) {
-                setSelectedClub(globalClub);
+        if (clubs.length > 0) {
+            if (selectedClubId && selectedClubId !== 'all') {
+                const globalClub = clubs.find(c => c._id === selectedClubId);
+                if (globalClub) {
+                    if (!selectedClub || selectedClub._id !== globalClub._id) {
+                        setSelectedClub(globalClub);
+                    }
+                } else if (!selectedClub) {
+                    // Fallback to first if global doesn't exist in Joined List
+                    setSelectedClub(clubs[0]);
+                    updateSelectedClub(clubs[0]._id);
+                }
+            } else if (!selectedClub) {
+                setSelectedClub(clubs[0]);
+                updateSelectedClub(clubs[0]._id);
             }
         }
     }, [selectedClubId, clubs]);
@@ -268,8 +265,8 @@ const MembersScreen = ({ navigation }) => {
                 </View>
                 <View style={styles.memberInfo}>
                     <View style={styles.memberHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.memberName}>{item.displayName}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                            <Text style={styles.memberName} numberOfLines={1} ellipsizeMode="tail">{item.displayName}</Text>
                             {isBday && (
                                 <Ionicons name="gift" size={16} color="#EC4899" style={{ marginLeft: 6 }} />
                             )}
@@ -462,6 +459,23 @@ const MembersScreen = ({ navigation }) => {
                                                 )}
                                             </View>
                                             <Text style={styles.modalEmail}>{selectedMember.email}</Text>
+                                            <Text style={styles.modalLastSeen}>
+                                                {selectedMember.isOnline ? (
+                                                    <>
+                                                        <Ionicons name="ellipse" size={8} color="#10B981" /> Online now
+                                                    </>
+                                                ) : selectedMember.lastSeen ? (
+                                                    `Last seen: ${new Date(selectedMember.lastSeen).toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric'
+                                                    })} at ${new Date(selectedMember.lastSeen).toLocaleTimeString('en-US', {
+                                                        hour: 'numeric',
+                                                        minute: '2-digit',
+                                                        hour12: true
+                                                    })}`
+                                                ) : 'Last seen recently'}
+                                            </Text>
                                             <View style={styles.badge}>
                                                 <Text style={styles.badgeText}>Member</Text>
                                             </View>
@@ -723,6 +737,7 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '600',
         color: '#1F2937',
+        flexShrink: 1,
     },
     lastSeen: {
         fontSize: 12,
@@ -842,7 +857,13 @@ const styles = StyleSheet.create({
     modalEmail: {
         fontSize: 16,
         color: '#6B7280',
+        marginBottom: 8,
+    },
+    modalLastSeen: {
+        fontSize: 14,
+        color: '#9CA3AF',
         marginBottom: 12,
+        fontStyle: 'italic',
     },
     badge: {
         backgroundColor: '#E0F2FE',

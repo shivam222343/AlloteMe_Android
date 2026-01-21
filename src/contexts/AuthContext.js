@@ -122,6 +122,7 @@ export const AuthProvider = ({ children }) => {
                     });
                 }
                 fetchUnreadCount();
+                checkAuth(); // Refresh user profile to pick up new club memberships
             });
 
             newSocket.on('message:receive', (message) => {
@@ -162,6 +163,7 @@ export const AuthProvider = ({ children }) => {
 
             newSocket.on('notification_receive', () => {
                 fetchUnreadCount();
+                checkAuth(); // Refresh user profile to pick up new club memberships
             });
 
             setSocket(newSocket);
@@ -312,6 +314,10 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         try {
+            // Remove FCM token from backend
+            const { removeFCMTokenFromBackend } = require('../services/NotificationService');
+            await removeFCMTokenFromBackend();
+
             await authAPI.logout();
         } catch (error) {
             // Ignore error

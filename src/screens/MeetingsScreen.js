@@ -13,6 +13,7 @@ import {
     Alert,
     FlatList,
     Dimensions,
+    Share,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -186,6 +187,38 @@ const MeetingsScreen = ({ navigation }) => {
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to update status');
+        }
+    };
+
+    const handleShareMeeting = async (meeting) => {
+        try {
+            const dateStr = new Date(meeting.date).toLocaleDateString(undefined, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            const location = meeting.mode === 'Online'
+                ? `🌐 Online (${meeting.platform})`
+                : `📍 ${meeting.locationCategory} ${meeting.classroomNumber ? `- Room ${meeting.classroomNumber}` : meeting.otherLocationName ? `- ${meeting.otherLocationName}` : ''}`;
+
+            const message = `🚀 *MAVERICKS MEETING ALERT* 🚀\n\n` +
+                `📌 *Topic:* ${meeting.name}\n` +
+                `🏢 *Club:* ${selectedClub?.name || 'Mavericks Club'}\n` +
+                `📅 *Date:* ${dateStr}\n` +
+                `⏰ *Time:* ${meeting.time}\n` +
+                `📍 *Venue:* ${location}\n\n` +
+                (meeting.description ? `📝 *Context:* ${meeting.description}\n\n` : '') +
+                `Let's gather for some productive chaos! ⚡️🔥\n\n` +
+                `Sent via *Mavericks App* 🚀`;
+
+            await Share.share({
+                message,
+                title: `Meeting: ${meeting.name}`
+            });
+        } catch (error) {
+            console.error('Share meeting error:', error);
         }
     };
 
@@ -387,13 +420,12 @@ const MeetingsScreen = ({ navigation }) => {
         };
     }, [socket, selectedClub, managingMeeting]);
 
-    // Load Clubs on Mount or User Change
+    // Load Clubs whenever user data (like joined clubs) changes
     useEffect(() => {
         if (user) {
-            // Only load if clubs list is empty to avoid reset
-            if (myClubs.length === 0) loadClubs();
+            loadClubs();
         }
-    }, [user]);
+    }, [user?.clubsJoined]);
 
     // Load Meetings when Selected Club Changes
     useEffect(() => {
@@ -505,7 +537,10 @@ const MeetingsScreen = ({ navigation }) => {
                                                         <Text style={styles.cardTitle}>{meeting.name}</Text>
                                                         <Text style={styles.cardDate}>{new Date(meeting.date).toDateString()} | {meeting.time}</Text>
                                                     </View>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                        <TouchableOpacity onPress={() => handleShareMeeting(meeting)}>
+                                                            <Ionicons name="share-social-outline" size={20} color="#0A66C2" />
+                                                        </TouchableOpacity>
                                                         <View style={[styles.badge, { backgroundColor: status.bg }]}>
                                                             <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
                                                         </View>

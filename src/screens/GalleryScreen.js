@@ -525,7 +525,12 @@ const GalleryScreen = ({ navigation }) => {
                 activeOpacity={0.95}
             >
                 <View style={{ height: itemHeight }}>
-                    <Image source={{ uri: item.imageUrl }} style={[styles.cardImage, { height: itemHeight }]} />
+                    <Image
+                        source={{ uri: item.imageUrl }}
+                        style={[styles.cardImage, { height: itemHeight }]}
+                        resizeMode="cover"
+                        fadeDuration={0}
+                    />
 
                     <LinearGradient
                         colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -606,10 +611,18 @@ const GalleryScreen = ({ navigation }) => {
                             <ScrollView
                                 showsVerticalScrollIndicator={false}
                                 contentContainerStyle={styles.scrollContent}
-                                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
-                                    setRefreshing(true);
-                                    fetchData();
-                                }} />}
+                                removeClippedSubviews={true}
+                                scrollEventThrottle={16}
+                                nestedScrollEnabled={false}
+                                overScrollMode="never"
+                                refreshControl={<RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={() => {
+                                        setRefreshing(true);
+                                        fetchData();
+                                    }}
+                                    progressViewOffset={0}
+                                />}
                             >
                                 <View style={styles.gridContainer}>
                                     <View style={styles.column}>

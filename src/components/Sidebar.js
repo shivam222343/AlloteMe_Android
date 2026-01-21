@@ -29,6 +29,7 @@ const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => 
         { id: 'tasks', icon: 'checkmark-circle', label: 'Tasks', route: 'Tasks' },
         { id: 'calendar', icon: 'calendar-outline', label: 'Calendar', route: 'Calendar' },
         { id: 'gallery', icon: 'images', label: 'Gallery', route: 'Gallery' },
+        { id: 'events', icon: 'star', label: 'Events & Activities', route: 'Events' },
         { id: 'messages', icon: 'chatbubbles', label: 'Messages', route: 'Messages' },
         { id: 'games', icon: 'game-controller', label: 'Maverick Games', route: 'MaverickGames' },
         { id: 'notes', icon: 'document-text-outline', label: 'Live Notes', route: 'LiveNotes' },
@@ -52,7 +53,7 @@ const Sidebar = ({ isOpen, onClose, onScanPress, navigation, currentRoute }) => 
         }
 
         // Only navigate to implemented screens
-        const implementedScreens = ['Dashboard', 'Profile', 'Admin', 'Login', 'Meetings', 'Members', 'Calendar', 'Settings', 'Messages', 'Chat', 'Camera', 'Gallery', 'Analytics', 'Tasks', 'MaverickGames', 'SketchHeads', 'LiveNotes'];
+        const implementedScreens = ['Dashboard', 'Profile', 'Admin', 'Login', 'Meetings', 'Members', 'Calendar', 'Settings', 'Messages', 'Chat', 'Camera', 'Gallery', 'Analytics', 'Tasks', 'MaverickGames', 'SketchHeads', 'LiveNotes', 'Events', 'EventDetail'];
 
         console.log('Navigating to:', route, 'Is implemented:', implementedScreens.includes(route));
 

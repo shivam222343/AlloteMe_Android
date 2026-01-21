@@ -53,6 +53,7 @@ const ProfileCompletionModal = ({ visible, onComplete, onClose, initialData = {}
 
     const branches = [
         'Computer Science',
+        'Computer Science and Business System',
         'Information Technology',
         'Electronics',
         'Mechanical',

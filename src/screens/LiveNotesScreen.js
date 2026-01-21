@@ -1093,66 +1093,74 @@ const LiveNotesScreen = ({ navigation }) => {
                     style={{ flex: 1 }}
                 >
                     <View ref={editorViewRef} collapsable={false} style={styles.editorInner}>
-                        <View style={styles.titleRow}>
-                            <TextInput
-                                style={styles.contentTitleInput}
-                                value={noteTitle}
-                                onChangeText={handleTitleChange}
-                                placeholder="Note Title"
-                                placeholderTextColor="#9CA3AF"
-                                editable={canEdit}
-                            />
-                            <TouchableOpacity
-                                onPress={togglePublic}
-                                disabled={!isOwner}
-                                style={[styles.statusBadge, isPublic ? styles.publicBadge : styles.privateBadge, !isOwner && { opacity: 0.7 }]}
-                            >
-                                <Ionicons name={isPublic ? 'people' : 'lock-closed'} size={12} color="#FFF" />
-                                <Text style={styles.statusBadgeText}>{isPublic ? 'Public' : 'Personal'}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => isOwner && setShowClubPicker(true)}
-                                style={[styles.statusBadge, { backgroundColor: '#E0F2FE', marginLeft: 8 }]}
-                            >
-                                <Ionicons name="business" size={12} color="#0A66C2" />
-                                <Text style={[styles.statusBadgeText, { color: '#0A66C2' }]}>
-                                    {noteClubId ? (user?.clubsJoined?.find(c => (c.clubId?._id || c.clubId) === noteClubId)?.clubId?.name || 'Club') : 'Select Club'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.titleSeparator} />
-
-                        <View style={styles.editorWrapper}>
-                            {Platform.OS === 'web' ? (
+                        <ScrollView
+                            style={{ flex: 1 }}
+                            contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={true}
+                        >
+                            <View style={styles.titleRow}>
                                 <TextInput
-                                    multiline
-                                    style={styles.webInput}
-                                    value={webContent}
-                                    onChangeText={(val) => {
-                                        setWebContent(val);
-                                        onEditorChange(val);
-                                    }}
-                                    placeholder="Write something brilliant..."
+                                    style={styles.contentTitleInput}
+                                    value={noteTitle}
+                                    onChangeText={handleTitleChange}
+                                    placeholder="Note Title"
                                     placeholderTextColor="#9CA3AF"
                                     editable={canEdit}
                                 />
-                            ) : (
-                                <RichEditor
-                                    ref={richText}
-                                    initialContentHTML={lastContentRef.current}
-                                    onChange={onEditorChange}
-                                    onStatusChange={handleStatusChange}
-                                    placeholder={'Write something brilliant...'}
-                                    style={styles.richEditor}
-                                    initialHeight={height * 0.7}
-                                    useContainer={false}
-                                    disabled={!canEdit}
-                                    editorInitializedCallback={() => {
-                                        richText.current?.setContentHTML(lastContentRef.current);
-                                    }}
-                                />
-                            )}
-                        </View>
+                                <TouchableOpacity
+                                    onPress={togglePublic}
+                                    disabled={!isOwner}
+                                    style={[styles.statusBadge, isPublic ? styles.publicBadge : styles.privateBadge, !isOwner && { opacity: 0.7 }]}
+                                >
+                                    <Ionicons name={isPublic ? 'people' : 'lock-closed'} size={12} color="#FFF" />
+                                    <Text style={styles.statusBadgeText}>{isPublic ? 'Public' : 'Personal'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => isOwner && setShowClubPicker(true)}
+                                    style={[styles.statusBadge, { backgroundColor: '#E0F2FE', marginLeft: 8 }]}
+                                >
+                                    <Ionicons name="business" size={12} color="#0A66C2" />
+                                    <Text style={[styles.statusBadgeText, { color: '#0A66C2' }]}>
+                                        {noteClubId ? (user?.clubsJoined?.find(c => (c.clubId?._id || c.clubId) === noteClubId)?.clubId?.name || 'Club') : 'Select Club'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.titleSeparator} />
+
+                            <View style={styles.editorWrapper}>
+                                {Platform.OS === 'web' ? (
+                                    <TextInput
+                                        multiline
+                                        style={styles.webInput}
+                                        value={webContent}
+                                        onChangeText={(val) => {
+                                            setWebContent(val);
+                                            onEditorChange(val);
+                                        }}
+                                        placeholder="Write something brilliant..."
+                                        placeholderTextColor="#9CA3AF"
+                                        editable={canEdit}
+                                    />
+                                ) : (
+                                    <RichEditor
+                                        ref={richText}
+                                        initialContentHTML={lastContentRef.current}
+                                        onChange={onEditorChange}
+                                        onStatusChange={handleStatusChange}
+                                        placeholder={'Write something brilliant...'}
+                                        style={styles.richEditor}
+                                        initialHeight={250}
+                                        useContainer={false}
+                                        scrollEnabled={false}
+                                        disabled={!canEdit}
+                                        editorInitializedCallback={() => {
+                                            richText.current?.setContentHTML(lastContentRef.current);
+                                        }}
+                                    />
+                                )}
+                            </View>
+                        </ScrollView>
                     </View>
                 </KeyboardAvoidingView>
 
@@ -1578,7 +1586,7 @@ const styles = StyleSheet.create({
     toolbarDivider: { width: 1, height: 24, backgroundColor: '#E5E7EB', marginHorizontal: 6 },
 
     richEditor: { backgroundColor: '#FFF' },
-    editorWrapper: { flex: 1, minHeight: height * 0.7, paddingHorizontal: 20 },
+    editorWrapper: { minHeight: height, paddingHorizontal: 20 },
     webInput: { fontSize: 16, color: '#1F2937', minHeight: 400, textAlignVertical: 'top', paddingTop: 10 },
     editorInner: { flex: 1, backgroundColor: '#FFF' },
     titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 15, paddingBottom: 10 },

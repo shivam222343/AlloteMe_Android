@@ -183,6 +183,8 @@ const MemeMatchScreen = ({ navigation, route }) => {
             });
 
             return () => {
+                socket.off('game:update');
+                socket.off('game:error');
                 socket.off('memematch:question');
                 socket.off('memematch:answer_count');
                 socket.off('memematch:time_update');
@@ -190,6 +192,9 @@ const MemeMatchScreen = ({ navigation, route }) => {
                 socket.off('memematch:next_round');
                 socket.off('memematch:game_over');
                 socket.emit('memematch:leave', roomId);
+
+                if (resultsTimerRef.current) clearTimeout(resultsTimerRef.current);
+                if (gameOverRedirectTimerRef.current) clearTimeout(gameOverRedirectTimerRef.current);
             };
         }
     }, [socket, roomId]);

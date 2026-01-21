@@ -60,6 +60,7 @@ const CodeBreakerScreen = ({ navigation, route }) => {
     const [showPickCode, setShowPickCode] = useState(false);
     const [codeOptions, setCodeOptions] = useState([]);
     const [pickedCode, setPickedCode] = useState([]);
+    const gameOverTimerRef = useRef(null);
 
     const handleLeaveGame = () => {
         const title = isHost ? "End Game for Everyone?" : "Leave Game?";
@@ -218,13 +219,17 @@ const CodeBreakerScreen = ({ navigation, route }) => {
                 setTurnResult(data);
                 setShowResults(true);
                 setRoundInProgress(false);
-                setTimeout(() => {
+                if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
+                gameOverTimerRef.current = setTimeout(() => {
                     navigation.navigate('MaverickGames');
                 }, 30000);
             });
 
             return () => {
+                socket.off('game:update');
+                socket.off('game:error');
                 socket.off('codebreaker:select_settings');
+                socket.off('codebreaker:pick_code');
                 socket.off('codebreaker:game_started');
                 socket.off('codebreaker:attempt_made');
                 socket.off('codebreaker:time_update');
@@ -232,6 +237,7 @@ const CodeBreakerScreen = ({ navigation, route }) => {
                 socket.off('codebreaker:new_turn');
                 socket.off('codebreaker:game_over');
                 socket.emit('codebreaker:leave', roomId);
+                if (gameOverTimerRef.current) clearTimeout(gameOverTimerRef.current);
             };
         }
     }, [socket, roomId]);

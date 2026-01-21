@@ -14,6 +14,7 @@ import {
     Modal,
     Animated,
     Easing,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -324,13 +325,13 @@ const ProfileScreen = ({ navigation, route }) => {
                                                             { uri: user.preferences.sidebarBanner }
                                         )
                                 }
-                                style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]}
+                                style={StyleSheet.absoluteFillObject}
                                 resizeMode="cover"
                             />
                             <View style={styles.headerOverlay} />
                             <LinearGradient
                                 colors={['transparent', 'rgba(0,0,0,0.7)']}
-                                style={StyleSheet.absoluteFill}
+                                style={StyleSheet.absoluteFillObject}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 0, y: 1 }}
                             />
@@ -340,7 +341,7 @@ const ProfileScreen = ({ navigation, route }) => {
                             colors={['#0A66C2', '#0E76A8']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
-                            style={StyleSheet.absoluteFill}
+                            style={StyleSheet.absoluteFillObject}
                         />
                     )}
 
@@ -400,34 +401,43 @@ const ProfileScreen = ({ navigation, route }) => {
                 {/* Maverick ID Badge - Outside Header */}
                 {user?.maverickId && (
                     <View style={styles.idBadgeContainer}>
-                        <LinearGradient
-                            colors={['#0EA5E9', '#0284C7', '#0369A1', '#075985']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.idBadge}
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                Clipboard.setString(user.maverickId);
+                                Alert.alert('Copied!', `Maverick ID "${user.maverickId}" copied to clipboard`, [{ text: 'OK' }]);
+                            }}
                         >
-                            <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                            <Text style={styles.idText}>{user.maverickId}</Text>
-
-                            <Animated.View
-                                style={[
-                                    styles.shineEffect,
-                                    {
-                                        transform: [
-                                            { translateX: shineAnim },
-                                            { skewX: '-20deg' }
-                                        ]
-                                    }
-                                ]}
+                            <LinearGradient
+                                colors={['#0EA5E9', '#0284C7', '#0369A1', '#075985']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.idBadge}
                             >
-                                <LinearGradient
-                                    colors={['transparent', 'rgba(255, 255, 255, 0.9)', 'transparent']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={StyleSheet.absoluteFill}
-                                />
-                            </Animated.View>
-                        </LinearGradient>
+                                <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                <Text style={styles.idText}>{user.maverickId}</Text>
+                                <Ionicons name="copy-outline" size={16} color="#FFFFFF" style={{ marginLeft: 8 }} />
+
+                                <Animated.View
+                                    style={[
+                                        styles.shineEffect,
+                                        {
+                                            transform: [
+                                                { translateX: shineAnim },
+                                                { skewX: '-20deg' }
+                                            ]
+                                        }
+                                    ]}
+                                >
+                                    <LinearGradient
+                                        colors={['transparent', 'rgba(255, 255, 255, 0.9)', 'transparent']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={StyleSheet.absoluteFill}
+                                    />
+                                </Animated.View>
+                            </LinearGradient>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -761,7 +771,7 @@ const styles = StyleSheet.create({
     header: {
         alignItems: 'center',
         paddingTop: 40,
-        paddingBottom: 24,
+        paddingBottom: 40, // Use padding instead of margin to ensure background covers it
         backgroundColor: '#0A66C2', // Fallback
         overflow: 'hidden',
     },

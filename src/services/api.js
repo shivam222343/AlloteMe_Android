@@ -163,6 +163,7 @@ export const clubsAPI = {
     join: (accessKey) => api.post('/clubs/join', { accessKey }),
     addMember: (clubId, maverickId) => api.post('/clubs/add-member', { clubId, maverickId }),
     getMembers: (clubId) => api.get(`/clubs/${clubId}/members`),
+    getAttendanceWarnings: (clubId) => api.get(`/clubs/${clubId}/members-warnings`),
     removeMember: (clubId, userId) => api.post('/clubs/remove-member', { clubId, userId }),
     generateKey: (clubId, data) => api.post(`/clubs/${clubId}/generate-key`, data),
 };
@@ -411,6 +412,33 @@ export const notesAPI = {
     create: (data) => api.post('/notes', data),
     update: (id, data) => api.put(`/notes/${id}`, data),
     delete: (id) => api.delete(`/notes/${id}`),
+};
+
+// Events API
+export const eventsAPI = {
+    getAll: () => api.get('/events'),
+    getById: (id) => api.get(`/events/${id}`),
+    create: (data) => api.post('/events', data),
+    update: (id, data) => api.put(`/events/${id}`, data),
+    delete: (id) => api.delete(`/events/${id}`),
+};
+
+// Resources API
+export const resourcesAPI = {
+    getByEventId: (eventId) => api.get(`/resources/event/${eventId}`),
+    addLink: (data) => api.post('/resources/link', data),
+    uploadFile: (data, onProgress) => api.post('/resources/upload', data, {
+        timeout: 600000,
+        headers: { 'Content-Type': 'application/json' },
+        onUploadProgress: (progressEvent) => {
+            if (onProgress && progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                onProgress(percentCompleted);
+            }
+        }
+    }),
+    update: (id, data) => api.put(`/resources/${id}`, data),
+    delete: (id) => api.delete(`/resources/${id}`),
 };
 
 export default api;
