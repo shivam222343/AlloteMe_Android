@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Modal, Image, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Modal, Image, TouchableOpacity, ActivityIndicator, Platform, Linking } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
@@ -18,6 +18,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         name: '',
         university: '',
+        dteCode: '',
         type: 'Autonomous',
         feesPerYear: '',
         website: '',
@@ -116,6 +117,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
                 ...prev,
                 name: p.name || prev.name,
                 university: p.university || prev.university,
+                dteCode: p.dteCode || prev.dteCode,
                 type: p.type || prev.type,
                 feesPerYear: p.feesPerYear != null ? p.feesPerYear.toString() : prev.feesPerYear,
                 website: p.website || prev.website,
@@ -178,6 +180,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
             const payload = {
                 name: formData.name,
                 university: formData.university || undefined,
+                dteCode: formData.dteCode || undefined,
                 type: formData.type,
                 feesPerYear: n(formData.feesPerYear),
                 website: formData.website || undefined,
@@ -223,7 +226,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
             navigation.goBack();
         } catch (error) {
             console.error('Save error:', error?.response?.data || error.message);
-            Alert.alert('Error', error?.response?.data?.message || 'Failed to save institution');
+            Alert.alert('Error', 'Failed to save institution');
         } finally {
             setLoading(false);
         }
@@ -252,13 +255,26 @@ const CreateInstitutionScreen = ({ navigation }) => {
                         placeholder="e.g. COEP Technological University"
                         leftIcon={ImageIcon}
                     />
-                    <Input
-                        label="University Affiliation"
-                        value={formData.university}
-                        onChangeText={(val) => setFormData({ ...formData, university: val })}
-                        placeholder="e.g. SPPU"
-                        leftIcon={Globe}
-                    />
+                    <View style={styles.row}>
+                        <View style={{ flex: 1 }}>
+                            <Input
+                                label="University"
+                                value={formData.university}
+                                onChangeText={(val) => setFormData({ ...formData, university: val })}
+                                placeholder="e.g. SPPU"
+                                leftIcon={Globe}
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Input
+                                label="DTE Code"
+                                value={formData.dteCode}
+                                onChangeText={(val) => setFormData({ ...formData, dteCode: val })}
+                                placeholder="e.g. 6006"
+                                leftIcon={Hash}
+                            />
+                        </View>
+                    </View>
                     <View style={styles.row}>
                         <View style={{ flex: 1 }}>
                             <Input
@@ -399,6 +415,14 @@ const CreateInstitutionScreen = ({ navigation }) => {
                             />
                         </View>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.coordHelper}
+                        onPress={() => Linking.openURL('https://www.latlong.net/')}
+                    >
+                        <MapPin size={14} color={Colors.primary} />
+                        <Text style={styles.coordHelperText}>Get Coordinates from Map</Text>
+                    </TouchableOpacity>
                 </Card>
 
                 {/* General Stats */}
@@ -572,7 +596,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>✨ Magic AI Extraction</Text>
                         <Text style={styles.modalSub}>Paste raw text from a website or brochure to auto-fill the form.</Text>
-                        
+
                         <View style={styles.templateNote}>
                             <Text style={styles.templateNoteTitle}>💡 Recommended Format:</Text>
                             <Text style={styles.templateNoteText}>
@@ -642,6 +666,8 @@ const styles = StyleSheet.create({
     templateNote: { backgroundColor: '#F0F9FF', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BAE6FD' },
     templateNoteTitle: { fontSize: 13, fontWeight: 'bold', color: '#0369A1', marginBottom: 4 },
     templateNoteText: { fontSize: 11, color: '#0EA5E9', lineHeight: 16 },
+    coordHelper: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 15, padding: 10, borderRadius: 10, backgroundColor: Colors.primary + '08', borderColor: Colors.primary + '20', borderWidth: 1, borderStyle: 'dashed', justifyContent: 'center' },
+    coordHelperText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
 });
 
 export default CreateInstitutionScreen;

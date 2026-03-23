@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
@@ -42,7 +42,7 @@ const UploadCutoffScreen = ({ navigation }) => {
     };
 
     const filteredInstitutions = institutions.filter(inst =>
-        (inst.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (inst.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inst.location?.city?.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
@@ -50,10 +50,10 @@ const UploadCutoffScreen = ({ navigation }) => {
         if (!rawText.trim()) return Alert.alert('Empty', 'Paste some text first');
         setAiLoading(true);
         try {
-            const res = isBulkMode 
-                ? await cutoffAPI.parseBulk(rawText) 
+            const res = isBulkMode
+                ? await cutoffAPI.parseBulk(rawText)
                 : await cutoffAPI.parse(rawText);
-            
+
             if (isBulkMode) {
                 // Backend returns { branches: [...] }
                 const branches = res.data.branches || [];
@@ -67,7 +67,22 @@ const UploadCutoffScreen = ({ navigation }) => {
             setInputMode('JSON');
         } catch (error) {
             console.error('Parse error:', error);
-            Alert.alert('Error', 'AI failed to parse text. Please try again or use JSON mode.');
+            const serverMsg = error.response?.data?.message || '';
+            const isGroqError = serverMsg.toLowerCase().includes('groq') || serverMsg.toLowerCase().includes('api_key') || serverMsg.toLowerCase().includes('model');
+
+            Alert.alert(
+                isGroqError ? '🔧 AI Configuration Error' : '❌ AI Parse Error',
+                isGroqError
+                    ? `There was an issue with the AI configuration:\n\n"${serverMsg}"\n\nPlease ensure your Groq API Key is valid in your Profile Settings.`
+                    : 'AI failed to parse text. Please check the text format or try again later.',
+                [
+                    { text: 'OK' },
+                    {
+                        text: 'Update Profile',
+                        onPress: () => navigation.navigate('Profile')
+                    }
+                ]
+            );
         } finally {
             setAiLoading(false);
         }
@@ -82,7 +97,23 @@ const UploadCutoffScreen = ({ navigation }) => {
         setLoading(true);
         try {
             let parsedData = JSON.parse(jsonText);
-            
+
+            // 1. Auto-Add Missing Branches if in Bulk Mode
+            if (isBulkMode) {
+                const incomingBranchNames = [...new Set(parsedData.map(item => item.branchName).filter(Boolean))];
+                const existingBranchNames = (selectedInst.branches || []).map(b => b.name);
+                const missingBranches = incomingBranchNames.filter(name => !existingBranchNames.includes(name));
+
+                if (missingBranches.length > 0) {
+                    const newBranchObjects = missingBranches.map(name => ({
+                        name,
+                        code: name.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 5)
+                    }));
+                    const updatedBranches = [...(selectedInst.branches || []), ...newBranchObjects];
+                    await institutionAPI.update(selectedInst._id, { branches: updatedBranches });
+                }
+            }
+
             if (isBulkMode) {
                 // Filter out empty branches or invalid entries
                 const bulkItems = parsedData
@@ -96,6 +127,15 @@ const UploadCutoffScreen = ({ navigation }) => {
                     }))
                     .filter(item => item.cutoffData.length > 0);
 
+                // 2. Remove older cutoffs for each branch being uploaded (Replace mode)
+                for (const item of bulkItems) {
+                    await cutoffAPI.delete(selectedInst._id, item.branchName, {
+                        examType: item.examType,
+                        year: item.year,
+                        round: item.round
+                    });
+                }
+
                 await cutoffAPI.bulkAdd({
                     institutionId: selectedInst._id,
                     items: bulkItems
@@ -103,7 +143,14 @@ const UploadCutoffScreen = ({ navigation }) => {
             } else {
                 // Filter out invalid single entries
                 const cleanData = parsedData.filter(c => c.category && c.percentile != null);
-                
+
+                // 2. Remove older cutoffs for this branch (Replace mode)
+                await cutoffAPI.delete(selectedInst._id, selectedBranch.name, {
+                    examType: metaData.examType,
+                    year: parseInt(metaData.year),
+                    round: parseInt(metaData.round)
+                });
+
                 await cutoffAPI.add({
                     institutionId: selectedInst._id,
                     branchName: selectedBranch.name,
@@ -113,7 +160,7 @@ const UploadCutoffScreen = ({ navigation }) => {
                     cutoffData: cleanData
                 });
             }
-            Alert.alert('Success', 'Cutoff data uploaded successfully!');
+            Alert.alert('Success', 'Cutoff data uploaded successfully (Previous data replaced)!');
             navigation.goBack();
         } catch (error) {
             console.error('Upload Error:', error.response?.data || error.message);
@@ -339,10 +386,10 @@ const UploadCutoffScreen = ({ navigation }) => {
                         )}
 
                         <View style={{ gap: 12, marginTop: 32 }}>
-                            <Button 
-                                title={isBulkMode ? "Confirm & Upload Bulk" : "Confirm & Upload"} 
-                                onPress={handleUpload} 
-                                loading={loading} 
+                            <Button
+                                title={isBulkMode ? "Confirm & Upload Bulk" : "Confirm & Upload"}
+                                onPress={handleUpload}
+                                loading={loading}
                             />
                             <Button title="Back" type="secondary" onPress={() => setStep(3)} />
                         </View>

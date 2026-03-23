@@ -8,7 +8,7 @@ import { Search, MapPin, Star, Pencil } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 
 const BrowseCollegesScreen = ({ navigation }) => {
-    const { user } = useAuth();
+    const { user, socket } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [institutions, setInstitutions] = useState([]);
     const [filtered, setFiltered] = useState([]);
@@ -20,7 +20,24 @@ const BrowseCollegesScreen = ({ navigation }) => {
 
     useEffect(() => {
         fetchInstitutions();
-    }, []);
+
+        if (socket) {
+            const handleUpdate = () => {
+                console.log('[Socket] Institution changed, refreshing list...');
+                fetchInstitutions();
+            };
+
+            socket.on('institution:created', handleUpdate);
+            socket.on('institution:updated', handleUpdate);
+            socket.on('institution:deleted', handleUpdate);
+
+            return () => {
+                socket.off('institution:created', handleUpdate);
+                socket.off('institution:updated', handleUpdate);
+                socket.off('institution:deleted', handleUpdate);
+            };
+        }
+    }, [socket]);
 
     const fetchInstitutions = async () => {
         try {
@@ -60,7 +77,14 @@ const BrowseCollegesScreen = ({ navigation }) => {
                 )}
                 <View style={styles.itemInfo}>
                     <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                    <Text style={styles.itemUniversity}>{item.university || 'Affiliated'}</Text>
+                    <View style={styles.subInfoRow}>
+                        <Text style={styles.itemUniversity}>{item.university || 'Affiliated'}</Text>
+                        {item.dteCode && (
+                            <View style={styles.dteMiniBadge}>
+                                <Text style={styles.dteMiniText}>DTE: {item.dteCode}</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
             </View>
 
@@ -160,16 +184,16 @@ const styles = StyleSheet.create({
         height: 48,
     },
     searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: Colors.text.primary },
-    
-    tabBar: { 
-        backgroundColor: Colors.white, 
-        borderBottomWidth: 1, 
-        borderBottomColor: Colors.divider 
+
+    tabBar: {
+        backgroundColor: Colors.white,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.divider
     },
     tabScroll: { paddingHorizontal: 10 },
-    tabItem: { 
-        paddingHorizontal: 16, 
-        paddingVertical: 14, 
+    tabItem: {
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         marginHorizontal: 4,
         alignItems: 'center',
         justifyContent: 'center',
@@ -178,47 +202,50 @@ const styles = StyleSheet.create({
     activeTabItem: {},
     tabItemText: { fontSize: 14, color: Colors.text.tertiary, fontWeight: '600' },
     activeTabItemText: { color: Colors.primary, fontWeight: 'bold' },
-    activeLine: { 
-        position: 'absolute', 
-        bottom: 0, 
-        left: 0, 
-        right: 0, 
-        height: 3, 
+    activeLine: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 3,
         backgroundColor: Colors.primary,
         borderTopLeftRadius: 3,
         borderTopRightRadius: 3
     },
-    
+
     listContent: { paddingBottom: 120 },
-    listItem: { 
-        padding: 20, 
+    listItem: {
+        padding: 20,
         backgroundColor: Colors.white,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.divider 
+        borderBottomColor: Colors.divider
     },
     itemHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 14 },
     itemThumbnail: { width: 60, height: 60, borderRadius: 12, backgroundColor: Colors.divider },
     itemInfo: { flex: 1 },
-    itemName: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 4 },
+    itemName: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 2 },
+    subInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     itemUniversity: { fontSize: 13, color: Colors.text.tertiary, fontWeight: '500' },
-    
+    dteMiniBadge: { backgroundColor: Colors.primary + '08', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: Colors.primary + '15' },
+    dteMiniText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
+
     badgeRow: { flexDirection: 'row', gap: 10, marginBottom: 16, alignItems: 'center' },
-    professionTag: { 
-        backgroundColor: Colors.primary + '10', 
-        paddingHorizontal: 10, paddingVertical: 5, 
-        borderRadius: 6, borderWidth: 1, borderColor: Colors.primary + '20' 
+    professionTag: {
+        backgroundColor: Colors.primary + '10',
+        paddingHorizontal: 10, paddingVertical: 5,
+        borderRadius: 6, borderWidth: 1, borderColor: Colors.primary + '20'
     },
     professionTagText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary, textTransform: 'uppercase' },
-    nirfBadgeMini: { 
-        flexDirection: 'row', alignItems: 'center', gap: 6, 
-        backgroundColor: '#FFF8E1', 
-        paddingHorizontal: 10, paddingVertical: 5, 
-        borderRadius: 6, borderWidth: 1, borderColor: '#FFD54F' 
+    nirfBadgeMini: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: '#FFF8E1',
+        paddingHorizontal: 10, paddingVertical: 5,
+        borderRadius: 6, borderWidth: 1, borderColor: '#FFD54F'
     },
     nirfTextMini: { fontSize: 10, fontWeight: 'bold', color: '#B8860B' },
-    
-    itemFooter: { 
-        flexDirection: 'row', justifyContent: 'space-between', 
+
+    itemFooter: {
+        flexDirection: 'row', justifyContent: 'space-between',
         alignItems: 'center'
     },
     itemLoc: { flexDirection: 'row', alignItems: 'center', gap: 6 },

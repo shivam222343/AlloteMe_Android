@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Alert, Image,
-    TouchableOpacity, ActivityIndicator, Platform, Modal
+    TouchableOpacity, ActivityIndicator, Platform, Modal, Linking
 } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
@@ -37,6 +37,7 @@ const EditInstitutionScreen = ({ route, navigation }) => {
             setFormData({
                 name: d.name || '',
                 university: d.university || '',
+                dteCode: d.dteCode || '',
                 type: d.type || 'Autonomous',
                 feesPerYear: d.feesPerYear?.toString() || '',
                 website: d.website || '',
@@ -88,6 +89,7 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                 // Basic
                 name: p.name || prev.name,
                 university: p.university || prev.university,
+                dteCode: p.dteCode || prev.dteCode,
                 type: p.type || prev.type,
                 feesPerYear: p.feesPerYear != null ? p.feesPerYear.toString() : prev.feesPerYear,
                 website: p.website || prev.website,
@@ -207,6 +209,7 @@ const EditInstitutionScreen = ({ route, navigation }) => {
             const payload = {
                 name: formData.name,
                 university: formData.university || undefined,
+                dteCode: formData.dteCode || undefined,
                 type: formData.type,
                 feesPerYear: n(formData.feesPerYear),
                 website: formData.website || undefined,
@@ -259,6 +262,32 @@ const EditInstitutionScreen = ({ route, navigation }) => {
         }
     };
 
+    const handleDelete = async () => {
+        Alert.alert(
+            "Delete Institution",
+            "Are you sure you want to delete this institution and ALL its cutoff data? This action IS IRREVERSIBLE.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await institutionAPI.delete(id);
+                            Alert.alert("Success", "Institution deleted.");
+                            navigation.navigate('Dashboard');
+                        } catch (error) {
+                            Alert.alert("Error", "Failed to delete institution.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     if (fetchLoading || !formData) {
         return <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>;
     }
@@ -284,7 +313,14 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                 <Text style={styles.sectionTitle}>Basic Info</Text>
                 <Card style={styles.card}>
                     <Input label="Institution Name *" value={f.name} onChangeText={v => setF({ name: v })} placeholder="e.g. COEP Technological University" />
-                    <Input label="Affiliated University" value={f.university} onChangeText={v => setF({ university: v })} placeholder="e.g. Pune University" />
+                    <View style={styles.row}>
+                        <View style={{ flex: 1 }}>
+                            <Input label="University" value={f.university} onChangeText={v => setF({ university: v })} placeholder="e.g. SPPU" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Input label="DTE Code" value={f.dteCode} onChangeText={v => setF({ dteCode: v })} placeholder="e.g. 6006" />
+                        </View>
+                    </View>
                     <View style={styles.row}>
                         <View style={{ flex: 1 }}>
                             <Input label="Fees / Year (₹)" value={f.feesPerYear} onChangeText={v => setF({ feesPerYear: v })} placeholder="e.g. 100000" keyboardType="numeric" />
@@ -348,6 +384,14 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                         <View style={{ flex: 1 }}><Input label="Latitude" value={f.location.coordinates?.lat?.toString()} onChangeText={v => setFormData({ ...f, location: { ...f.location, coordinates: { ...f.location.coordinates, lat: v } } })} placeholder="e.g. 18.5196" keyboardType="numeric" /></View>
                         <View style={{ flex: 1 }}><Input label="Longitude" value={f.location.coordinates?.lng?.toString()} onChangeText={v => setFormData({ ...f, location: { ...f.location, coordinates: { ...f.location.coordinates, lng: v } } })} placeholder="e.g. 73.8554" keyboardType="numeric" /></View>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.coordHelper}
+                        onPress={() => Linking.openURL('https://www.latlong.net/')}
+                    >
+                        <MapPin size={14} color={Colors.primary} />
+                        <Text style={styles.coordHelperText}>Get Coordinates from Map</Text>
+                    </TouchableOpacity>
                 </Card>
 
                 {/* General Info */}
@@ -410,7 +454,7 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                                         />
                                     </View>
                                 </View>
-                                <TouchableOpacity style={styles.removeBranchBtn} onPress={() => removeBranch(idx)}>
+                                <TouchableOpacity style={styles.removeBtnSmall} onPress={() => removeBranch(idx)}>
                                     <X size={16} color={Colors.error} />
                                 </TouchableOpacity>
                             </View>
@@ -434,7 +478,13 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                     <Input label="Hostel Notes" value={f.hostel.notes} onChangeText={v => setFormData({ ...f, hostel: { ...f.hostel, notes: v } })} placeholder="Additional hostel info" multiline />
                 </Card>
 
-                <Button title="Save Changes" onPress={handleSave} loading={loading} style={styles.saveBtn} />
+                <View style={styles.bottomActions}>
+                    <Button title="Save Changes" onPress={handleSave} loading={loading} style={{ flex: 2 }} />
+                    <TouchableOpacity style={styles.deleteInstBtn} onPress={handleDelete}>
+                        <X size={20} color={Colors.error} />
+                        <Text style={styles.deleteInstText}>Delete College</Text>
+                    </TouchableOpacity>
+                </View>
             </ScrollView>
 
             {/* Magic AI Modal */}
@@ -478,6 +528,7 @@ const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 16, marginTop: 16 },
     title: { fontSize: 24, fontWeight: 'bold', color: Colors.text.primary },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     sectionTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 20, marginBottom: 10, color: Colors.primary, paddingHorizontal: 16 },
     card: { marginBottom: 12, marginHorizontal: 16, padding: 16 },
     row: { flexDirection: 'row', gap: 12 },
@@ -486,6 +537,7 @@ const styles = StyleSheet.create({
     imageWrapper: { width: 80, height: 80, borderRadius: 12, overflow: 'hidden', marginRight: 12, position: 'relative', ...Shadows.sm },
     previewImage: { width: '100%', height: '100%' },
     removeBtn: { position: 'absolute', top: 4, right: 4, backgroundColor: Colors.error || '#EF4444', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    removeBtnSmall: { padding: 8, marginTop: 15 },
     addImgBtn: { width: 80, height: 80, borderRadius: 12, borderStyle: 'dashed', borderWidth: 2, borderColor: Colors.primary, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary + '05' },
     addImgText: { fontSize: 10, color: Colors.primary, fontWeight: 'bold', marginTop: 4 },
     typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
@@ -497,7 +549,6 @@ const styles = StyleSheet.create({
     facChipActive: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
     facChipText: { fontSize: 13, color: Colors.text.secondary, fontWeight: '600' },
     facChipTextActive: { color: Colors.primary },
-    saveBtn: { marginTop: 24, marginBottom: 60, marginHorizontal: 16 },
     aiBtn: { paddingVertical: 4, paddingHorizontal: 12 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 20 },
     modalContent: { backgroundColor: Colors.white, borderRadius: 24, padding: 24, ...Shadows.lg },
@@ -508,11 +559,35 @@ const styles = StyleSheet.create({
     addBtnText: { color: Colors.primary, fontWeight: 'bold', fontSize: 14 },
     branchItem: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     branchInputs: { flex: 1, flexDirection: 'row', gap: 10 },
-    removeBranchBtn: { padding: 8, marginTop: 15 },
     emptyText: { textAlign: 'center', color: Colors.text.tertiary, marginVertical: 10, fontSize: 14 },
     templateNote: { backgroundColor: '#F0F9FF', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#BAE6FD' },
     templateNoteTitle: { fontSize: 13, fontWeight: 'bold', color: '#0369A1', marginBottom: 4 },
     templateNoteText: { fontSize: 11, color: '#0EA5E9', lineHeight: 16 },
+    coordHelper: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 15, padding: 10, borderRadius: 10, backgroundColor: Colors.primary + '08', borderColor: Colors.primary + '20', borderWidth: 1, borderStyle: 'dashed', justifyContent: 'center' },
+    coordHelperText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
+
+    // New bottom actions
+    bottomActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 24,
+        marginBottom: 60,
+        marginHorizontal: 16,
+        alignItems: 'center'
+    },
+    deleteInstBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 14,
+        borderRadius: 14,
+        backgroundColor: Colors.error + '10',
+        borderWidth: 1,
+        borderColor: Colors.error + '25'
+    },
+    deleteInstText: { color: Colors.error, fontWeight: 'bold', fontSize: 13 }
 });
 
 export default EditInstitutionScreen;

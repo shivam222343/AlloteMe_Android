@@ -1,5 +1,6 @@
 const Cutoff = require('../models/Cutoff');
-const { Groq } = require('groq-sdk');
+const Groq = require('groq-sdk');
+const { emitUpdate } = require('../utils/socket');
 
 // @desc    Add cutoff data (bulk or single)
 // @route   POST /api/cutoffs
@@ -28,6 +29,7 @@ const addCutoffData = async (req, res) => {
         }));
 
         const cutoffs = await Cutoff.insertMany(dataToInsert, { ordered: false });
+        emitUpdate('cutoff:updated', { institutionId });
         res.status(201).json(cutoffs);
     } catch (error) {
         // If ordered=false, some might have been inserted. We still report error if unique index failed.
@@ -45,8 +47,16 @@ const parseCutoffData = async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ message: 'No text provided' });
 
-    // Choose API key: User's personal key or System's .env key
-    const apiKey = req.user?.groqApiKey || process.env.GROQ_API_KEY;
+    const userKey = req.user?.groqApiKey;
+    const apiKey = (userKey && userKey.trim() !== '') ? userKey : process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+        console.error('[AI Parse] Error: No Groq API Key found in Profile or .env');
+        return res.status(500).json({ message: 'Groq API Key not configured. Please add it to your profile.' });
+    }
+
+    console.log(`[AI Parse] Using Groq Key from: ${userKey ? 'User Profile' : '.env'} (Starts with: ${apiKey.substring(0, 6)}...)`);
+
     const groqClient = new Groq({ apiKey });
 
     try {
@@ -75,11 +85,12 @@ const parseCutoffData = async (req, res) => {
             response_format: { type: 'json_object' }
         });
 
-        const parsed = JSON.parse(chatCompletion.choices[0].message.content);
+        const content = chatCompletion.choices[0].message.content;
+        const parsed = JSON.parse(content);
         res.json(parsed);
     } catch (error) {
-        console.error('AI Parse Error:', error);
-        res.status(500).json({ message: 'Failed to parse cutoff data' });
+        console.error('AI Parse Error Detail:', error);
+        res.status(500).json({ message: error.message || 'Failed to parse cutoff data' });
     }
 };
 
@@ -91,25 +102,135 @@ const getCutoffsByInstitution = async (req, res) => {
     res.json(cutoffs);
 };
 
-// @desc    Predict colleges based on percentile
+// @desc    Predict colleges based on percentile/rank with tolerance range
 // @route   GET /api/cutoffs/predict
 // @access  Public
 const predictColleges = async (req, res) => {
-    const { percentile, examType, category, round } = req.query;
+    const {
+        percentile,
+        rank,
+        pTolerance = 10,
+        rTolerance = 500,
+        examType,
+        category,
+        round,
+        year,
+        branches,
+        regions,
+        autonomy,
+        institutionTypes,
+        seatTypes
+    } = req.query;
 
     try {
-        const matches = await Cutoff.find({
+        const query = {
             examType,
-            round: round || 1,
-            category: category || 'OPEN',
-            percentile: { $lte: parseFloat(percentile) }
-        }).populate('collegeId', 'name location type');
+            category: category || 'OPEN'
+        };
 
-        // Sort by highest possible percentile below user's
-        const sorted = matches.sort((a, b) => b.percentile - a.percentile);
+        if (round) query.round = parseInt(round);
+        if (year) query.year = parseInt(year);
 
-        res.json(sorted);
+        // Branch Filter (Strict 99% match/Strict preference)
+        if (branches) {
+            const branchArray = Array.isArray(branches) ? branches : [branches];
+            if (branchArray.length > 0) {
+                query.branch = { $in: branchArray };
+            }
+        }
+
+        // Seat Type Filter (e.g., Home University, State Level)
+        if (seatTypes) {
+            const seatArray = Array.isArray(seatTypes) ? seatTypes : [seatTypes];
+            if (seatArray.length > 0) {
+                // We use regex for flexibility matching seat types likes "GOPENH" (Home University)
+                const orConditions = seatArray.map(st => {
+                    if (st === 'Home University') return { seatType: /H$/i }; // Ends with H
+                    if (st === 'Other Than Home University') return { seatType: /O$/i }; // Ends with O
+                    if (st === 'State Level') return { seatType: /S$/i }; // Ends with S
+                    if (st === 'All India Level') return { seatType: /AI$/i }; // AI
+                    return { seatType: new RegExp(st, 'i') };
+                });
+                query.$and = query.$and || [];
+                query.$and.push({ $or: orConditions });
+            }
+        }
+
+        // Institution-level Filtering (Region & Autonomy)
+        const instQuery = {};
+        if (regions) {
+            const regionArray = Array.isArray(regions) ? regions : [regions];
+            if (regionArray.length > 0) {
+                instQuery['location.region'] = { $in: regionArray };
+            }
+        }
+
+        // Handle Institution Types (e.g. Government, Private Autonomous)
+        if (institutionTypes) {
+            const typeArray = Array.isArray(institutionTypes) ? institutionTypes : [institutionTypes];
+            if (typeArray.length > 0) {
+                const typeRegexes = typeArray.map(t => new RegExp(t, 'i'));
+                instQuery.type = { $in: typeRegexes };
+            }
+        }
+
+        if (autonomy && autonomy !== 'All') {
+            if (autonomy === 'Autonomous') {
+                instQuery.type = { $regex: /Autonomous/i };
+            } else if (autonomy === 'Non-Autonomous') {
+                instQuery.type = { $not: /Autonomous/i };
+            }
+        }
+
+        // If we have institution filters, find matching IDs first
+        if (Object.keys(instQuery).length > 0) {
+            const Institution = require('../models/Institution');
+            const matchingInsts = await Institution.find(instQuery).select('_id');
+            const instIds = matchingInsts.map(i => i._id);
+            query.collegeId = { $in: instIds };
+        }
+
+        const conditions = [];
+        if (percentile) {
+            const p = parseFloat(percentile);
+            const tol = parseFloat(pTolerance);
+            conditions.push({
+                percentile: {
+                    $gte: Math.max(0, p - tol),
+                    $lte: Math.min(100, p + tol)
+                }
+            });
+        }
+
+        if (rank) {
+            const r = parseInt(rank);
+            const tol = parseInt(rTolerance);
+            conditions.push({
+                rank: {
+                    $gte: Math.max(1, r - tol),
+                    $lte: r + tol
+                }
+            });
+        }
+
+        if (conditions.length > 0) {
+            query.$or = conditions;
+        }
+
+        const matches = await Cutoff.find(query)
+            .populate({
+                path: 'collegeId',
+                select: 'name location type website email dteCode'
+            })
+            .sort({ percentile: -1, rank: 1 })
+            .lean();
+
+        // Final sanity check for populated data
+        const validMatches = matches.filter(m => m.collegeId);
+
+        res.json(validMatches);
     } catch (error) {
+        console.error('Prediction error:', error);
         res.status(500).json({ message: 'Prediction failed' });
     }
 };
@@ -118,7 +239,7 @@ const predictColleges = async (req, res) => {
 // @route   POST /api/cutoffs/bulk
 // @access  Private/Admin
 const bulkAddCutoffData = async (req, res) => {
-    const { institutionId, items } = req.body; 
+    const { institutionId, items } = req.body;
 
     if (!items || !Array.isArray(items)) {
         return res.status(400).json({ message: 'Invalid data format' });
@@ -145,6 +266,7 @@ const bulkAddCutoffData = async (req, res) => {
         });
 
         const cutoffs = await Cutoff.insertMany(dataToInsert, { ordered: false });
+        emitUpdate('cutoff:updated', { institutionId });
         res.status(201).json(cutoffs);
     } catch (error) {
         if (error.code === 11000) {
@@ -161,10 +283,20 @@ const parseBulkCutoffData = async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ message: 'No text provided' });
 
-    const apiKey = req.user?.groqApiKey || process.env.GROQ_API_KEY;
+    const userKey = req.user?.groqApiKey;
+    const apiKey = (userKey && userKey.trim() !== '') ? userKey : process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+        console.error('[AI Bulk Parse] Error: No Groq API Key found in Profile or .env');
+        return res.status(500).json({ message: 'Groq API Key not configured. Please add it to your profile.' });
+    }
+
+    console.log(`[AI Bulk Parse] Using Groq Key from: ${userKey ? 'User Profile' : '.env'} (Starts with: ${apiKey.substring(0, 6)}...)`);
+
     const groqClient = new Groq({ apiKey });
 
     try {
+        console.log('[AI Bulk Parse] Sending data to Groq...');
         const chatCompletion = await groqClient.chat.completions.create({
             messages: [
                 {
@@ -178,12 +310,6 @@ const parseBulkCutoffData = async (req, res) => {
                                 "cutoffData": [
                                     { "category": "OPEN", "seatType": "GOPENH", "percentile": 98.5, "rank": 1200 },
                                     { "category": "SC", "seatType": "GSCH", "percentile": 92.1, "rank": 5400 }
-                                ]
-                            },
-                            {
-                                "branchName": "Information Technology",
-                                "cutoffData": [
-                                    { "category": "OPEN", "seatType": "GOPENH", "percentile": 97.2, "rank": 2100 }
                                 ]
                             }
                         ]
@@ -200,19 +326,47 @@ const parseBulkCutoffData = async (req, res) => {
             response_format: { type: 'json_object' }
         });
 
-        const parsed = JSON.parse(chatCompletion.choices[0].message.content);
+        const content = chatCompletion.choices[0].message.content;
+        console.log('[AI Bulk Parse] AI Response received');
+        const parsed = JSON.parse(content);
         res.json(parsed);
     } catch (error) {
-        console.error('AI Bulk Parse Error:', error);
-        res.status(500).json({ message: 'Failed to parse bulk cutoff data' });
+        console.error('AI Bulk Parse Error Detail:', error);
+        res.status(500).json({ message: error.message || 'Failed to parse bulk cutoff data' });
     }
 };
 
-module.exports = { 
-    addCutoffData, 
-    bulkAddCutoffData, 
-    parseCutoffData, 
-    parseBulkCutoffData, 
-    getCutoffsByInstitution, 
-    predictColleges 
+// @desc    Delete cutoffs for a specific branch/year/round
+// @route   DELETE /api/cutoffs/:institutionId/branch/:branchName
+// @access  Private/Admin
+const deleteCutoffs = async (req, res) => {
+    const { institutionId, branchName } = req.params;
+    const { examType, year, round } = req.query;
+
+    try {
+        const query = {
+            collegeId: institutionId,
+            branch: branchName
+        };
+
+        if (examType) query.examType = examType;
+        if (year) query.year = parseInt(year);
+        if (round) query.round = parseInt(round);
+
+        const result = await Cutoff.deleteMany(query);
+        emitUpdate('cutoff:updated', { institutionId });
+        res.json({ message: 'Cutoffs deleted successfully', count: result.deletedCount });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = {
+    addCutoffData,
+    bulkAddCutoffData,
+    parseCutoffData,
+    parseBulkCutoffData,
+    getCutoffsByInstitution,
+    predictColleges,
+    deleteCutoffs
 };

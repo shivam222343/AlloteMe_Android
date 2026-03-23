@@ -15,10 +15,10 @@ const Sidebar = ({ navigation, state }) => {
 
     // Map local banner IDs to assets
     const bannerAssets = {
-        'local-banner-1': require('../../assets/banners/blue_geometric.png'),
-        'local-banner-2': require('../../assets/banners/blue_abstract.png'),
-        'local-banner-3': require('../../assets/banners/blue_shapes.png'),
-        'local-banner-4': require('../../assets/banners/blue_cloud.png'),
+        'local-banner-1': require('../../../assets/banners/blue_geometric.png'),
+        'local-banner-2': require('../../../assets/banners/blue_abstract.png'),
+        'local-banner-3': require('../../../assets/banners/blue_shapes.png'),
+        'local-banner-4': require('../../../assets/banners/blue_cloud.png'),
     };
 
     const MenuItems = [
@@ -63,8 +63,8 @@ const Sidebar = ({ navigation, state }) => {
     const renderHeader = () => {
         const hasBanner = !!user?.preferences?.sidebarBanner;
         const bannerUrl = user?.preferences?.sidebarBanner;
-        
-        const bannerSource = hasBanner 
+
+        const bannerSource = hasBanner
             ? (bannerAssets[bannerUrl] || { uri: bannerUrl })
             : null;
 
@@ -75,15 +75,8 @@ const Sidebar = ({ navigation, state }) => {
                         <Image source={bannerSource} style={styles.headerBg} resizeMode="cover" />
                         <View style={styles.headerOverlay} />
                     </>
-                ) : (
-                    <LinearGradient
-                        colors={[Colors.primary, '#0E76A8']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.headerBg}
-                    />
-                )}
-                
+                ) : null}
+
                 <View style={styles.profileBox}>
                     <GradientBorder size={54} borderWidth={hasBanner ? 2 : 1}>
                         <Image
@@ -133,11 +126,11 @@ const Sidebar = ({ navigation, state }) => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.white },
-    header: { 
-        paddingHorizontal: 20, 
-        paddingTop: 30, 
-        paddingBottom: 25, 
+    container: { flex: 1, backgroundColor: Colors.white, marginTop: 28 },
+    header: {
+        paddingHorizontal: 20,
+        paddingTop: 30,
+        paddingBottom: 25,
         backgroundColor: Colors.white,
         position: 'relative',
         overflow: 'hidden'
@@ -159,7 +152,7 @@ const styles = StyleSheet.create({
     profileEmail: { fontSize: 13, color: Colors.text.tertiary },
     whiteText: { color: Colors.white },
     lightText: { color: 'rgba(255,255,255,0.8)' },
-    
+
     menuList: { flex: 1, padding: 16 },
     sectionLabel: { fontSize: 11, fontWeight: 'bold', color: Colors.text.tertiary, letterSpacing: 1, marginBottom: 16, marginLeft: 8 },
     navItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 4, gap: 12 },

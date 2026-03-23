@@ -1,5 +1,7 @@
 const Institution = require('../models/Institution');
-const { Groq } = require('groq-sdk');
+const Cutoff = require('../models/Cutoff');
+const Groq = require('groq-sdk');
+const { emitUpdate } = require('../utils/socket');
 
 // @desc    Create new institution
 // @route   POST /api/institutions
@@ -8,6 +10,7 @@ const createInstitution = async (req, res) => {
     try {
         const institution = new Institution(req.body);
         const createdInstitution = await institution.save();
+        emitUpdate('institution:created', createdInstitution);
         res.status(201).json(createdInstitution);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -21,8 +24,15 @@ const parseInstitutionText = async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ message: 'No text provided' });
 
-    // Choose API key: User's personal key or System's .env key
-    const apiKey = req.user?.groqApiKey || process.env.GROQ_API_KEY;
+    const userKey = req.user?.groqApiKey;
+    const apiKey = (userKey && userKey.trim() !== '') ? userKey : process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({ message: 'Groq API Key not configured. Please add it to your profile.' });
+    }
+
+    console.log(`[Institution Parse] Using Groq Key from: ${userKey ? 'User Profile' : '.env'}`);
+
     const groq = new Groq({ apiKey });
 
     try {
@@ -33,6 +43,7 @@ const parseInstitutionText = async (req, res) => {
                     content: `You are a data extraction assistant. Extract institution details from the provided text and return a JSON object matching EXACTLY this schema (use null for missing values, never omit keys):
 {
   "name": string,
+  "dteCode": string (usually a 4-digit number),
   "university": string,
   "type": "Government" | "Government Autonomous" | "Autonomous" | "Private-Autonomous" | "Private" | "Deemed",
   "feesPerYear": number,
@@ -54,7 +65,7 @@ const parseInstitutionText = async (req, res) => {
   },
   "branches": [{ "name": string, "code": string }]
 }
-Only include facilities from the provided list. Extract as much as possible from the text.`
+Only include facilities from the provided list. Extract as much as possible from the text. IMPORTANT: Be sure to extract the DTE Code if present.`
                 },
                 {
                     role: 'user',
@@ -99,12 +110,29 @@ const getInstitutionById = async (req, res) => {
 // @access  Private/Admin
 const updateInstitution = async (req, res) => {
     try {
+        const oldInstitution = await Institution.findById(req.params.id);
+        if (!oldInstitution) return res.status(404).json({ message: 'Institution not found' });
+
+        // If branches are being updated, check for deleted ones
+        if (req.body.branches) {
+            const oldBranchNames = oldInstitution.branches.map(b => b.name);
+            const newBranchNames = req.body.branches.map(b => b.name);
+            const deletedBranchNames = oldBranchNames.filter(name => !newBranchNames.includes(name));
+
+            if (deletedBranchNames.length > 0) {
+                await Cutoff.deleteMany({
+                    collegeId: req.params.id,
+                    branch: { $in: deletedBranchNames }
+                });
+            }
+        }
+
         const institution = await Institution.findByIdAndUpdate(
             req.params.id,
             { $set: req.body },
             { new: true, runValidators: true }
         );
-        if (!institution) return res.status(404).json({ message: 'Institution not found' });
+        emitUpdate('institution:updated', institution);
         res.json(institution);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -118,10 +146,37 @@ const deleteInstitution = async (req, res) => {
     try {
         const institution = await Institution.findByIdAndDelete(req.params.id);
         if (!institution) return res.status(404).json({ message: 'Institution not found' });
-        res.json({ message: 'Institution removed' });
+
+        // Also delete all cutoffs associated with this institution
+        await Cutoff.deleteMany({ collegeId: req.params.id });
+
+        emitUpdate('institution:deleted', institution._id);
+        res.json({ message: 'Institution and associated cutoffs removed' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
-module.exports = { createInstitution, parseInstitutionText, getInstitutions, getInstitutionById, updateInstitution, deleteInstitution };
+// @desc    Delete branch and its cutoffs
+// @route   DELETE /api/institutions/:id/branches/:branchName
+// @access  Private/Admin
+const deleteBranch = async (req, res) => {
+    try {
+        const institution = await Institution.findById(req.params.id);
+        if (!institution) return res.status(404).json({ message: 'Institution not found' });
+
+        // Remove from branches array
+        institution.branches = institution.branches.filter(b => b.name !== req.params.branchName);
+        await institution.save();
+
+        // Delete associated cutoffs
+        const Cutoff = require('../models/Cutoff');
+        await Cutoff.deleteMany({ collegeId: req.params.id, branch: req.params.branchName });
+
+        res.json({ message: 'Branch and associated cutoffs removed', branches: institution.branches });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { createInstitution, parseInstitutionText, getInstitutions, getInstitutionById, updateInstitution, deleteInstitution, deleteBranch };

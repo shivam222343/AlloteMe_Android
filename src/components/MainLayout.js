@@ -5,6 +5,7 @@ import {
     Dimensions,
     Platform,
     Text,
+    ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Sidebar from './Sidebar';

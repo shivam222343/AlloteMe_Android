@@ -1,20 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
     StatusBar, Platform, KeyboardAvoidingView, Modal, FlatList,
-    ActivityIndicator, Alert, Pressable
+    Alert, Pressable, ActivityIndicator, ScrollView, Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Shadows } from '../../constants/theme';
 import { Menu, ChevronLeft, Bell, X, CheckCheck, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import GradientBorder from '../ui/GradientBorder';
-import { Image } from 'react-native';
 import { notificationAPI } from '../../services/api';
-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPadding = false, style, botSafe = false }) => {
+const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPadding = false, style, botSafe = false, scrollable = false }) => {
     const navigation = useNavigation();
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
@@ -23,23 +21,23 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
     const topPadding = Math.max(insets.top, Platform.OS === 'ios' ? 0 : 20);
     const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 0 : 20);
 
-    const [showNotifs, setShowNotifs] = React.useState(false);
-    const [notifications, setNotifications] = React.useState([]);
-    const [loading, setLoading] = React.useState(false);
+    const [showNotifs, setShowNotifs] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [notifLoading, setNotifLoading] = useState(false);
 
     const fetchNotifications = async () => {
-        setLoading(true);
+        setNotifLoading(true);
         try {
             const res = await notificationAPI.getAll();
-            setNotifications(res.data);
+            setNotifications(res.data || []);
         } catch (error) {
             console.error('Failed to fetch notifications', error);
         } finally {
-            setLoading(false);
+            setNotifLoading(false);
         }
     };
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (showNotifs) fetchNotifications();
     }, [showNotifs]);
 
@@ -74,7 +72,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         );
     };
 
-    const unreadCount = notifications.filter(n => !n.isRead).length;
+    const unreadCount = (notifications || []).filter(n => !n.isRead).length;
 
     return (
         <View style={[
@@ -146,7 +144,19 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                 style={[styles.content, !noPadding && styles.defaultPadding]}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
-                {children}
+                {scrollable ? (
+                    <ScrollView 
+                        style={{ flex: 1 }} 
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 100 }}
+                    >
+                        {children}
+                    </ScrollView>
+                ) : (
+                    <View style={{ flex: 1 }}>
+                        {children}
+                    </View>
+                )}
             </KeyboardAvoidingView>
 
             {/* Notification Drawer Modal */}
@@ -180,9 +190,9 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 </TouchableOpacity>
                             </View>
 
-                            {loading ? (
+                            {notifLoading ? (
                                 <View style={styles.loaderBox}>
-                                    <ActivityIndicator color={Colors.primary} />
+                                    <ActivityIndicator size="large" color={Colors.primary} />
                                 </View>
                             ) : (
                                 <FlatList

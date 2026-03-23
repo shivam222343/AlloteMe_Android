@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Alloteme0077",
+    "name": "AlloteMe",
     "slug": "alloteme0077",
     "version": "1.0.0",
     "scheme": "alloteme0077",
@@ -106,7 +106,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "4108adc1-5d28-442b-8a39-9bb9ba6c1b05"
+        "projectId": "d1b13417-c5c0-4e6b-8b7e-e5882876549e"
       }
     }
   }

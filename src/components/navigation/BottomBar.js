@@ -9,9 +9,15 @@ const BottomBar = ({ state, navigation }) => {
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
     const isAdmin = user?.role === 'admin';
-    
+
     // Adjust height based on insets - Increased for "upside" look
     const BAR_HEIGHT = Platform.OS === 'ios' ? 70 + insets.bottom : 80 + (insets.bottom > 0 ? insets.bottom : 20);
+    const currentRoute = state.routes[state.index].name;
+
+    // Completely hide the bottom bar for results view to give "whole screen" look
+    if (currentRoute === 'PredictionResults') {
+        return null;
+    }
 
     const tabs = isAdmin ? [
         { name: 'Dashboard', icon: Home, label: 'Admin' },

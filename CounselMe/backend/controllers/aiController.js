@@ -1,3 +1,4 @@
+const { Groq } = require('groq-sdk');
 const Chat = require('../models/Chat');
 const Knowledge = require('../models/Knowledge');
 const Institution = require('../models/Institution');
@@ -8,7 +9,7 @@ const Cutoff = require('../models/Cutoff');
 // @access  Private
 const getAICounsel = async (req, res) => {
     const { message, chatId, history, userProfile } = req.body;
-    
+
     // Choose API key: User's personal key or System's .env key
     const apiKey = req.user?.groqApiKey || process.env.GROQ_API_KEY;
     const groqClient = new Groq({ apiKey });
@@ -34,14 +35,21 @@ const getAICounsel = async (req, res) => {
 
         // 2. Chat history formation
         const previousMessages = history || [];
+
+        const systemPrompt = `You are the "Eta powered by AlloteMe - AI Education Counselor", an expert in Indian engineering and medical admissions.
+        Your goal is to help students (MHTCET, JEE, NEET) find their dream college.
+        ALWAYS use the provided database context if relevant.
+        Focus on accuracy regarding cutoffs, locations, and branch specialties.
+        Tone: Professional, empathetic, helpful.
         
-        const systemPrompt = `You are the "Alloteme0077 Education Counselor". 
-        Your goal is to help Indian students (specifically MHTCET, JEE, NEET) find their dream college.
-        ALWAYS use the context below if relevant. If you don't know, suggest they check official brochures.
-        Focus on accuracy regarding cutoffs and location.
+        FORMATTING RULE: Use Rich Markdown. 
+        - Use **bold** for key terms and college names.
+        - Use ### headings for sections.
+        - MANDATORY RULE: If providing cutoffs, ranks, or comparisons, you MUST use a Markdown TABLE with columns: | Institute | Branch | Category | Cutoff (%ile/Rank) |.
+        - Use bullet points for general advice.
+        
         Current User Profile: ${JSON.stringify(userProfile || {})}
-        Context from our Database: ${JSON.stringify(contextData)}
-        Tone: Professional, empathetic, helpful.`;
+        Context from our Database: ${JSON.stringify(contextData)}`;
 
         // Compose full history
         const messages = [
@@ -62,7 +70,7 @@ const getAICounsel = async (req, res) => {
         res.json({ reply, contextUsed: !!relevantKnowledge.length });
     } catch (error) {
         console.error('AI Counsel Error:', error);
-        res.status(500).json({ message: 'Error from Alloteme0077 Counselor' });
+        res.status(500).json({ message: 'Error from Eta Counselor' });
     }
 };
 
@@ -112,7 +120,7 @@ const trainAI = async (req, res) => {
     try {
         // Split by paragraph or specific delimiter for knowledge chunks
         const chunks = text.split('\n\n').filter(t => t.trim().length > 10);
-        
+
         const knowledgeItems = chunks.map(chunk => ({
             type: type || 'info',
             content: chunk.trim(),
@@ -148,11 +156,11 @@ const setFrequentQuestion = async (req, res) => {
     res.status(201).json(newQ);
 };
 
-module.exports = { 
-    getAICounsel, 
-    saveChat, 
-    getMyChats, 
-    trainAI, 
-    getFrequentQuestions, 
-    setFrequentQuestion 
+module.exports = {
+    getAICounsel,
+    saveChat,
+    getMyChats,
+    trainAI,
+    getFrequentQuestions,
+    setFrequentQuestion
 };

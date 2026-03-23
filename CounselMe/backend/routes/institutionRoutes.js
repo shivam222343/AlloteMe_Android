@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createInstitution, parseInstitutionText, getInstitutions, getInstitutionById, updateInstitution, deleteInstitution } = require('../controllers/institutionController');
+const { createInstitution, parseInstitutionText, getInstitutions, getInstitutionById, updateInstitution, deleteInstitution, deleteBranch } = require('../controllers/institutionController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
@@ -8,6 +8,8 @@ router.route('/')
     .post(protect, authorize('admin'), createInstitution);
 
 router.post('/parse', protect, authorize('admin'), parseInstitutionText);
+
+router.delete('/:id/branches/:branchName', protect, authorize('admin'), deleteBranch);
 
 router.route('/:id')
     .get(getInstitutionById)

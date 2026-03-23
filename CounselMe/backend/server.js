@@ -5,11 +5,25 @@ const connectDB = require('./config/db');
 const { connectRedis } = require('./config/redis');
 const morgan = require('morgan');
 
+const http = require('http');
+const { initSocket } = require('./utils/socket');
+
 const app = express();
+const server = http.createServer(app);
 
 // Connect to Databases
 connectDB();
 connectRedis();
+
+// Initialize Socket.io
+const io = initSocket(server);
+
+// Attach io to global req for use in controllers if target logic requires it
+// (though I also have a separate util for direct emitUpdate calls)
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
 
 // Middleware
 app.use(cors());
@@ -35,6 +49,6 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5100;
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+server.listen(PORT, () => {
+    console.log(`Server (with Sockets) running on port ${PORT}`);
 });

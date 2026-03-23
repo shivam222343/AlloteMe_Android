@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    addCutoffData, 
+const {
+    addCutoffData,
     bulkAddCutoffData,
-    parseCutoffData, 
+    parseCutoffData,
     parseBulkCutoffData,
-    getCutoffsByInstitution, 
-    predictColleges 
+    getCutoffsByInstitution,
+    predictColleges,
+    deleteCutoffs
 } = require('../controllers/cutoffController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -16,6 +17,8 @@ router.route('/')
 router.post('/bulk', protect, authorize('admin'), bulkAddCutoffData);
 router.post('/parse', protect, authorize('admin'), parseCutoffData);
 router.post('/parse-bulk', protect, authorize('admin'), parseBulkCutoffData);
+
+router.delete('/:institutionId/branch/:branchName', protect, authorize('admin'), deleteCutoffs);
 
 router.get('/predict', predictColleges);
 router.get('/:institutionId', getCutoffsByInstitution);

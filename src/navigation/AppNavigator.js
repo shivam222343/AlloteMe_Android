@@ -15,6 +15,7 @@ import CreateInstitutionScreen from '../screens/CreateInstitutionScreen';
 import UploadCutoffScreen from '../screens/UploadCutoffScreen';
 import BrowseCollegesScreen from '../screens/BrowseCollegesScreen';
 import PredictorScreen from '../screens/PredictorScreen';
+import PredictionResultsScreen from '../screens/PredictionResultsScreen';
 import AICounselorScreen from '../screens/AICounselorScreen';
 import CollegeDetailScreen from '../screens/CollegeDetailScreen';
 import NearbyCollegesScreen from '../screens/NearbyCollegesScreen';
@@ -45,6 +46,7 @@ const TabNavigator = () => {
         <Tab.Navigator
             tabBar={props => <BottomBar {...props} />}
             screenOptions={{ headerShown: false }}
+            backBehavior="history"
         >
             {/* Main Tabs (Visible in BottomBar) */}
             <Tab.Screen
@@ -57,6 +59,11 @@ const TabNavigator = () => {
 
             {/* Sub-Screens (Hidden from BottomBar, but keep BottomBar visible) */}
             <Tab.Screen name="Predictor" component={PredictorScreen} />
+            <Tab.Screen
+                name="PredictionResults"
+                component={PredictionResultsScreen}
+                options={{ tabBarButton: () => null }}
+            />
             <Tab.Screen name="NearbyColleges" component={NearbyCollegesScreen} />
             <Tab.Screen name="SavedColleges" component={SavedCollegesScreen} />
             <Tab.Screen name="ConnectCounselor" component={ConnectCounselorScreen} />

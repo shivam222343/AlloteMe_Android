@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Alert, Modal, FlatList, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Alert, Modal, FlatList, Linking, ActivityIndicator } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -172,7 +172,7 @@ const ProfileScreen = ({ navigation }) => {
                                 />
                                 {uploading && (
                                     <View style={styles.uploadOverlay}>
-                                        <ActivityIndicator color={Colors.white} />
+                                        <ActivityIndicator size="small" color="#FFF" />
                                     </View>
                                 )}
                             </View>

@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const institutionSchema = new mongoose.Schema({
     name: { type: String, required: true },
     university: String,
+    dteCode: String,
     type: {
         type: String,
         enum: ['Government', 'Government Autonomous', 'Autonomous', 'Private-Autonomous', 'Private', 'Deemed'],

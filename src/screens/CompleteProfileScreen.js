@@ -7,7 +7,7 @@ import Card from '../components/ui/Card';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
-import { MapPin, Target, Award, Hash } from 'lucide-react-native';
+import { MapPin, Target, Award, Hash, Bot } from 'lucide-react-native';
 
 const CompleteProfileScreen = ({ navigation }) => {
     const { user, refreshUser, setHasSkippedProfile } = useAuth();

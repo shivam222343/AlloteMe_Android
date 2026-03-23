@@ -11,10 +11,12 @@ import {
     Globe, MapPin, Info, Award, ShieldCheck, ExternalLink, BookOpen,
     Wifi, Utensils, Library, FlaskConical, Dumbbell, Home, Car, Trees,
     CheckCircle2, LayoutGrid, Image as ImageIcon, BedDouble, GitBranch,
-    ChevronRight
+    ChevronRight, Trash2, Edit, Maximize2, X as CloseIcon
 } from 'lucide-react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { Modal } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const { width, height: screenHeight } = Dimensions.get('window');
 
 const TABS = ['Overview', 'Branches', 'Map', 'Hostel', 'Facilities', 'Gallery'];
 
@@ -24,7 +26,7 @@ const buildLeafletHTML = (lat, lng, name) => `
 <html>
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -46,9 +48,9 @@ body { font-family:sans-serif; background:#f0f4f8; }
 <script>
 var map = L.map('map').setView([${lat}, ${lng}], 16);
 var layers = {
-  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap', maxZoom:19 }),
+  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OSM', maxZoom:19 }),
   satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'Tiles &copy; Esri', maxZoom:19 }),
-  terrain: L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg', { attribution:'Stamen Terrain', maxZoom:14 })
+  terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenTopoMap', maxZoom:17 })
 };
 var currentLayer = layers.street.addTo(map);
 L.marker([${lat}, ${lng}]).addTo(map).bindPopup('<b>${name.replace(/'/g, "\\'")}</b>',{maxWidth:200}).openPopup();
@@ -66,12 +68,42 @@ const FACILITY_ICONS = { 'WiFi': Wifi, 'Canteen': Utensils, 'Library': Library, 
 
 const CollegeDetailScreen = ({ route, navigation }) => {
     const { id } = route.params;
+    const { user, socket } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [inst, setInst] = useState(null);
     const [cutoffs, setCutoffs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Overview');
+    const [showFullMap, setShowFullMap] = useState(false);
 
-    useEffect(() => { fetchData(); }, [id]);
+    useEffect(() => {
+        fetchData();
+
+        if (socket) {
+            const handleInstUpdate = (data) => {
+                const updatedId = data?._id || data;
+                if (updatedId === id) {
+                    console.log('[Socket] Institution info updated, refreshing...');
+                    fetchData();
+                }
+            };
+
+            const handleCutoffUpdate = (data) => {
+                if (data?.institutionId === id) {
+                    console.log('[Socket] Cutoffs updated, refreshing...');
+                    fetchData();
+                }
+            };
+
+            socket.on('institution:updated', handleInstUpdate);
+            socket.on('cutoff:updated', handleCutoffUpdate);
+
+            return () => {
+                socket.off('institution:updated', handleInstUpdate);
+                socket.off('cutoff:updated', handleCutoffUpdate);
+            };
+        }
+    }, [id, socket]);
 
     const fetchData = async () => {
         try {
@@ -83,6 +115,31 @@ const CollegeDetailScreen = ({ route, navigation }) => {
             setCutoffs(cutoffRes.data);
         } catch (error) { console.error(error); }
         finally { setLoading(false); }
+    };
+
+    const handleDelete = async () => {
+        Alert.alert(
+            "Delete Institution",
+            "This will permanently remove this institution and ALL its cutoff data. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            await institutionAPI.delete(id);
+                            Alert.alert("Success", "Institution deleted.");
+                            navigation.navigate('Dashboard');
+                        } catch (error) {
+                            Alert.alert("Error", "Failed to delete.");
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (loading || !inst) return null;
@@ -122,25 +179,51 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                     </View>
                 ) : (
                     branches.map((b, i) => (
-                        <TouchableOpacity
-                            key={i}
-                            style={styles.branchRow}
-                            onPress={() => navigation.navigate('BranchCutoffDetail', {
-                                institutionId: inst._id,
-                                branchName: b.name,
-                                institutionName: inst.name
-                            })}
-                        >
-                            <View style={styles.branchIndex}><Text style={styles.branchIndexText}>{i + 1}</Text></View>
-                            <View style={styles.branchInfo}>
-                                <Text style={styles.branchRowName}>{b.name}</Text>
-                                {b.code ? <Text style={styles.branchCode}>{b.code}</Text> : null}
-                            </View>
-                            <View style={styles.viewCutoffBadge}>
-                                <Text style={styles.viewCutoffText}>View Cutoffs</Text>
-                                <ChevronRight size={14} color={Colors.primary} />
-                            </View>
-                        </TouchableOpacity>
+                        <View key={i} style={styles.branchRowContainer}>
+                            <TouchableOpacity
+                                style={styles.branchRow}
+                                onPress={() => navigation.navigate('BranchCutoffDetail', {
+                                    institutionId: inst._id,
+                                    branchName: b.name,
+                                    institutionName: inst.name
+                                })}
+                            >
+                                <View style={styles.branchIndex}><Text style={styles.branchIndexText}>{i + 1}</Text></View>
+                                <View style={styles.branchInfo}>
+                                    <Text style={styles.branchRowName}>{b.name}</Text>
+                                    {b.code ? <Text style={styles.branchCode}>{b.code}</Text> : null}
+                                </View>
+                                <View style={styles.viewCutoffBadge}>
+                                    <Text style={styles.viewCutoffText}>View Cutoffs</Text>
+                                    <ChevronRight size={14} color={Colors.primary} />
+                                </View>
+                            </TouchableOpacity>
+                            {isAdmin && (
+                                <TouchableOpacity
+                                    style={styles.deleteBranchBtn}
+                                    onPress={() => {
+                                        Alert.alert("Delete Branch", `Are you sure you want to remove ${b.name}? This will not delete the cutoff data from database but will remove the branch from this college list.`, [
+                                            { text: "Cancel" },
+                                            {
+                                                text: "Delete",
+                                                style: "destructive",
+                                                onPress: async () => {
+                                                    try {
+                                                        const res = await institutionAPI.deleteBranch(inst._id, b.name);
+                                                        setInst({ ...inst, branches: res.data.branches });
+                                                        Alert.alert("Success", "Branch and its cutoffs removed.");
+                                                    } catch (e) {
+                                                        Alert.alert("Error", "Failed to delete branch");
+                                                    }
+                                                }
+                                            }
+                                        ])
+                                    }}
+                                >
+                                    <Trash2 size={16} color={Colors.error} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     ))
                 )}
                 <View style={{ height: 40 }} />
@@ -168,18 +251,45 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                 </View>
             );
         }
+
         try {
             const { WebView } = require('react-native-webview');
             return (
                 <View style={{ width, height: 420 }}>
                     <WebView source={{ html }} style={{ flex: 1 }} javaScriptEnabled originWhitelist={['*']} scrollEnabled={false} />
-                    {inst.mapUrl && (
-                        <TouchableOpacity style={styles.openMapsBtn} onPress={() => Linking.openURL(inst.mapUrl)}>
-                            <MapPin size={16} color={Colors.white} />
-                            <Text style={styles.openMapsBtnText}>Open in Maps</Text>
-                            <ExternalLink size={14} color={Colors.white} />
+
+                    <View style={styles.mapActions}>
+                        <TouchableOpacity style={styles.miniMapBtn} onPress={() => setShowFullMap(true)}>
+                            <Maximize2 size={16} color={Colors.primary} />
                         </TouchableOpacity>
-                    )}
+
+                        {inst.mapUrl && (
+                            <TouchableOpacity style={styles.openMapsBtnSmall} onPress={() => Linking.openURL(inst.mapUrl)}>
+                                <MapPin size={16} color={Colors.white} />
+                                <Text style={styles.openMapsBtnTextSmall}>Open in Maps</Text>
+                                <ExternalLink size={12} color={Colors.white} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {/* Full Screen Map Modal */}
+                    <Modal visible={showFullMap} animationType="fade" transparent={false} onRequestClose={() => setShowFullMap(false)}>
+                        <View style={{ flex: 1, backgroundColor: '#000' }}>
+                            <View style={styles.fullMapHeader}>
+                                <Text style={styles.fullMapTitle}>Campus Location</Text>
+                                <TouchableOpacity onPress={() => setShowFullMap(false)} style={styles.closeFullMap}>
+                                    <CloseIcon size={24} color={Colors.white} />
+                                </TouchableOpacity>
+                            </View>
+                            <WebView
+                                source={{ html }}
+                                style={{ flex: 1 }}
+                                javaScriptEnabled
+                                originWhitelist={['*']}
+                                containerStyle={{ backgroundColor: '#f0f4f8' }}
+                            />
+                        </View>
+                    </Modal>
                 </View>
             );
         } catch {
@@ -311,6 +421,17 @@ const CollegeDetailScreen = ({ route, navigation }) => {
 
                 {/* 1 – Identity Section */}
                 <View style={styles.identitySection}>
+                    {isAdmin && (
+                        <View style={styles.adminBar}>
+                            <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('EditInstitution', { id })}>
+                                <Edit size={16} color={Colors.primary} />
+                                <Text style={styles.adminBtnText}>Edit College</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.adminBtn, styles.deleteBtnSmall]} onPress={handleDelete}>
+                                <Trash2 size={16} color={Colors.error} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
                     <View style={styles.badgeRow}>
                         <View style={styles.premiumTag}>
                             <ShieldCheck size={13} color={Colors.primary} />
@@ -327,6 +448,11 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                     <View style={styles.uniRow}>
                         <BookOpen size={13} color={Colors.text.tertiary} />
                         <Text style={styles.uniText}>{inst.university}</Text>
+                        {inst.dteCode && (
+                            <View style={styles.dteBadge}>
+                                <Text style={styles.dteBadgeText}>DTE: {inst.dteCode}</Text>
+                            </View>
+                        )}
                     </View>
                     <View style={styles.actionRow}>
                         <TouchableOpacity style={styles.actionBtn} onPress={() => {
@@ -386,6 +512,8 @@ const styles = StyleSheet.create({
     name: { fontSize: 22, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 5 },
     uniRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
     uniText: { fontSize: 13, color: Colors.text.tertiary, fontWeight: '500', flex: 1 },
+    dteBadge: { backgroundColor: Colors.primary + '10', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: Colors.primary + '20' },
+    dteBadgeText: { fontSize: 10, color: Colors.primary, fontWeight: 'bold' },
     actionRow: { flexDirection: 'row', gap: 12 },
     actionBtn: { flex: 1, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, borderWidth: 1, borderColor: '#E2E8F0' },
     actionText: { fontSize: 13, fontWeight: 'bold', color: Colors.primary },
@@ -427,10 +555,17 @@ const styles = StyleSheet.create({
     branchCode: { fontSize: 12, color: Colors.text.tertiary, fontWeight: '500' },
 
     // Map
-    openMapsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, margin: 16, borderRadius: 16, padding: 14 },
-    openMapsBtnText: { color: Colors.white, fontSize: 15, fontWeight: 'bold', flex: 1, textAlign: 'center' },
-    openMapsFallbackBtn: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, marginTop: 12 },
-    openMapsFallbackText: { color: Colors.white, fontWeight: 'bold', fontSize: 14 },
+    mapActions: { position: 'absolute', bottom: 16, left: 16, right: 16, flexDirection: 'row', gap: 10, alignItems: 'center' },
+    miniMapBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadows.md },
+    openMapsBtnSmall: { flex: 1, backgroundColor: Colors.primary, height: 44, borderRadius: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, ...Shadows.md },
+    openMapsBtnTextSmall: { color: Colors.white, fontWeight: 'bold', fontSize: 13 },
+    openMapsFallbackBtn: { marginTop: 16, backgroundColor: Colors.primary + '10', padding: 12, borderRadius: 12, width: '100%', alignItems: 'center' },
+    openMapsFallbackText: { color: Colors.primary, fontWeight: 'bold' },
+
+    // Full Map Modal
+    fullMapHeader: { height: 60, backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
+    fullMapTitle: { color: Colors.white, fontSize: 16, fontWeight: 'bold' },
+    closeFullMap: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
 
     // Hostel
     hostelRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
@@ -453,9 +588,17 @@ const styles = StyleSheet.create({
     galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     galleryImg: { width: (width - 52) / 2, height: 160, borderRadius: 14, backgroundColor: '#E2E8F0' },
 
+    branchRowContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+    deleteBranchBtn: { padding: 10, backgroundColor: Colors.error + '10', borderRadius: 10, borderWidth: 1, borderColor: Colors.error + '20' },
+
     // Shared empty
     emptyCard: { alignItems: 'center', justifyContent: 'center', padding: 60, gap: 14 },
     emptyText: { fontSize: 14, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 },
+
+    adminBar: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginBottom: 15 },
+    adminBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary + '10', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.primary + '20' },
+    adminBtnText: { color: Colors.primary, fontSize: 12, fontWeight: 'bold' },
+    deleteBtnSmall: { backgroundColor: Colors.error + '10', borderColor: Colors.error + '25' },
 });
 
 export default CollegeDetailScreen;

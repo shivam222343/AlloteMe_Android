@@ -71,7 +71,9 @@ const FrequentQuestionsManager = ({ navigation }) => {
                 </View>
 
                 {loading ? (
-                    <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+                    <View style={{ marginTop: 40, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                    </View>
                 ) : (
                     <FlatList
                         data={questions}

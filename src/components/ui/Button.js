@@ -32,7 +32,7 @@ const Button = ({
             ]}
         >
             {loading ? (
-                <ActivityIndicator color={isPrimary ? '#FFF' : Colors.primary} />
+                <ActivityIndicator size="small" color={isPrimary ? '#FFF' : Colors.primary} />
             ) : (
                 <Text style={[
                     styles.text,
