@@ -399,7 +399,7 @@ const EventResourcesScreen = ({ route, navigation }) => {
                 fileName = `${fileName}.${extension}`;
             }
 
-            const fileUri = FileSystem.documentDirectory + fileName;
+            const fileUri = FileSystem.cacheDirectory + fileName;
             console.log('Download Debug - Final FileName:', fileName, 'Target URI:', fileUri);
 
             Alert.alert('Download', 'Downloading file...', [
@@ -424,7 +424,7 @@ const EventResourcesScreen = ({ route, navigation }) => {
             }
         } catch (error) {
             console.error('Download error:', error);
-            Alert.alert('Error', 'Failed to download or share file. Make sure you have a stable connection.');
+            Alert.alert('Download Error', `Failed to download or share file: ${error.message}`);
         }
     };
 

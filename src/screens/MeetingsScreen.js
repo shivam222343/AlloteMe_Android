@@ -203,15 +203,15 @@ const MeetingsScreen = ({ navigation }) => {
                 ? `🌐 Online (${meeting.platform})`
                 : `📍 ${meeting.locationCategory} ${meeting.classroomNumber ? `- Room ${meeting.classroomNumber}` : meeting.otherLocationName ? `- ${meeting.otherLocationName}` : ''}`;
 
-            const message = `🚀 *MAVERICKS MEETING ALERT* 🚀\n\n` +
+            const message = `🚀 *AURA MEETING ALERT* 🚀\n\n` +
                 `📌 *Topic:* ${meeting.name}\n` +
-                `🏢 *Club:* ${selectedClub?.name || 'Mavericks Club'}\n` +
+                `🏢 *Club:* ${selectedClub?.name || 'Aura Club'}\n` +
                 `📅 *Date:* ${dateStr}\n` +
                 `⏰ *Time:* ${meeting.time}\n` +
                 `📍 *Venue:* ${location}\n\n` +
                 (meeting.description ? `📝 *Context:* ${meeting.description}\n\n` : '') +
                 `Let's gather for some productive chaos! ⚡️🔥\n\n` +
-                `Sent via *Mavericks App* 🚀`;
+                `Sent via *Aura App* 🚀`;
 
             await Share.share({
                 message,

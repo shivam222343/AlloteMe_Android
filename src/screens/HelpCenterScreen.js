@@ -9,26 +9,26 @@ import {
     Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import MainLayout from '../components/layouts/MainLayout';
+import { Colors, Spacing, Shadows, BorderRadius } from '../constants/theme';
 
 const HelpCenterScreen = ({ navigation }) => {
     const faqs = [
         {
-            question: "How do I join a club?",
-            answer: "Go to the Clubs section, browse available clubs, and click 'Join'. Some clubs might require an access key provided by the admin."
+            question: "How do I predict my colleges?",
+            answer: "Go to the Predictor section, enter your percentile/score and select your category. The AI will show you colleges where you have a high chance based on historical cutoff data."
         },
         {
-            question: "How to upload a snap?",
-            answer: "Click on the Camera icon in the bottom navigation or the camera button in the Snaps section. Take a photo or video and select the club you want to post to."
+            question: "How to browse all colleges?",
+            answer: "Go to the 'Explore Colleges' tab. You can search by name or university and filter results to find your preferred institutions."
         },
         {
-            question: "How can I mark attendance?",
-            answer: "During a meeting, the admin will provide a 4-digit code. Go to the meeting details and enter the code to mark your attendance."
+            question: "Is the cutoff data accurate?",
+            answer: "We use official historical data from previous rounds. While it's highly indicative, actual cutoffs vary each year based on student performance."
         },
         {
-            question: "Can I delete my account?",
-            answer: "Account deletion can be requested through the 'Contact Support' section below. Our team will process it within 24-48 hours."
+            question: "How can I contact a counselor?",
+            answer: "You can use the AI Counselor for instant help, or visit the 'Connect' section to find professional admission consultants."
         }
     ];
 
@@ -36,44 +36,21 @@ const HelpCenterScreen = ({ navigation }) => {
         {
             icon: "mail-outline",
             title: "Email Support",
-            subtitle: "support@mavericks.app",
-            color: "#0A66C2",
-            onPress: () => Linking.openURL('mailto:support@mavericks.app')
+            subtitle: "support@alloteme.com",
+            color: Colors.primary,
+            onPress: () => Linking.openURL('mailto:support@alloteme.com')
         },
         {
             icon: "chatbubble-ellipses-outline",
             title: "Live Chat",
             subtitle: "Available 24/7",
-            color: "#7C3AED",
+            color: Colors.accent,
             onPress: () => alert('Live chat coming soon!')
         }
     ];
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={['#0A66C2', '#7C3AED']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.header}
-            >
-                <SafeAreaView edges={['top']}>
-                    <View style={styles.headerContent}>
-                        <TouchableOpacity
-                            onPress={() => navigation.goBack()}
-                            style={styles.backButton}
-                        >
-                            <Ionicons name="arrow-back" size={28} color="#FFF" />
-                        </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Help Center</Text>
-                        <View style={{ width: 28 }} />
-                    </View>
-                    <View style={styles.headerStats}>
-                        <Text style={styles.headerSubtitle}>How can we help you today?</Text>
-                    </View>
-                </SafeAreaView>
-            </LinearGradient>
-
+        <MainLayout title="Help Center">
             <ScrollView
                 style={styles.content}
                 showsVerticalScrollIndicator={false}
@@ -81,7 +58,7 @@ const HelpCenterScreen = ({ navigation }) => {
             >
                 <View style={styles.searchContainer}>
                     <View style={styles.searchBar}>
-                        <Ionicons name="search-outline" size={20} color="#64748B" />
+                        <Ionicons name="search-outline" size={20} color={Colors.text.tertiary} />
                         <Text style={styles.searchText}>Search for help...</Text>
                     </View>
                 </View>
@@ -110,18 +87,8 @@ const HelpCenterScreen = ({ navigation }) => {
                         </TouchableOpacity>
                     ))}
                 </View>
-
-                <TouchableOpacity style={styles.communityBtn}>
-                    <LinearGradient
-                        colors={['#F59E0B', '#D97706']}
-                        style={styles.communityGradient}
-                    >
-                        <Ionicons name="people" size={22} color="#FFF" />
-                        <Text style={styles.communityText}>Join Mavericks Community</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
             </ScrollView>
-        </View>
+        </MainLayout>
     );
 };
 

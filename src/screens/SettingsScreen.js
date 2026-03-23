@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import MainLayout from '../components/MainLayout';
+import MainLayout from '../components/layouts/MainLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import { SkeletonBannerItem } from '../components/SkeletonLoader';
@@ -169,7 +169,7 @@ const SettingsScreen = ({ navigation, route }) => {
     );
 
     return (
-        <MainLayout navigation={navigation} currentRoute="Settings" title="Settings">
+        <MainLayout title="Settings" scrollable={false}>
             <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
                 <Text style={styles.sectionHeader}>Preferences</Text>
@@ -265,7 +265,7 @@ const SettingsScreen = ({ navigation, route }) => {
 
                 <View style={styles.footer}>
                     <Text style={styles.versionText}>Version 1.2.0 (Build 45)</Text>
-                    <Text style={styles.copyrightText}>© 2026 Team Mavericks</Text>
+                    <Text style={styles.copyrightText}>© 2026 Team Alloteme0077</Text>
                 </View>
 
                 {/* Change Password Modal */}
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8FAFC',
     },
     content: {
-        padding: 20,
+        paddingVertical: 20,
     },
     sectionHeader: {
         fontSize: 13,

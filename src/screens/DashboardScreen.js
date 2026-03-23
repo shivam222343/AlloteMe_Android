@@ -132,18 +132,18 @@ const DashboardScreen = ({ navigation }) => {
     const getCurrentStats = () => {
         if (selectedClubId === 'all') {
             return [
-                { label: 'Clubs', value: dashboardData?.globalStats?.clubsJoined || 0, icon: 'business-outline', color: '#6366F1' },
-                { label: 'Meetings', value: dashboardData?.globalStats?.upcomingMeetings || 0, icon: 'calendar-outline', color: '#0EA5E9' },
+                { label: 'Collectives', value: dashboardData?.globalStats?.clubsJoined || 0, icon: 'business-outline', color: '#6366F1' },
+                { label: 'Gatherings', value: dashboardData?.globalStats?.upcomingMeetings || 0, icon: 'calendar-outline', color: '#0EA5E9' },
                 { label: 'Tasks', value: dashboardData?.globalStats?.pendingTasks || 0, icon: 'list-outline', color: '#F59E0B' },
-                { label: 'Attendance', value: dashboardData?.globalStats?.attendanceRate || '0%', icon: 'checkmark-circle-outline', color: '#10B981' },
+                { label: 'Participation', value: dashboardData?.globalStats?.attendanceRate || '0%', icon: 'checkmark-circle-outline', color: '#10B981' },
             ];
         } else {
             const club = (dashboardData?.clubStats || []).find(c => c.clubId === selectedClubId);
             if (!club) return [];
             return [
                 { label: 'Upcoming', value: club.stats?.upcomingMeetings || 0, icon: 'calendar-outline', color: '#0EA5E9' },
-                { label: 'Tasks', value: club.stats?.pendingTasks || 0, icon: 'list-outline', color: '#F59E0B' },
-                { label: 'Attendance', value: club.stats?.attendanceRate || '0%', icon: 'checkmark-circle-outline', color: '#10B981' },
+                { label: 'Milestones', value: club.stats?.pendingTasks || 0, icon: 'list-outline', color: '#F59E0B' },
+                { label: 'Persistence', value: club.stats?.attendanceRate || '0%', icon: 'checkmark-circle-outline', color: '#10B981' },
             ];
         }
     };
@@ -170,28 +170,27 @@ const DashboardScreen = ({ navigation }) => {
         // If period changed or no stored greeting, generate new one
         if (storedPeriod !== currentPeriod || !storedGreeting) {
             const morningGreetings = [
-                "Rise and shine!",
-                "Good morning!",
-                "Start your day strong!",
-                "Morning, champion!",
-                "Hello, early bird!",
-                "Fresh start ahead!"
+                "Awaken your creativity!",
+                "Good morning, Artist!",
+                "Start your masterpiece today!",
+                "Morning, visionary!",
+                "Hello, creative soul!",
+                "A fresh canvas awaits!"
             ];
             const afternoonGreetings = [
                 "Good afternoon!",
-                "Keep pushing forward!",
-                "Afternoon, achiever!",
-                "Stay productive!",
-                "Halfway there!",
-                "Power through!"
+                "Keep creating!",
+                "Afternoon, visionary!",
+                "Stay inspired!",
+                "The flow is strong!",
+                "Creative power through!"
             ];
             const eveningGreetings = [
                 "Good evening!",
-                "Wind down well!",
                 "Evening, star!",
-                "Reflect and relax!",
-                "Great work today!",
-                "Almost there!"
+                "Reflect on your art!",
+                "Great expressions today!",
+                "The Muse is calling!"
             ];
 
             let greetings;
@@ -329,7 +328,7 @@ const DashboardScreen = ({ navigation }) => {
                         {/* Actual Header - Not Loading */}
                         <View style={styles.header}>
                             <Text style={styles.greetingText}>{greeting}</Text>
-                            <Text style={styles.nameText}>{user?.displayName || 'Maverick'}</Text>
+                            <Text style={styles.nameText}>{user?.displayName || 'Artist'}</Text>
                         </View>
 
                         {/* Skeleton Carousel - Loading with Shimmer */}
@@ -419,7 +418,7 @@ const DashboardScreen = ({ navigation }) => {
                 {/* Minimal Header */}
                 <View style={styles.header}>
                     <Text style={styles.greetingText}>{greeting}</Text>
-                    <Text style={styles.nameText}>{user?.displayName || 'Maverick'}</Text>
+                    <Text style={styles.nameText}>{user?.displayName || 'Artist'}</Text>
                 </View>
 
                 {/* Birthday Cards Section */}
@@ -600,7 +599,7 @@ const DashboardScreen = ({ navigation }) => {
                         {/* Recent Activity Section */}
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>Recent Meetings</Text>
+                                <Text style={styles.sectionTitle}>Recent Gatherings</Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Meetings')}>
                                     <Text style={styles.viewAll}>View all</Text>
                                 </TouchableOpacity>

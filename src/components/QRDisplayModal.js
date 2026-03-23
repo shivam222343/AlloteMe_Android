@@ -14,7 +14,7 @@ const { width } = Dimensions.get('window');
 
 const QRDisplayModal = ({ visible, onClose, meetingName, meetingId, code }) => {
     // Format: MAVERICKS_ATTENDANCE:meetingId:code
-    const qrValue = `MAVERICKS_ATTENDANCE:${meetingId}:${code}`;
+    const qrValue = `AURA_ATTENDANCE:${meetingId}:${code}`;
 
     return (
         <Modal

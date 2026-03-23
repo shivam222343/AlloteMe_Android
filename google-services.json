@@ -1,41 +1,34 @@
 {
     "project_info": {
-        "project_number": "440104788015",
-        "project_id": "myauth-91ca5",
-        "storage_bucket": "myauth-91ca5.appspot.com"
+        "project_number": "291149459575",
+        "project_id": "auraandroid-ac697",
+        "storage_bucket": "auraandroid-ac697.firebasestorage.app"
     },
     "client": [
         {
             "client_info": {
-                "mobilesdk_app_id": "1:440104788015:android:fb4374fd81b81fac5766da",
+                "mobilesdk_app_id": "1:291149459575:android:f55d199aec72519ebe1672",
                 "android_client_info": {
-                    "package_name": "com.mycompany.myauth"
+                    "package_name": "com.aura.artistapp"
                 }
             },
             "oauth_client": [
                 {
-                    "client_id": "440104788015-47p2oqv4ab736ktbbsosp562klvjcpl1.apps.googleusercontent.com",
+                    "client_id": "291149459575-j0g5nnm06egi7ndopgr29kr3326ka0ef.apps.googleusercontent.com",
                     "client_type": 3
                 }
             ],
             "api_key": [
                 {
-                    "current_key": "AIzaSyAG2HyHAu1Ic38e0oV83xtDEGEyOAH7gRw"
+                    "current_key": "AIzaSyBAuqpEBqYUxccqTBwoX5Hc4huRmP3jIFo"
                 }
             ],
             "services": {
                 "appinvite_service": {
                     "other_platform_oauth_client": [
                         {
-                            "client_id": "440104788015-47p2oqv4ab736ktbbsosp562klvjcpl1.apps.googleusercontent.com",
+                            "client_id": "291149459575-j0g5nnm06egi7ndopgr29kr3326ka0ef.apps.googleusercontent.com",
                             "client_type": 3
-                        },
-                        {
-                            "client_id": "440104788015-r5s0g8ff39rdct2e8t7v92qh8dkdr4o2.apps.googleusercontent.com",
-                            "client_type": 2,
-                            "ios_info": {
-                                "bundle_id": "com.mycompany.myauth"
-                            }
                         }
                     ]
                 }

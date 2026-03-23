@@ -1,34 +1,37 @@
 {
   "expo": {
-    "name": "Mavericks",
-    "slug": "mavericks",
+    "name": "Alloteme0077",
+    "slug": "alloteme0077",
     "version": "1.0.0",
-    "scheme": "mavericks",
+    "scheme": "alloteme0077",
     "orientation": "portrait",
-    "icon": "./assets/padded_icon.png",
+    "icon": "./imgs/logo.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/AS.png",
+      "image": "./imgs/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mavericks.clubmanagement"
+      "bundleIdentifier": "com.alloteme0077.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/padded_icon.png",
-        "backgroundColor": "#0A66C2"
+        "foregroundImage": "./imgs/logo.png",
+        "backgroundColor": "#FFFFFF"
       },
-      "package": "com.mycompany.myauth",
+      "package": "com.alloteme0077.app",
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "intentFilters": [
         {
           "action": "VIEW",
           "data": {
-            "scheme": "mavericks"
+            "scheme": "alloteme0077"
           },
           "category": [
             "BROWSABLE",
@@ -50,7 +53,7 @@
         "android.permission.VIBRATE"
       ],
       "notification": {
-        "icon": "./assets/AS.png",
+        "icon": "./imgs/logo.png",
         "color": "#0A66C2"
       },
       "statusBar": {
@@ -59,12 +62,11 @@
       }
     },
     "web": {
-      "favicon": "./assets/AS.png"
+      "favicon": "./imgs/logo.png"
     },
     "plugins": [
       "./withAndroidXFix",
       "@react-native-community/datetimepicker",
-      "@react-native-voice/voice",
       [
         "expo-build-properties",
         {
@@ -86,11 +88,10 @@
           }
         }
       ],
-      "expo-web-browser",
       [
         "expo-notifications",
         {
-          "icon": "./assets/AS.png",
+          "icon": "./imgs/logo.png",
           "color": "#0A66C2",
           "mode": "production",
           "androidMode": "default",
@@ -105,9 +106,8 @@
     },
     "extra": {
       "eas": {
-        "projectId": "440c4d07-fcad-449b-9ac3-d08ab07f0913"
+        "projectId": "4108adc1-5d28-442b-8a39-9bb9ba6c1b05"
       }
-    },
-    "owner": "jaywani"
+    }
   }
 }

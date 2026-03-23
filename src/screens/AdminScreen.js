@@ -205,7 +205,7 @@ const AdminScreen = ({ navigation }) => {
 
     const handleAddMember = async () => {
         if (!selectedClubId || !memberMaverickId) {
-            setStatusModal({ visible: true, title: 'Missing Info', message: 'Please select a club and enter a Maverick ID.', type: 'error' });
+            setStatusModal({ visible: true, title: 'Missing Info', message: 'Please select a club and enter a Artist Id.', type: 'error' });
             return;
         }
         setLoading(true);
@@ -503,7 +503,7 @@ const AdminScreen = ({ navigation }) => {
 
                 {currentUser && (
                     <View style={styles.myIdContainer}>
-                        <Text style={styles.myIdLabel}>Your Maverick ID:</Text>
+                        <Text style={styles.myIdLabel}>Your Artist Id:</Text>
                         <TouchableOpacity onPress={() => setMemberMaverickId(currentUser.maverickId)}>
                             <Text style={styles.myIdValue}>{currentUser.maverickId || 'Loading...'}</Text>
                         </TouchableOpacity>
@@ -525,7 +525,7 @@ const AdminScreen = ({ navigation }) => {
                 </ScrollView>
                 <TextInput
                     style={styles.input}
-                    placeholder="Enter User Maverick ID (e.g. MAV-A1B2)"
+                    placeholder="Enter Artist Id (e.g. MAV-A1B2)"
                     placeholderTextColor="#9CA3AF"
                     value={memberMaverickId}
                     onChangeText={setMemberMaverickId}

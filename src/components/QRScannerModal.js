@@ -37,7 +37,7 @@ const QRScannerModal = ({ visible, onClose }) => {
 
         try {
             // Check if it's a Mavericks attendance QR
-            if (data.startsWith('MAVERICKS_ATTENDANCE:')) {
+            if (data.startsWith('AURA_ATTENDANCE:')) {
                 const parts = data.split(':');
                 if (parts.length === 3) {
                     const meetingId = parts[1];

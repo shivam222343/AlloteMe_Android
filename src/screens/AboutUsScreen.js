@@ -9,14 +9,14 @@ import {
     Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import MainLayout from '../components/layouts/MainLayout';
+import { Colors, Spacing } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
 
 const AboutUsScreen = ({ navigation }) => {
     return (
-        <View style={styles.container}>
+        <MainLayout noPadding>
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.heroSection}>
                     <Image
@@ -27,17 +27,9 @@ const AboutUsScreen = ({ navigation }) => {
                         colors={['transparent', 'rgba(0,0,0,0.8)']}
                         style={styles.heroOverlay}
                     >
-                        <SafeAreaView edges={['top']}>
-                            <TouchableOpacity
-                                onPress={() => navigation.goBack()}
-                                style={styles.backButton}
-                            >
-                                <Ionicons name="arrow-back" size={28} color="#FFF" />
-                            </TouchableOpacity>
-                        </SafeAreaView>
                         <View style={styles.heroContent}>
-                            <Text style={styles.heroTitle}>Mission Mavericks</Text>
-                            <Text style={styles.heroSubtitle}>Connecting the brightest minds, one club at a time.</Text>
+                            <Text style={styles.heroTitle}>AlloteMe</Text>
+                            <Text style={styles.heroSubtitle}>Simplifying college admissions, one student at a time.</Text>
                         </View>
                     </LinearGradient>
                 </View>
@@ -46,72 +38,52 @@ const AboutUsScreen = ({ navigation }) => {
                     <View style={styles.card}>
                         <Text style={styles.sectionTitle}>Our Story</Text>
                         <Text style={styles.text}>
-                            Mavericks App was born out of a simple idea: that community is the catalyst for growth.
-                            What started as a tool for managing a single club has transformed into a comprehensive
-                            ecosystem for student organizations, professional circles, and interest groups.
+                            AlloteMe was born out of a simple idea: that navigating college admissions shouldn't be a nightmare.
+                            We provide smart tools for students to predict their chances and for institutions to manage their data efficiently.
                         </Text>
                     </View>
 
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>10k+</Text>
-                            <Text style={styles.statLabel}>Members</Text>
+                            <Text style={styles.statNumber}>50k+</Text>
+                            <Text style={styles.statLabel}>Students</Text>
                         </View>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>50+</Text>
-                            <Text style={styles.statLabel}>Active Clubs</Text>
+                            <Text style={styles.statNumber}>200+</Text>
+                            <Text style={styles.statLabel}>Colleges</Text>
                         </View>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>100k+</Text>
-                            <Text style={styles.statLabel}>Snaps Shared</Text>
+                            <Text style={styles.statNumber}>1M+</Text>
+                            <Text style={styles.statLabel}>Predictions</Text>
                         </View>
                     </View>
 
                     <Text style={styles.sectionTitle}>Our Values</Text>
                     <View style={styles.valuesGrid}>
                         <View style={styles.valueCard}>
-                            <Ionicons name="flash-outline" size={32} color="#0A66C2" />
+                            <Ionicons name="flash-outline" size={32} color={Colors.primary} />
                             <Text style={styles.valueTitle}>Innovation</Text>
                         </View>
                         <View style={styles.valueCard}>
-                            <Ionicons name="heart-outline" size={32} color="#EF4444" />
+                            <Ionicons name="heart-outline" size={32} color={Colors.error} />
                             <Text style={styles.valueTitle}>Community</Text>
                         </View>
                         <View style={styles.valueCard}>
-                            <Ionicons name="shield-outline" size={32} color="#10B981" />
+                            <Ionicons name="shield-outline" size={32} color={Colors.success} />
                             <Text style={styles.valueTitle}>Integrity</Text>
                         </View>
                         <View style={styles.valueCard}>
-                            <Ionicons name="globe-outline" size={32} color="#8B5CF6" />
+                            <Ionicons name="globe-outline" size={32} color={Colors.accent} />
                             <Text style={styles.valueTitle}>Diversity</Text>
                         </View>
                     </View>
 
-                    <LinearGradient
-                        colors={['#0A66C2', '#0284C7']}
-                        style={styles.teamSection}
-                    >
-                        <Text style={[styles.sectionTitle, { color: '#FFF' }]}>The Team</Text>
-                        <Text style={[styles.text, { color: 'rgba(255,255,255,0.9)' }]}>
-                            A group of passionate developers, designers, and community builders
-                            working together to build the future of social networking.
-                        </Text>
-                        <TouchableOpacity style={styles.joinBtn}>
-                            <Text style={styles.joinBtnText}>Join the Team</Text>
-                        </TouchableOpacity>
-                    </LinearGradient>
-
                     <View style={styles.footer}>
-                        <Image
-                            source={require('../../assets/AS.png')}
-                            style={styles.logo}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.footerText}>Made with ❤️ by Team Mavericks</Text>
+                        <Text style={styles.footerText}>Made with ❤️ by AlloteMe Team</Text>
                     </View>
                 </View>
             </ScrollView>
-        </View>
+        </MainLayout>
     );
 };
 

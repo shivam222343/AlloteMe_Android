@@ -355,7 +355,7 @@ const MaverickGamesScreen = ({ navigation, route }) => {
                     console.log('[Banner] Upload success, updating config...', uploadRes.data.url);
                     const updateRes = await adminAPI.updateGameConfig({
                         gameId: 'banner',
-                        name: 'Mavericks Games Banner',
+                        name: 'Aura Games Banner',
                         posterUrl: uploadRes.data.url
                     });
 
@@ -581,7 +581,7 @@ const MaverickGamesScreen = ({ navigation, route }) => {
     );
 
     return (
-        <MainLayout title="Maverick Games" navigation={navigation} currentRoute="MaverickGames">
+        <MainLayout title="Aura Games" navigation={navigation} currentRoute="MaverickGames">
             <View style={styles.container}>
                 {updatingPoster && (
                     <View style={styles.uploadingOverlay}>

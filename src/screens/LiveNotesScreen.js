@@ -712,7 +712,7 @@ const LiveNotesScreen = ({ navigation }) => {
                     }
                 }
 
-                const message = `${meetingInfo}📝 *${noteTitle || 'Untitled Note'}*\n\n${plainText}\n\nShared via Mavericks App 🚀`;
+                const message = `${meetingInfo}📝 *${noteTitle || 'Untitled Note'}*\n\n${plainText}\n\nShared via Aura App 🚀`;
 
                 await Share.share({
                     message,

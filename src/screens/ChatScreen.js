@@ -2288,7 +2288,7 @@ const ChatScreen = ({ route, navigation }) => {
                                     style={styles.largeAvatar}
                                 />
                                 <Text style={styles.profileName}>{otherUser?.displayName || 'Member'}</Text>
-                                <Text style={styles.profileEmail}>{otherUser?.email || 'Member of Mavericks'}</Text>
+                                <Text style={styles.profileEmail}>{otherUser?.email || 'Member of Aura'}</Text>
                             </View>
 
                             <View style={styles.profileActions}>

@@ -31,9 +31,9 @@ const AnalyticsScreen = ({ navigation }) => {
 
     const tabs = [
         { id: 'overview', label: 'Overview', icon: 'analytics' },
-        { id: 'attendance', label: 'Attendance', icon: 'calendar' },
-        { id: 'tasks', label: 'Tasks', icon: 'checkmark-done' },
-        { id: 'performance', label: 'Performance', icon: 'trending-up' },
+        { id: 'gatherings', label: 'Gatherings', icon: 'calendar' },
+        { id: 'milestones', label: 'Milestones', icon: 'checkmark-done' },
+        { id: 'performance', label: 'Artist Growth', icon: 'trending-up' },
     ];
 
     const navScrollRef = useRef(null);
@@ -107,7 +107,7 @@ const AnalyticsScreen = ({ navigation }) => {
 
     const generateRecommendation = (analyticsData) => {
         if (!analyticsData || !analyticsData.summary) {
-            return "Welcome to Mavericks! Start attending meetings and completing tasks to see personalized insights here.";
+            return "Welcome to Aura! Start attending meetings and completing tasks to see personalized insights here.";
         }
 
         const { summary, monthlyActivity, attendanceHistory } = analyticsData;
@@ -118,17 +118,17 @@ const AnalyticsScreen = ({ navigation }) => {
         if (attendanceRate < 50) {
             potentialInsights.push({
                 priority: 'high',
-                text: `Your attendance is currently ${attendanceRate}%. Consistent participation is key to growth. Try to join the next few meetings! 📅`
+                text: `Your participation is currently ${attendanceRate}%. Consistent presence is key to creative growth. Try to join the next few gatherings! 🎨`
             });
         } else if (attendanceRate >= 90) {
             potentialInsights.push({
                 priority: 'low',
-                text: `Stellar attendance record (${attendanceRate}%)! Your reliability sets a great example for the entire team. ⭐`
+                text: `Stellar participation record (${attendanceRate}%)! Your reliability sets a great example for the entire artist community. ⭐`
             });
         } else {
             potentialInsights.push({
                 priority: 'medium',
-                text: `You're attending ${attendanceRate}% of meetings. Aim for 90% to maximize your learning and team contribution! 🚀`
+                text: `You're attending ${attendanceRate}% of gatherings. Aim for 90% to maximize your creative growth and collective contribution! 🚀`
             });
         }
 
@@ -136,7 +136,7 @@ const AnalyticsScreen = ({ navigation }) => {
         if (taskCompletionRate < 50 && pendingTasks > 0) {
             potentialInsights.push({
                 priority: 'high',
-                text: `You have ${pendingTasks} pending tasks. Knocking out a couple today will significantly boost your ${taskCompletionRate}% completion rate! 💪`
+                text: `You have ${pendingTasks} pending milestones. Reaching a couple today will significantly boost your ${taskCompletionRate}% completion rate! 💪`
             });
         } else if (taskCompletionRate >= 95 && totalTasks > 5) {
             potentialInsights.push({
@@ -152,7 +152,7 @@ const AnalyticsScreen = ({ navigation }) => {
             if (currentMonth.meetings > lastMonth.meetings) {
                 potentialInsights.push({
                     priority: 'medium',
-                    text: `You've attended more meetings this month compared to last. Great job engaging more with the community! 📈`
+                    text: `You've attended more gatherings this month compared to last. Great job engaging more with the creative community! 📈`
                 });
             }
         }
@@ -237,7 +237,7 @@ const AnalyticsScreen = ({ navigation }) => {
                 <View style={styles.aiContent}>
                     <View style={styles.aiHeader}>
                         <Ionicons name="sparkles" size={20} color="#0A66C2" />
-                        <Text style={styles.aiTitle}>Mavericks Insights</Text>
+                        <Text style={styles.aiTitle}>Aura Insights</Text>
                     </View>
                     <Text style={styles.aiBody}>{generateRecommendation(data)}</Text>
                     <View style={styles.aiBadge}>
@@ -272,7 +272,7 @@ const AnalyticsScreen = ({ navigation }) => {
                 <Text style={styles.chartTitle}>Performance Overview</Text>
                 <ProgressChart
                     data={{
-                        labels: ["Attendance", "Tasks"],
+                        labels: ["Participation", "Milestones"],
                         data: [
                             (data?.summary?.attendanceRate || 0) / 100,
                             (data?.summary?.taskCompletionRate || 0) / 100,
@@ -304,7 +304,7 @@ const AnalyticsScreen = ({ navigation }) => {
                                 { data: data.monthlyActivity.map(a => a.meetings), color: (opacity = 1) => `rgba(10, 102, 194, ${opacity})`, strokeWidth: 3 },
                                 { data: data.monthlyActivity.map(a => a.tasks), color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`, strokeWidth: 3 }
                             ],
-                            legend: ["Meetings", "Tasks"]
+                            legend: ["Gatherings", "Milestones"]
                         }}
                         width={width - 48}
                         height={220}
@@ -326,7 +326,7 @@ const AnalyticsScreen = ({ navigation }) => {
         <>
             {/* Attendance Rate Gauge */}
             <Animatable.View animation="fadeIn" style={styles.chartCard}>
-                <Text style={styles.chartTitle}>Attendance Rate</Text>
+                <Text style={styles.chartTitle}>Gathering Participation Rate</Text>
                 <View style={styles.gaugeContainer}>
                     <View style={styles.gaugeCircle}>
                         <Text style={styles.gaugeValue}>{data?.summary?.attendanceRate}%</Text>
@@ -336,7 +336,7 @@ const AnalyticsScreen = ({ navigation }) => {
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <Text style={styles.statValue}>{data?.summary?.totalMeetings || 0}</Text>
-                        <Text style={styles.statLabel}>Total Meetings</Text>
+                        <Text style={styles.statLabel}>Total Sessions</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
@@ -355,7 +355,7 @@ const AnalyticsScreen = ({ navigation }) => {
 
             {/* Monthly Attendance Bar Chart */}
             <Animatable.View animation="fadeInUp" delay={300} style={styles.chartCard}>
-                <Text style={styles.chartTitle}>Monthly Attendance</Text>
+                <Text style={styles.chartTitle}>Monthly Participation</Text>
                 {(data?.monthlyActivity?.length || 0) > 0 && (
                     <ScrollView
                         horizontal
@@ -384,7 +384,7 @@ const AnalyticsScreen = ({ navigation }) => {
 
             {/* Meeting History */}
             <Animatable.View animation="fadeInUp" delay={600} style={styles.chartCard}>
-                <Text style={styles.chartTitle}>Recent Meeting History</Text>
+                <Text style={styles.chartTitle}>Recent Gathering History</Text>
                 <View style={styles.historyList}>
                     {data?.attendanceHistory?.length > 0 ? (
                         data.attendanceHistory.slice(0, 10).map((h, idx) => (
@@ -453,7 +453,7 @@ const AnalyticsScreen = ({ navigation }) => {
 
             {/* Task Stats */}
             <Animatable.View animation="fadeInUp" delay={300} style={styles.chartCard}>
-                <Text style={styles.chartTitle}>Task Statistics</Text>
+                <Text style={styles.chartTitle}>Milestone Statistics</Text>
                 <View style={styles.statsGrid}>
                     <View style={styles.statBox}>
                         <Ionicons name="list" size={24} color="#0A66C2" />
@@ -532,7 +532,7 @@ const AnalyticsScreen = ({ navigation }) => {
                                     strokeWidth: 3
                                 }
                             ],
-                            legend: ["Meetings", "Tasks"]
+                            legend: ["Gatherings", "Milestones"]
                         }}
                         width={width - 48}
                         height={220}
@@ -552,7 +552,7 @@ const AnalyticsScreen = ({ navigation }) => {
                     <View style={styles.breakdownItem}>
                         <View style={styles.breakdownHeader}>
                             <Ionicons name="calendar" size={20} color="#10B981" />
-                            <Text style={styles.breakdownLabel}>Meeting Participation</Text>
+                            <Text style={styles.breakdownLabel}>Gathering Participation</Text>
                         </View>
                         <View style={styles.breakdownBar}>
                             <View style={[styles.breakdownFill, { width: `${data?.summary?.attendanceRate}%`, backgroundColor: '#10B981' }]} />
@@ -563,7 +563,7 @@ const AnalyticsScreen = ({ navigation }) => {
                     <View style={styles.breakdownItem}>
                         <View style={styles.breakdownHeader}>
                             <Ionicons name="checkmark-done" size={20} color="#F59E0B" />
-                            <Text style={styles.breakdownLabel}>Task Completion</Text>
+                            <Text style={styles.breakdownLabel}>Milestone Completion</Text>
                         </View>
                         <View style={styles.breakdownBar}>
                             <View style={[styles.breakdownFill, { width: `${data?.summary?.taskCompletionRate}%`, backgroundColor: '#F59E0B' }]} />
@@ -578,7 +578,7 @@ const AnalyticsScreen = ({ navigation }) => {
                 <Text style={styles.chartTitle}>Summary Statistics</Text>
                 <View style={styles.summaryGrid}>
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Total Meetings</Text>
+                        <Text style={styles.summaryLabel}>Total Gatherings</Text>
                         <Text style={styles.summaryValue}>{data?.summary?.totalMeetings || 0}</Text>
                     </View>
                     <View style={styles.summaryItem}>
@@ -586,7 +586,7 @@ const AnalyticsScreen = ({ navigation }) => {
                         <Text style={[styles.summaryValue, { color: '#10B981' }]}>{data?.summary?.attendedMeetings || 0}</Text>
                     </View>
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Total Tasks</Text>
+                        <Text style={styles.summaryLabel}>Total Milestones</Text>
                         <Text style={styles.summaryValue}>{data?.summary?.totalTasks || 0}</Text>
                     </View>
                     <View style={styles.summaryItem}>
@@ -639,8 +639,8 @@ const AnalyticsScreen = ({ navigation }) => {
                             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                         >
                             {selectedTab === 'overview' && renderOverviewTab()}
-                            {selectedTab === 'attendance' && renderAttendanceTab()}
-                            {selectedTab === 'tasks' && renderTasksTab()}
+                            {selectedTab === 'gatherings' && renderAttendanceTab()}
+                            {selectedTab === 'milestones' && renderTasksTab()}
                             {selectedTab === 'performance' && renderPerformanceTab()}
 
                             <View style={{ height: 100 }} />
