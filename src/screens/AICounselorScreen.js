@@ -8,53 +8,81 @@ import { Send, User, Bot, Mic, MicOff, X, Sparkles, Key } from 'lucide-react-nat
 import Voice from '@react-native-voice/voice';
 import Markdown from 'react-native-markdown-display';
 import GradientBorder from '../components/ui/GradientBorder';
-import { Image, Modal } from 'react-native';
+import { Image, Modal, ScrollView as horizontalScroll } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 
 const AICounselorScreen = ({ navigation }) => {
     const { user } = useAuth();
 
-    const [messages, setMessages] = useState([
-        { id: '1', text: `Hi ${user?.displayName || 'there'}! I'm your AI counselor. Ask me anything about ${user?.examType || 'MHTCET/JEE'} admissions!`, sender: 'bot' }
-    ]);
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const [userMessageCount, setUserMessageCount] = useState(0);
-    const [showKeyPopup, setShowKeyPopup] = useState(false);
+    const [chatId, setChatId] = useState(null);
+    const [frequentQuestions, setFrequentQuestions] = useState([]);
+    const [isDirty, setIsDirty] = useState(false);
     const flatListRef = useRef();
+    const scrollX = useSharedValue(0);
 
     React.useEffect(() => {
-        if (user?.role === 'student' && !user?.preferences?.isProfileComplete) {
+        loadFrequentQuestions();
+        startNewChat();
+
+        // Handle leaving screen - Confirm Save
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (!isDirty || messages.length <= 1) return;
+
+            // Prevent default action
+            e.preventDefault();
+
             Alert.alert(
-                'Unlock AI Insights',
-                'Complete your admission profile to get personalized AI counseling recommendations.',
+                'Save Conversation?',
+                'Would you like to save this chat history before leaving?',
                 [
-                    { text: 'Later', style: 'cancel' },
-                    { text: 'Complete Now', onPress: () => navigation.navigate('CompleteProfile') }
+                    { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+                    { text: 'Save', onPress: async () => {
+                        await handleSaveChat();
+                        navigation.dispatch(e.data.action);
+                    }},
+                    { text: 'Continue Chatting', style: 'cancel', onPress: () => {} }
                 ]
             );
-        }
+        });
 
-        if (Voice && Platform.OS !== 'web') {
-            Voice.onSpeechStart = () => setIsListening(true);
-            Voice.onSpeechEnd = () => setIsListening(false);
-            Voice.onSpeechResults = (e) => {
-                if (e.value && e.value[0]) {
-                    setInput(e.value[0]);
-                }
-            };
-            Voice.onSpeechError = (e) => {
-                console.error(e);
-                setIsListening(false);
-            };
-        }
+        return unsubscribe;
+    }, [navigation, isDirty, messages]);
 
-        return () => {
-            if (Voice && Platform.OS !== 'web') {
-                Voice.destroy().then(Voice.removeAllListeners).catch(() => { });
-            }
-        };
-    }, [user]);
+    const loadFrequentQuestions = async () => {
+        try {
+            const res = await aiAPI.getFrequentQuestions();
+            setFrequentQuestions(res.data);
+        } catch (e) {
+            setFrequentQuestions([
+                { question: "What is the cutoff for COEP?" },
+                { question: "Top engineering colleges in Pune" },
+                { question: "Best branches for 95 percentile" },
+                { question: "Admission process for VJTI" }
+            ]);
+        }
+    };
+
+    const startNewChat = () => {
+        setMessages([
+            { id: '1', text: `Hi ${user?.displayName || 'there'}! I'm your Alloteme0077 Counselor. Only remembering your profile info now. How can I help?`, sender: 'bot' }
+        ]);
+        setChatId(null);
+        setIsDirty(false);
+    };
+
+    const handleSaveChat = async () => {
+        try {
+            const history = messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
+            await aiAPI.saveChat({ chatId, messages: history });
+            setIsDirty(false);
+        } catch (e) {
+            Alert.alert('Error', 'Failed to save chat');
+        }
+    };
 
     const startListening = async () => {
         if (!Voice || Platform.OS === 'web') {
@@ -77,34 +105,38 @@ const AICounselorScreen = ({ navigation }) => {
         }
     };
 
-    const handleSend = async () => {
-        if (!input.trim() || loading) return;
+    const handleSend = async (overrideInput = null) => {
+        const textToSend = overrideInput || input;
+        if (!textToSend.trim() || loading) return;
 
-        const userMsg = { id: Date.now().toString(), text: input, sender: 'user' };
+        const userMsg = { id: Date.now().toString(), text: textToSend, sender: 'user' };
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setLoading(true);
+        setIsDirty(true);
 
         try {
-            const context = {
-                examType: user?.examType,
-                percentile: user?.percentile,
-                rank: user?.rank,
-                location: user?.location
-            };
-            const res = await aiAPI.counsel(input, context);
-            const botMsg = { id: (Date.now() + 1).toString(), text: res.data.answer, sender: 'bot' };
+            const history = messages.slice(1).map(m => ({
+                role: m.sender === 'user' ? 'user' : 'assistant',
+                content: m.text
+            }));
+
+            const res = await aiAPI.counsel({
+                message: textToSend,
+                chatId,
+                history,
+                userProfile: {
+                    examType: user?.examType,
+                    percentile: user?.percentile,
+                    rank: user?.rank,
+                    location: user?.location
+                }
+            });
+
+            const botMsg = { id: (Date.now() + 1).toString(), text: res.data.reply, sender: 'bot' };
             setMessages(prev => [...prev, botMsg]);
-
-            // Track message count for popup
-            const newCount = userMessageCount + 1;
-            setUserMessageCount(newCount);
-
-            if (newCount === 5 && !user?.groqApiKey) {
-                setShowKeyPopup(true);
-            }
         } catch (error) {
-            const errorMsg = { id: (Date.now() + 1).toString(), text: "Sorry, I'm having trouble connecting right now.", sender: 'bot' };
+            const errorMsg = { id: (Date.now() + 1).toString(), text: "Sorry, I'm having trouble connecting to the Alloteme0077 brain right now.", sender: 'bot' };
             setMessages(prev => [...prev, errorMsg]);
         } finally {
             setLoading(false);
@@ -160,12 +192,35 @@ const AICounselorScreen = ({ navigation }) => {
                         </GradientBorder>
                     </TouchableOpacity>
                     <View style={styles.headerInfo}>
-                        <Text style={styles.title}>AI Counselor</Text>
+                        <Text style={styles.title}>Alloteme Assistant</Text>
                         <View style={styles.statusContainer}>
                             <View style={styles.statusDot} />
-                            <Text style={styles.status}>Online • Ready to help</Text>
+                            <Text style={styles.status}>Knowledge Base Connected</Text>
                         </View>
                     </View>
+                    <TouchableOpacity style={styles.newChatBtn} onPress={startNewChat}>
+                        <Sparkles size={18} color={Colors.primary} />
+                        <Text style={styles.newChatText}>New Chat</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Question Tags Marquee */}
+                <View style={styles.tagsWrapper}>
+                    <FlatList
+                        horizontal
+                        data={[...frequentQuestions, ...frequentQuestions]} // Simple duplication for infinite-like feel
+                        renderItem={({ item }) => (
+                            <TouchableOpacity 
+                                style={styles.tag} 
+                                onPress={() => handleSend(item.question)}
+                            >
+                                <Text style={styles.tagText}>{item.question}</Text>
+                            </TouchableOpacity>
+                        )}
+                        keyExtractor={(item, index) => index.toString()}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingHorizontal: 10 }}
+                    />
                 </View>
 
                 <FlatList
@@ -300,6 +355,41 @@ const styles = StyleSheet.create({
     userText: { color: Colors.white },
     botText: { color: Colors.text.primary },
     avatarImg: { width: '100%', height: '100%' },
+    newChatBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.primary + '10',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6
+    },
+    newChatText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: Colors.primary
+    },
+    tagsWrapper: {
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.divider,
+        backgroundColor: '#F8FAFC'
+    },
+    tag: {
+        backgroundColor: Colors.white,
+        borderWidth: 1,
+        borderColor: Colors.primary + '30',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginHorizontal: 6,
+        ...Shadows.sm
+    },
+    tagText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: Colors.text.secondary
+    },
     inputArea: {
         flexDirection: 'row',
         padding: 12,

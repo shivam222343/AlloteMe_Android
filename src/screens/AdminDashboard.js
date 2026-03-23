@@ -32,10 +32,24 @@ const AdminDashboard = ({ navigation }) => {
             color: '#F59E0B'
         },
         {
+            title: 'Train AI Counselor',
+            desc: 'Upload knowledge base and text for RAG',
+            icon: BarChart3,
+            route: 'AITraining',
+            color: '#8B5CF6'
+        },
+        {
+            title: 'Frequent Questions',
+            desc: 'Set sliding question tags for chat',
+            icon: Settings,
+            route: 'FrequentQuestionsManager',
+            color: '#EC4899'
+        },
+        {
             title: 'User Management',
             desc: 'View and manage student registrations',
             icon: Users,
-            route: 'Dashboard', // Placeholder
+            route: 'Dashboard',
             color: '#3B82F6'
         },
     ];

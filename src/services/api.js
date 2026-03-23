@@ -50,7 +50,12 @@ export const cutoffAPI = {
 };
 
 export const aiAPI = {
-    counsel: (message, context) => api.post('/ai/counsel', { message, context }),
+    counsel: (payload) => api.post('/ai/counsel', payload),
+    getChats: () => api.get('/ai/chats'),
+    saveChat: (data) => api.post('/ai/chats', data),
+    trainAI: (data) => api.post('/ai/train', data),
+    getFrequentQuestions: () => api.get('/ai/frequent-questions'),
+    setFrequentQuestion: (data) => api.post('/ai/frequent-questions', data),
 };
 
 export const notificationAPI = {
