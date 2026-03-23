@@ -391,3 +391,5 @@ For support, email support@mavericks.com
 6. **Customize**: Adjust colors, add features, enhance UI
 
 **Happy Coding! 🚀**
+#   A l l o t e M e _ A n d r o i d  
+ 
