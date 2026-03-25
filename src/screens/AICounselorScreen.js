@@ -151,32 +151,41 @@ const MessageItem = React.memo(({ item, user, onDelete }) => {
                             style={styles.avatarImg}
                         />
                     </GradientBorder>
-                    <Text style={[styles.timestamp, { marginLeft: 10, fontSize: 11 }]}>{time}</Text>
+                    <View style={{ marginLeft: 10, flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.timestamp, { fontSize: 11 }]}>{time}</Text>
+                        <TouchableOpacity onPress={() => onDelete(item.id)} style={{ marginLeft: 8 }}>
+                            <Trash2 size={11} color={Colors.text.tertiary} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <View style={{ width: '100%' }}>
-                    <TouchableOpacity onLongPress={() => onDelete(item.id)} activeOpacity={0.8}>
-                        <Markdown
-                            style={markdownStyles}
-                            rules={{
-                                table: (node, children, parent, styles) => (
-                                    <ScrollView
-                                        key={node.key}
-                                        horizontal
-                                        showsHorizontalScrollIndicator={true}
-                                        contentContainerStyle={{ flexGrow: 1, paddingBottom: 8 }}
-                                        style={{ marginVertical: 12 }}
-                                    >
-                                        <View style={[styles.table, { marginVertical: 0 }]}>
-                                            {children}
-                                        </View>
-                                    </ScrollView>
-                                ),
-                            }}
-                        >
-                            {displayedText}
-                        </Markdown>
-                    </TouchableOpacity>
+                    <Markdown
+                        style={markdownStyles}
+                        rules={{
+                            table: (node, children, parent, styles) => (
+                                <ScrollView
+                                    key={node.key}
+                                    horizontal
+                                    showsHorizontalScrollIndicator={true}
+                                    persistentScrollbar={true}
+                                    nestedScrollEnabled={true}
+                                    contentContainerStyle={{
+                                        paddingRight: 30,
+                                        paddingBottom: 4,
+                                        alignItems: 'flex-start'
+                                    }}
+                                    style={{ marginVertical: 12 }}
+                                >
+                                    <View style={[styles.table, { marginVertical: 0 }]}>
+                                        {children}
+                                    </View>
+                                </ScrollView>
+                            ),
+                        }}
+                    >
+                        {displayedText}
+                    </Markdown>
                 </View>
             </View>
         );
@@ -186,14 +195,12 @@ const MessageItem = React.memo(({ item, user, onDelete }) => {
         <View style={[styles.messageContainer, styles.userContainer]}>
             <View style={[styles.bubbleWrapper, { alignItems: 'flex-end', maxWidth: '85%' }]}>
                 <View style={[styles.bubble, styles.userBubble]}>
-                    <TouchableOpacity onLongPress={() => onDelete(item.id)} activeOpacity={0.8}>
-                        <Text style={[styles.messageText, styles.userText]}>{item.text}</Text>
-                    </TouchableOpacity>
+                    <Text style={[styles.messageText, styles.userText]}>{item.text}</Text>
                 </View>
                 <View style={styles.messageMeta}>
                     <Text style={styles.timestamp}>{time}</Text>
                     <TouchableOpacity onPress={() => onDelete(item.id)} style={{ marginLeft: 6 }}>
-                        <Trash2 size={10} color={Colors.text.tertiary} />
+                        <Trash2 size={11} color={Colors.text.tertiary} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -512,8 +519,21 @@ const AICounselorScreen = ({ navigation }) => {
     }, [loading, messages, chatId, user]);
 
     const deleteMessage = React.useCallback((id) => {
-        setMessages(prev => prev.filter(m => m.id !== id));
-        setIsDirty(true);
+        Alert.alert(
+            "Delete Message",
+            "Are you sure you want to remove this message?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => {
+                        setMessages(prev => prev.filter(m => m.id !== id));
+                        setIsDirty(true);
+                    }
+                }
+            ]
+        );
     }, []);
 
     const openPastChat = async (id) => {

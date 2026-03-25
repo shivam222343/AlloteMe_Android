@@ -94,23 +94,31 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 <head>
                     <style>
                         body { font-family: 'Helvetica'; padding: 40px; color: #333; }
-                        h1 { color: #0A66C2; margin-bottom: 5px; }
+                        .header { border-bottom: 2px solid #0A66C2; padding-bottom: 10px; margin-bottom: 20px; }
+                        h1 { color: #0A66C2; margin: 0; }
+                        .meta { color: #64748b; font-size: 12px; margin-top: 5px; }
                         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th { background-color: #f8fafc; text-align: left; padding: 12px; border-bottom: 2px solid #e2e8f0; font-size: 12px; }
-                        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
+                        th { background-color: #f8fafc; text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0; font-size: 11px; color: #475569; }
+                        td { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 10px; }
+                        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
+                        .contact { font-weight: bold; color: #0A66C2; font-size: 14px; margin-top: 8px; }
                     </style>
                 </head>
                 <body>
-                    <h1>AlloteMe Prediction Report</h1>
-                    <p>Exam: ${examType} | Category: ${category} | Percentile: ${percentile}%</p>
+                    <div class="header">
+                        <h1>AlloteMe Prediction Report</h1>
+                        <div class="meta">Exam: ${examType} | Category: ${category} | Percentile: ${percentile}%</div>
+                    </div>
                     <table>
                         <thead>
                             <tr>
                                 <th>#</th>
+                                <th>DTE Code</th>
                                 <th>College Name</th>
                                 <th>Branch</th>
-                                <th>Cutoff</th>
-                                <th>Chance</th>
+                                <th>Cutoff %</th>
+                                <th>Rank</th>
+                                <th>Match</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -119,21 +127,31 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 return `
                                     <tr>
                                         <td>${index + 1}</td>
+                                        <td style="color:#0A66C2; font-weight:bold;">${item.collegeId?.dteCode || '—'}</td>
                                         <td><b>${item.collegeId?.name}</b></td>
                                         <td>${item.branch}</td>
-                                        <td>${item.percentile}%</td>
-                                        <td>${score}% Match</td>
+                                        <td>${Number(item.percentile).toFixed(2)}%</td>
+                                        <td>${item.rank || '—'}</td>
+                                        <td>${score}%</td>
                                     </tr>
                                 `;
             }).join('')}
                         </tbody>
                     </table>
+                    <div class="footer">
+                        <p><b>Instructions:</b> This report is based on previous year cutoff trends. Actual allotments depend on current year merit lists and seat availability.</p>
+                        <p>For counseling assistance and queries, contact AlloteMe Support:</p>
+                        <div class="contact">📞 8010961216</div>
+                    </div>
                 </body>
                 </html>
             `;
             const { uri } = await Print.printToFileAsync({ html });
             await Sharing.shareAsync(uri);
-        } catch (error) { Alert.alert('PDF Export Failed'); }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('PDF Export Failed');
+        }
         finally { setExportingPDF(false); }
     };
 
@@ -141,11 +159,15 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         if (processedResults.length === 0) return;
         setExportingCSV(true);
         try {
-            let csv = 'No,College,Branch,Cutoff,Match%\n';
+            let csv = 'No,DTE Code,College,Branch,Cutoff%,Rank,Match%\n';
             processedResults.forEach((item, idx) => {
                 const score = Math.round(item.matchScore || 0);
-                csv += `${idx + 1},"${item.collegeId?.name}","${item.branch}",${item.percentile},${score}%\n`;
+                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${item.collegeId?.name}","${item.branch}",${item.percentile},${item.rank || ''},${score}%\n`;
             });
+            csv += '\n\nAlloteMe Information\n';
+            csv += 'Support Contact,8010961216\n';
+            csv += 'Note,Actual allotments depend on current year merit lists.\n';
+
             const fileUri = `${FileSystem.cacheDirectory}AlloteMe_Predictions.csv`;
             await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
             await Sharing.shareAsync(fileUri);

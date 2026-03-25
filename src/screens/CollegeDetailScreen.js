@@ -77,6 +77,8 @@ const CollegeDetailScreen = ({ route, navigation }) => {
     const [showFullMap, setShowFullMap] = useState(false);
 
     useEffect(() => {
+        setLoading(true);
+        setInst(null);
         fetchData();
 
         if (socket) {

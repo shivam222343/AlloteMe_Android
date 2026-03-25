@@ -178,29 +178,46 @@ const PredictorScreen = ({ navigation }) => {
         }
     };
 
-    const renderMultiSelect = (items, selectedItems, setSelectedItems, Icon, label) => (
-        <View style={styles.advanceGroup}>
-            <View style={styles.advanceLabelRow}>
-                <Icon size={14} color={Colors.text.tertiary} />
-                <Text style={styles.advanceLabel}>{label}</Text>
-                {selectedItems.length > 0 && <Text style={styles.countTag}>{selectedItems.length} selected</Text>}
+    const renderMultiSelect = (items, selectedItems, setSelectedItems, Icon, label) => {
+        // Dynamic row count: 4 rows for large lists, fewer for smaller ones.
+        const rowCount = items.length > 20 ? 4 : (items.length > 10 ? 3 : (items.length > 5 ? 2 : 1));
+        const rows = Array.from({ length: rowCount }, () => []);
+        items.forEach((item, i) => rows[i % rowCount].push(item));
+
+        return (
+            <View style={styles.advanceGroup}>
+                <View style={styles.advanceLabelRow}>
+                    <Icon size={14} color={Colors.text.tertiary} />
+                    <Text style={styles.advanceLabel}>{label}</Text>
+                    {selectedItems.length > 0 && <Text style={styles.countTag}>{selectedItems.length} selected</Text>}
+                </View>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipScrollContent}
+                >
+                    <View>
+                        {rows.map((rowItems, rowIndex) => (
+                            <View key={rowIndex} style={styles.chipRow}>
+                                {rowItems.map(item => {
+                                    const isActive = selectedItems.includes(item);
+                                    return (
+                                        <TouchableOpacity
+                                            key={item}
+                                            style={[styles.advanceChip, isActive && styles.advanceChipActive]}
+                                            onPress={() => toggleSelection(item, selectedItems, setSelectedItems)}
+                                        >
+                                            <Text style={[styles.advanceChipText, isActive && styles.advanceChipTextActive]}>{item}</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        ))}
+                    </View>
+                </ScrollView>
             </View>
-            <View style={styles.chipGrid}>
-                {items.map(item => {
-                    const isActive = selectedItems.includes(item);
-                    return (
-                        <TouchableOpacity
-                            key={item}
-                            style={[styles.advanceChip, isActive && styles.advanceChipActive]}
-                            onPress={() => toggleSelection(item, selectedItems, setSelectedItems)}
-                        >
-                            <Text style={[styles.advanceChipText, isActive && styles.advanceChipTextActive]}>{item}</Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-        </View>
-    );
+        );
+    };
 
     return (
         <MainLayout scrollable={true} showHeader={false} noPadding={true}>
@@ -358,8 +375,27 @@ const styles = StyleSheet.create({
     advanceLabel: { fontSize: 12, fontWeight: '700', color: Colors.text.secondary },
     countTag: { fontSize: 9, fontWeight: 'bold', color: Colors.white, backgroundColor: Colors.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 },
 
-    chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    advanceChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+    chipGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    chipScrollContent: {
+        paddingRight: 20,
+        paddingBottom: 4
+    },
+    chipRow: {
+        flexDirection: 'row',
+        paddingVertical: 2
+    },
+    advanceChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 24,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginRight: 10,
+        marginBottom: 8,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
     advanceChipActive: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
     advanceChipText: { fontSize: 12, color: Colors.text.secondary },
     advanceChipTextActive: { color: Colors.primary, fontWeight: 'bold' },
