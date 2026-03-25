@@ -130,38 +130,17 @@ export const uploadMedia = async (uri, direct = false, onProgress = null) => {
                 resourceType: data.resource_type,
             };
         } else {
-            // BACKEND PROXY UPLOAD (Recommended for Android / Reliability)
-            const formData = new FormData();
-            formData.append('image', file);
-
-            const { uploadAPI } = require('./api');
-            const response = await uploadAPI.upload(formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-                onUploadProgress: (progressEvent) => {
-                    if (onProgress && progressEvent.total) {
-                        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                        onProgress(progress);
-                    }
-                },
-            });
-
-            if (response.data?.url) {
-                return {
-                    success: true,
-                    url: response.data.url,
-                    publicId: response.data.public_id,
-                };
-            } else {
-                throw new Error('Backend upload failed');
-            }
+            // Prepared for backend proxy (normalizing format)
+            return {
+                success: true,
+                file: file, // Return normalized file object for local FormData construction
+            };
         }
     } catch (error) {
-        console.error('[CloudinaryService] Upload error:', error.response?.data || error.message);
+        console.error('[CloudinaryService] Upload error:', error);
         return {
             success: false,
-            message: error.response?.data?.message || error.message || 'Upload failed',
+            message: error.message || 'Upload failed',
         };
     }
 };
