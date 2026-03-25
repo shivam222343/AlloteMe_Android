@@ -3,11 +3,32 @@ const Institution = require('../models/Institution');
 const Groq = require('groq-sdk');
 const { emitUpdate } = require('../utils/socket');
 
-// @desc    Add single cutoff entry
+// @desc    Add single cutoff entry (or multiple for one branch)
 // @route   POST /api/cutoffs
 // @access  Private/Admin
 const addCutoffData = async (req, res) => {
     try {
+        const { institutionId, branchName, examType, year, round, cutoffData } = req.body;
+
+        // If it's a list for one branch (common frontend pattern)
+        if (cutoffData && Array.isArray(cutoffData)) {
+            const formatted = cutoffData.map(item => ({
+                collegeId: institutionId,
+                branch: branchName,
+                examType,
+                year,
+                round,
+                category: item.category,
+                seatType: item.seatType || null,
+                percentile: item.percentile,
+                rank: item.rank || null
+            }));
+            await Cutoff.insertMany(formatted);
+            emitUpdate('cutoff:updated', { institutionId });
+            return res.status(201).json({ message: 'Cutoffs added' });
+        }
+
+        // Traditional single entry
         const cutoff = new Cutoff(req.body);
         const createdCutoff = await cutoff.save();
         emitUpdate('cutoff:updated', { institutionId: createdCutoff.collegeId });
@@ -17,25 +38,50 @@ const addCutoffData = async (req, res) => {
     }
 };
 
-// @desc    Add multiple cutoff entries
+// @desc    Add multiple cutoff entries across branches
 // @route   POST /api/cutoffs/bulk
 // @access  Private/Admin
 const bulkAddCutoffData = async (req, res) => {
     try {
-        const { institutionId, data, examType, year, round } = req.body;
-        if (!data || !Array.isArray(data)) return res.status(400).json({ message: 'Invalid data format' });
+        const { institutionId, data, items, examType, year, round } = req.body;
+        const rawData = data || items; // Support both naming conventions
 
-        const formattedData = data.map(item => ({
-            ...item,
-            collegeId: institutionId || item.collegeId,
-            examType: examType || item.examType,
-            year: year || item.year,
-            round: round || item.round
-        }));
+        if (!rawData || !Array.isArray(rawData)) {
+            return res.status(400).json({ message: 'Invalid data format' });
+        }
 
-        await Cutoff.insertMany(formattedData);
+        let totalFormatted = [];
+
+        // Handle nested branch structure (from frontend)
+        if (rawData[0]?.branchName && rawData[0]?.cutoffData) {
+            rawData.forEach(branchGroup => {
+                const branchFormatted = branchGroup.cutoffData.map(item => ({
+                    collegeId: institutionId,
+                    branch: branchGroup.branchName,
+                    examType: examType || branchGroup.examType,
+                    year: year || branchGroup.year,
+                    round: round || branchGroup.round,
+                    category: item.category,
+                    seatType: item.seatType || null,
+                    percentile: item.percentile,
+                    rank: item.rank || null
+                }));
+                totalFormatted = [...totalFormatted, ...branchFormatted];
+            });
+        } else {
+            // Traditional flat array
+            totalFormatted = rawData.map(item => ({
+                ...item,
+                collegeId: institutionId || item.collegeId,
+                examType: examType || item.examType,
+                year: year || item.year,
+                round: round || item.round
+            }));
+        }
+
+        await Cutoff.insertMany(totalFormatted);
         emitUpdate('cutoff:updated', { institutionId });
-        res.status(201).json({ message: 'Bulk cutoffs added' });
+        res.status(201).json({ message: 'Bulk cutoffs added', count: totalFormatted.length });
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
