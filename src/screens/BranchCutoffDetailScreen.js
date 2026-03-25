@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, FlatList } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
 import { cutoffAPI } from '../services/api';
@@ -26,10 +26,13 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [institutionId, branchName]);
 
     const fetchData = async () => {
         setLoading(true);
+        // Clear previous state to prevent flickering of old data
+        setAllCutoffs([]);
+        setFilteredData([]);
         try {
             const res = await cutoffAPI.getByInstitution(institutionId);
             const rawData = res.data || [];
@@ -87,7 +90,28 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
             c.round === selectedRound
         );
         setFilteredData(matches);
-    }, [selectedYear, selectedRound, allCutoffs]);
+    }, [selectedYear, selectedRound, allCutoffs, branchName]);
+
+    const renderItem = ({ item, index }) => (
+        <View style={[styles.tableRow, index % 2 === 0 && styles.zebraRow]}>
+            <View style={{ flex: 2 }}>
+                <Text style={[styles.td, { fontWeight: '700', color: Colors.primary }]}>{item.category}</Text>
+            </View>
+            <View style={{ flex: 2 }}>
+                <Text style={[styles.td, { fontSize: 11, color: Colors.text.tertiary }]}>{item.seatType || 'General'}</Text>
+            </View>
+            <View style={{ flex: 1.5 }}>
+                <Text style={[styles.td, { textAlign: 'right', fontWeight: 'bold', color: Colors.text.primary }]}>
+                    {item.percentile}
+                </Text>
+            </View>
+            <View style={{ flex: 1.5 }}>
+                <Text style={[styles.td, { textAlign: 'right', color: Colors.text.tertiary, fontSize: 12 }]}>
+                    {item.rank || '-'}
+                </Text>
+            </View>
+        </View>
+    );
 
     const renderHeader = () => (
         <View style={styles.header}>
@@ -138,44 +162,6 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
         </View>
     );
 
-    const renderTable = () => (
-        <View style={styles.tableContainer}>
-            <View style={styles.tableHeader}>
-                <Text style={[styles.th, { flex: 2 }]}>Category</Text>
-                <Text style={[styles.th, { flex: 2 }]}>Seat Type</Text>
-                <Text style={[styles.th, { flex: 1.5, textAlign: 'right' }]}>Percentile</Text>
-                <Text style={[styles.th, { flex: 1.5, textAlign: 'right' }]}>Rank</Text>
-            </View>
-
-            {filteredData.length > 0 ? (
-                filteredData.map((item, idx) => (
-                    <View key={idx} style={[styles.tableRow, idx % 2 === 0 && styles.zebraRow]}>
-                        <View style={{ flex: 2 }}>
-                            <Text style={[styles.td, { fontWeight: '700', color: Colors.primary }]}>{item.category}</Text>
-                        </View>
-                        <View style={{ flex: 2 }}>
-                            <Text style={[styles.td, { fontSize: 11, color: Colors.text.tertiary }]}>{item.seatType || 'General'}</Text>
-                        </View>
-                        <View style={{ flex: 1.5 }}>
-                            <Text style={[styles.td, { textAlign: 'right', fontWeight: 'bold', color: Colors.text.primary }]}>
-                                {item.percentile}
-                            </Text>
-                        </View>
-                        <View style={{ flex: 1.5 }}>
-                            <Text style={[styles.td, { textAlign: 'right', color: Colors.text.tertiary, fontSize: 12 }]}>
-                                {item.rank || '-'}
-                            </Text>
-                        </View>
-                    </View>
-                ))
-            ) : (
-                <View style={styles.emptyBox}>
-                    <Text style={styles.emptyText}>No data available for Year {selectedYear} Round {selectedRound}</Text>
-                </View>
-            )}
-        </View>
-    );
-
     return (
         <MainLayout style={styles.container} title="Cutoff Details">
             {loading ? (
@@ -183,17 +169,37 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
                     <ActivityIndicator size="large" color={Colors.primary} />
                 </View>
             ) : (
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-                    {renderHeader()}
-                    {renderTable()}
-
-                    <View style={styles.infoBox}>
-                        <Filter size={14} color={Colors.text.tertiary} />
-                        <Text style={styles.infoText}>
-                            Data is based on official allotment lists. Cutoffs vary each year based on difficulty and applicant volume.
-                        </Text>
-                    </View>
-                </ScrollView>
+                <FlatList
+                    data={filteredData}
+                    keyExtractor={(item, index) => index.toString()}
+                    renderItem={renderItem}
+                    ListHeaderComponent={() => (
+                        <View style={{ backgroundColor: '#F8FAFC' }}>
+                            {renderHeader()}
+                            <View style={styles.tableHeader}>
+                                <Text style={[styles.th, { flex: 2 }]}>Category</Text>
+                                <Text style={[styles.th, { flex: 2 }]}>Seat Type</Text>
+                                <Text style={[styles.th, { flex: 1.5, textAlign: 'right' }]}>Percentile</Text>
+                                <Text style={[styles.th, { flex: 1.5, textAlign: 'right' }]}>Rank</Text>
+                            </View>
+                        </View>
+                    )}
+                    ListEmptyComponent={() => (
+                        <View style={styles.emptyBox}>
+                            <Text style={styles.emptyText}>No data available for Year {selectedYear} Round {selectedRound}</Text>
+                        </View>
+                    )}
+                    ListFooterComponent={() => (
+                        <View style={styles.infoBox}>
+                            <Filter size={14} color={Colors.text.tertiary} />
+                            <Text style={styles.infoText}>
+                                Data is based on official allotment lists. Cutoffs vary each year based on difficulty and applicant volume.
+                            </Text>
+                        </View>
+                    )}
+                    contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+                    stickyHeaderIndices={[0]} // Pin the table header
+                />
             )}
         </MainLayout>
     );

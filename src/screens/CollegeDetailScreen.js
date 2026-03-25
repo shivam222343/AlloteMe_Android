@@ -142,7 +142,15 @@ const CollegeDetailScreen = ({ route, navigation }) => {
         );
     };
 
-    if (loading || !inst) return null;
+    if (loading || !inst) {
+        return (
+            <MainLayout title="College Details">
+                <View style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                </View>
+            </MainLayout>
+        );
+    }
 
     const hasCoords = inst.location?.coordinates?.lat && inst.location?.coordinates?.lng;
 
@@ -594,6 +602,7 @@ const styles = StyleSheet.create({
     // Shared empty
     emptyCard: { alignItems: 'center', justifyContent: 'center', padding: 60, gap: 14 },
     emptyText: { fontSize: 14, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 400 },
 
     adminBar: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginBottom: 15 },
     adminBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary + '10', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.primary + '20' },

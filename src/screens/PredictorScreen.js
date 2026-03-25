@@ -81,6 +81,31 @@ const PredictorScreen = ({ navigation }) => {
     const [selectedSeatTypes, setSelectedSeatTypes] = useState([]);
     const [selectedYear, setSelectedYear] = useState(2025);
     const [loading, setLoading] = useState(false);
+    const [rankLoading, setRankLoading] = useState(false);
+
+    // Auto-calculate Rank based on Percentile
+    React.useEffect(() => {
+        if (!percentile || isNaN(parseFloat(percentile))) {
+            setRank('');
+            return;
+        }
+
+        const timeout = setTimeout(async () => {
+            setRankLoading(true);
+            try {
+                const res = await cutoffAPI.estimateRank(percentile);
+                if (res.data?.rank) {
+                    setRank(res.data.rank.toString());
+                }
+            } catch (error) {
+                console.log('Rank estimation failed', error);
+            } finally {
+                setRankLoading(false);
+            }
+        }, 800); // 800ms debounce
+
+        return () => clearTimeout(timeout);
+    }, [percentile]);
 
     const toggleAdvance = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -109,10 +134,10 @@ const PredictorScreen = ({ navigation }) => {
                 rTolerance,
                 examType: user?.examType || 'MHTCET',
                 category,
-                branches: selectedBranches,
-                regions: selectedRegions,
-                institutionTypes: selectedTypes,
-                seatTypes: selectedSeatTypes,
+                branches: selectedBranches.join(','),
+                regions: selectedRegions.join(','),
+                institutionTypes: selectedTypes.join(','),
+                seatTypes: selectedSeatTypes.join(','),
                 year: selectedYear,
                 round: 1
             });
@@ -121,11 +146,6 @@ const PredictorScreen = ({ navigation }) => {
                 ...item,
                 key: item._id || `id-${index}`
             }));
-
-            if (cleanData.length === 0) {
-                Alert.alert('No Matches', 'Try increasing your Tolerance Range or adjusting Advanced filters.');
-                return;
-            }
 
             navigation.navigate('PredictionResults', {
                 results: cleanData,

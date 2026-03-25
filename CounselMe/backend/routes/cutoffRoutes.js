@@ -7,10 +7,12 @@ const {
     parseBulkCutoffData,
     getCutoffsByInstitution,
     predictColleges,
-    deleteCutoffs
+    deleteCutoffs,
+    estimateRank
 } = require('../controllers/cutoffController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
+router.get('/estimate-rank', estimateRank);
 router.route('/')
     .post(protect, authorize('admin'), addCutoffData);
 

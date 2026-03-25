@@ -106,116 +106,116 @@ const getCutoffsByInstitution = async (req, res) => {
 // @route   GET /api/cutoffs/predict
 // @access  Public
 const predictColleges = async (req, res) => {
-    const {
+    // Standardize params (Handle both standard and [] array keys)
+    let {
         percentile,
         rank,
         pTolerance = 10,
-        rTolerance = 500,
+        rTolerance = 1000,
         examType,
         category,
         round,
         year,
         branches,
         regions,
-        autonomy,
         institutionTypes,
         seatTypes
     } = req.query;
 
+    // Fallback for axios array serialization styles
+    branches = branches || req.query['branches[]'] || req.query['branches'];
+    regions = regions || req.query['regions[]'] || req.query['regions'];
+    institutionTypes = institutionTypes || req.query['institutionTypes[]'];
+    seatTypes = seatTypes || req.query['seatTypes[]'];
+
+    console.log('[Predictor] Normalized Params:', { percentile, rank, branches, regions });
+
     try {
         const query = {
-            examType,
+            examType: examType || 'MHTCET',
             category: category || 'OPEN'
         };
 
         if (round) query.round = parseInt(round);
         if (year) query.year = parseInt(year);
 
-        // Branch Filter (Strict 99% match/Strict preference)
+        const filterClauses = [];
+
+        // 1. Branch Filter ($or for multiple branches, grouped in $and for overall query)
         if (branches) {
-            const branchArray = Array.isArray(branches) ? branches : [branches];
-            if (branchArray.length > 0) {
-                query.branch = { $in: branchArray };
+            const branchArray = Array.isArray(branches) ? branches : (typeof branches === 'string' ? branches.split(',') : [branches]);
+            const filteredBranches = branchArray.filter(b => b && b.trim() !== '');
+            if (filteredBranches.length > 0) {
+                const branchConditions = filteredBranches.map(b => ({
+                    branch: { $regex: new RegExp(`^${b.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                }));
+                filterClauses.push({ $or: branchConditions });
             }
         }
 
-        // Seat Type Filter (e.g., Home University, State Level)
-        if (seatTypes) {
-            const seatArray = Array.isArray(seatTypes) ? seatTypes : [seatTypes];
-            if (seatArray.length > 0) {
-                // We use regex for flexibility matching seat types likes "GOPENH" (Home University)
-                const orConditions = seatArray.map(st => {
-                    if (st === 'Home University') return { seatType: /H$/i }; // Ends with H
-                    if (st === 'Other Than Home University') return { seatType: /O$/i }; // Ends with O
-                    if (st === 'State Level') return { seatType: /S$/i }; // Ends with S
-                    if (st === 'All India Level') return { seatType: /AI$/i }; // AI
-                    return { seatType: new RegExp(st, 'i') };
-                });
-                query.$and = query.$and || [];
-                query.$and.push({ $or: orConditions });
-            }
-        }
-
-        // Institution-level Filtering (Region & Autonomy)
+        // 2. Strict Institution Filter (Region & Type)
         const instQuery = {};
         if (regions) {
-            const regionArray = Array.isArray(regions) ? regions : [regions];
-            if (regionArray.length > 0) {
-                instQuery['location.region'] = { $in: regionArray };
+            const regionArray = Array.isArray(regions) ? regions : (typeof regions === 'string' ? regions.split(',') : [regions]);
+            const filteredRegions = regionArray.filter(r => r && r.trim() !== '');
+            if (filteredRegions.length > 0) {
+                const regionFilter = filteredRegions.map(r => new RegExp(`^${r.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'));
+                instQuery.$or = [
+                    { 'location.region': { $in: regionFilter } },
+                    { 'location.city': { $in: regionFilter } }
+                ];
             }
         }
 
-        // Handle Institution Types (e.g. Government, Private Autonomous)
         if (institutionTypes) {
-            const typeArray = Array.isArray(institutionTypes) ? institutionTypes : [institutionTypes];
+            const typeArray = Array.isArray(institutionTypes) ? institutionTypes : (typeof institutionTypes === 'string' ? institutionTypes.split(',') : [institutionTypes]);
             if (typeArray.length > 0) {
-                const typeRegexes = typeArray.map(t => new RegExp(t, 'i'));
-                instQuery.type = { $in: typeRegexes };
+                instQuery.type = { $in: typeArray.map(t => new RegExp(t, 'i')) };
             }
         }
 
-        if (autonomy && autonomy !== 'All') {
-            if (autonomy === 'Autonomous') {
-                instQuery.type = { $regex: /Autonomous/i };
-            } else if (autonomy === 'Non-Autonomous') {
-                instQuery.type = { $not: /Autonomous/i };
-            }
-        }
-
-        // If we have institution filters, find matching IDs first
         if (Object.keys(instQuery).length > 0) {
             const Institution = require('../models/Institution');
             const matchingInsts = await Institution.find(instQuery).select('_id');
-            const instIds = matchingInsts.map(i => i._id);
-            query.collegeId = { $in: instIds };
+            query.collegeId = { $in: matchingInsts.map(i => i._id) };
         }
 
-        const conditions = [];
+        // 3. Score Filter 
+        const scoreConditions = [];
         if (percentile) {
             const p = parseFloat(percentile);
             const tol = parseFloat(pTolerance);
-            conditions.push({
-                percentile: {
-                    $gte: Math.max(0, p - tol),
-                    $lte: Math.min(100, p + tol)
-                }
-            });
+            scoreConditions.push({ percentile: { $gte: Math.max(0, p - tol), $lte: Math.min(100, p + tol) } });
         }
-
         if (rank) {
             const r = parseInt(rank);
-            const tol = parseInt(rTolerance);
-            conditions.push({
-                rank: {
-                    $gte: Math.max(1, r - tol),
-                    $lte: r + tol
-                }
-            });
+            const tolR = parseInt(rTolerance);
+            scoreConditions.push({ rank: { $gte: Math.max(1, r - tolR), $lte: r + (tolR * 5) } });
+        }
+        if (scoreConditions.length > 0) {
+            filterClauses.push({ $or: scoreConditions });
         }
 
-        if (conditions.length > 0) {
-            query.$or = conditions;
+        // 4. Seat Type Filter
+        if (seatTypes) {
+            const seatArray = Array.isArray(seatTypes) ? seatTypes : (typeof seatTypes === 'string' ? seatTypes.split(',') : [seatTypes]);
+            if (seatArray.length > 0) {
+                const orConditions = seatArray.map(st => {
+                    if (st === 'Home University') return { seatType: /H$/i };
+                    if (st === 'Other Than Home University') return { seatType: /O$/i };
+                    if (st === 'State Level') return { seatType: /S$/i };
+                    if (st === 'All India Level') return { seatType: /AI$/i };
+                    return { seatType: new RegExp(st, 'i') };
+                });
+                filterClauses.push({ $or: orConditions });
+            }
         }
+
+        if (filterClauses.length > 0) {
+            query.$and = filterClauses;
+        }
+
+        console.log('[Predictor] Final Query:', JSON.stringify(query, null, 2));
 
         const matches = await Cutoff.find(query)
             .populate({
@@ -225,10 +225,60 @@ const predictColleges = async (req, res) => {
             .sort({ percentile: -1, rank: 1 })
             .lean();
 
-        // Final sanity check for populated data
-        const validMatches = matches.filter(m => m.collegeId);
+        // 5. Enrichment & Sorting (Apply Strict Classification Logic)
+        const results = matches
+            .filter(m => m.collegeId)
+            .map(m => {
+                const diff = parseFloat(percentile) - m.percentile;
 
-        res.json(validMatches);
+                // Exclude "Not Possible" (diff < -5) as per requirement
+                if (diff < -5) return null;
+
+                let chanceLabel = 'Safe';
+                let chanceColor = '#10B981'; // Colors.success
+                let sortRank = 1;
+
+                if (diff >= 2) {
+                    chanceLabel = 'Safe';
+                    chanceColor = '#10B981';
+                    sortRank = 1;
+                } else if (diff >= 0) {
+                    chanceLabel = 'High Chance';
+                    chanceColor = '#059669';
+                    sortRank = 2;
+                } else if (diff >= -2) {
+                    chanceLabel = 'Borderline';
+                    chanceColor = '#D97706'; // Orange/Amber
+                    sortRank = 3;
+                } else {
+                    chanceLabel = 'Low Chance';
+                    chanceColor = '#EF4444'; // Red
+                    sortRank = 4;
+                }
+
+                // Output Format: College, Branch, Cutoff %, User %, Difference, Chance Label
+                return {
+                    ...m,
+                    userPercentile: percentile,
+                    difference: diff.toFixed(2),
+                    chanceLabel,
+                    chanceColor,
+                    sortRank
+                };
+            })
+            .filter(r => r !== null) // Final strict exclusion
+            .sort((a, b) => {
+                // Secondary sorting based on rank proximity if available
+                if (rank && a.rank && b.rank) {
+                    const r = parseInt(rank);
+                    const diffA = Math.abs(a.rank - r);
+                    const diffB = Math.abs(b.rank - r);
+                    if (a.sortRank === b.sortRank) return diffA - diffB;
+                }
+                return a.sortRank - b.sortRank || b.percentile - a.percentile;
+            });
+
+        res.json(results);
     } catch (error) {
         console.error('Prediction error:', error);
         res.status(500).json({ message: 'Prediction failed' });
@@ -361,6 +411,35 @@ const deleteCutoffs = async (req, res) => {
     }
 };
 
+// @desc    Estimate rank based on percentile from history
+// @route   GET /api/cutoffs/estimate-rank
+// @access  Public
+const estimateRank = async (req, res) => {
+    const { percentile } = req.query;
+    if (!percentile) return res.status(400).json({ message: 'Percentile is required' });
+
+    const p = parseFloat(percentile);
+    try {
+        // Find records within ±0.05 percentile range to get a reliable average
+        const matches = await Cutoff.find({
+            percentile: { $gte: p - 0.05, $lte: p + 0.05 },
+            rank: { $ne: null }
+        })
+            .select('rank')
+            .limit(20)
+            .lean();
+
+        if (matches.length === 0) {
+            return res.json({ rank: null, message: 'No enough data to estimate' });
+        }
+
+        const avgRank = Math.round(matches.reduce((sum, item) => sum + item.rank, 0) / matches.length);
+        res.json({ rank: avgRank });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     addCutoffData,
     bulkAddCutoffData,
@@ -368,5 +447,6 @@ module.exports = {
     parseBulkCutoffData,
     getCutoffsByInstitution,
     predictColleges,
-    deleteCutoffs
+    deleteCutoffs,
+    estimateRank
 };

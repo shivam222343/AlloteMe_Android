@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
@@ -14,6 +14,14 @@ const PredictionResultsScreen = ({ route, navigation }) => {
     const { results: resultsParam = [], percentile = 0, rank = '', category = '', examType = '' } = route?.params || {};
 
     const [results, setResults] = useState(resultsParam);
+
+    // Sync state with params when they update (fixes stale data bug)
+    useEffect(() => {
+        if (resultsParam) {
+            setResults(resultsParam);
+        }
+    }, [resultsParam]);
+
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
 
@@ -167,8 +175,8 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                                 <Text style={styles.dteText}>DTE: {item.collegeId?.dteCode || '—'}</Text>
                             </View>
                         </View>
-                        <View style={styles.matchBadge}>
-                            <Text style={[styles.matchPercent, { color: matchScore === 100 ? Colors.success : '#F59E0B' }]}>{matchScore}% Match</Text>
+                        <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: item.chanceColor + '10' }]}>
+                            <Text style={[styles.matchPercent, { color: item.chanceColor }]}>{item.chanceLabel}</Text>
                         </View>
                         <TouchableOpacity onPress={() => handleDelete(item.key)} style={styles.deleteBtn}>
                             <X size={16} color={Colors.text.tertiary} />
@@ -184,14 +192,25 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     </View>
 
                     <View style={styles.statsRow}>
-                        <View style={styles.statBox}><Text style={styles.statLabel}>CUTOFF</Text><Text style={styles.statVal}>{item.percentile}%</Text></View>
-                        <View style={styles.statBox}>
-                            <Text style={styles.statLabel}>CHANCE</Text>
-                            <View style={styles.chanceBarContainer}>
-                                <View style={[styles.chanceBarFill, { width: `${matchScore}%`, backgroundColor: matchScore === 100 ? Colors.success : '#F59E0B' }]} />
-                            </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.statLabel}>CUTOFF</Text>
+                            <Text style={styles.statVal}>{item.percentile}%</Text>
+                            {item.rank && <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text>}
                         </View>
-                        <View style={styles.statBox}><Text style={styles.statLabel}>REACH</Text><Text style={[styles.statVal, isSafe ? styles.safeText : styles.riskText]}>{isSafe ? '+' : ''}{diff}%</Text></View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.statLabel}>MY SCORE</Text>
+                            <Text style={styles.statVal}>{item.userPercentile}%</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.statLabel}>DIFF (+/-)</Text>
+                            <Text style={[styles.statVal, parseFloat(item.difference) >= 0 ? styles.safeText : styles.riskText]}>
+                                {parseFloat(item.difference) >= 0 ? '+' : ''}{item.difference}%
+                            </Text>
+                        </View>
+                        <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                            <Text style={styles.statLabel}>CHANCE</Text>
+                            <Text style={[styles.statVal, { color: item.chanceColor, fontSize: 13 }]}>{item.chanceLabel}</Text>
+                        </View>
                     </View>
                 </Card>
             </TouchableOpacity>
@@ -317,6 +336,7 @@ const styles = StyleSheet.create({
     statVal: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary },
     chanceBarContainer: { height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, marginTop: 4, overflow: 'hidden' },
     chanceBarFill: { height: '100%', borderRadius: 3 },
+    scoreText: { fontSize: 10, fontWeight: '800', color: Colors.primary, marginLeft: 4 },
     safeText: { color: Colors.success },
     riskText: { color: Colors.error },
 

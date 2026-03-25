@@ -4,7 +4,8 @@ import { authAPI } from '../services/api';
 import { io } from 'socket.io-client';
 import { Platform } from 'react-native';
 
-const API_BASE_URL = 'https://alloteme-android-cqdu.onrender.com';
+const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://localhost:5100';
+const API_BASE_URL = LOCAL_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {

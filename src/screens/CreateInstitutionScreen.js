@@ -78,11 +78,22 @@ const CreateInstitutionScreen = ({ navigation }) => {
                     const blob = await response.blob();
                     formDataFile.append('image', blob, fileName);
                 } else {
-                    const fileExt = fileName.split('.').pop();
+                    const uriParts = uri.split('.');
+                    const fileExt = uriParts[uriParts.length - 1] || 'jpg';
+                    const fileName = uri.split('/').pop();
+
+                    const mimeMapping = {
+                        'jpg': 'image/jpeg',
+                        'jpeg': 'image/jpeg',
+                        'png': 'image/png',
+                        'webp': 'image/webp'
+                    };
+                    const mimeType = mimeMapping[fileExt.toLowerCase()] || 'image/jpeg';
+
                     formDataFile.append('image', {
                         uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
-                        name: fileName,
-                        type: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
+                        name: fileName.includes('.') ? fileName : `${fileName}.${fileExt}`,
+                        type: mimeType,
                     });
                 }
 

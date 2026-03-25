@@ -176,8 +176,23 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                     const blob = await (await fetch(uri)).blob();
                     fd.append('image', blob, fileName);
                 } else {
-                    const ext = fileName.split('.').pop();
-                    fd.append('image', { uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''), name: fileName, type: `image/${ext === 'jpg' ? 'jpeg' : ext}` });
+                    const uriParts = uri.split('.');
+                    const fileExt = uriParts[uriParts.length - 1] || 'jpg';
+                    const fileName = uri.split('/').pop();
+
+                    const mimeMapping = {
+                        'jpg': 'image/jpeg',
+                        'jpeg': 'image/jpeg',
+                        'png': 'image/png',
+                        'webp': 'image/webp'
+                    };
+                    const mimeType = mimeMapping[fileExt.toLowerCase()] || 'image/jpeg';
+
+                    fd.append('image', {
+                        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+                        name: fileName.includes('.') ? fileName : `${fileName}.${fileExt}`,
+                        type: mimeType,
+                    });
                 }
                 const res = await uploadAPI.upload(fd);
                 uploadedUrls.push(res.data.url);

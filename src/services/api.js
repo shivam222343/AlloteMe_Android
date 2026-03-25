@@ -2,7 +2,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const API_BASE_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
+const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
+const API_BASE_URL = LOCAL_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -47,6 +48,7 @@ export const cutoffAPI = {
     parse: (text) => api.post('cutoffs/parse', { text }),
     parseBulk: (text) => api.post('cutoffs/parse-bulk', { text }),
     delete: (id, branch, params) => api.delete(`cutoffs/${id}/branch/${branch}`, { params }),
+    estimateRank: (percentile) => api.get('cutoffs/estimate-rank', { params: { percentile } }),
 };
 
 export const aiAPI = {
