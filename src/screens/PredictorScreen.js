@@ -296,11 +296,11 @@ const PredictorScreen = ({ navigation }) => {
                         </View>
                         <Slider
                             style={styles.slider}
-                            minimumValue={5}
-                            maximumValue={20}
+                            minimumValue={1}
+                            maximumValue={50}
                             step={1}
                             value={pTolerance}
-                            onValueChange={setPTolerance}
+                            onValueChange={v => setPTolerance(Math.round(v))}
                             minimumTrackTintColor={Colors.primary}
                             maximumTrackTintColor={Colors.divider}
                             thumbTintColor={Colors.primary}

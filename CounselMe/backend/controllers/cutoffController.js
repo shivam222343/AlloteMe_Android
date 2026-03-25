@@ -311,14 +311,37 @@ const estimateRank = async (req, res) => {
     try {
         const { percentile } = req.query;
         const p = parseFloat(percentile);
-        // Basic linear estimation based on historical data
-        // 99% -> ~2k rank, 90% -> ~25k rank, 80% -> ~50k rank
-        let estimated = 0;
-        if (p >= 99) estimated = Math.max(1, (100 - p) * 2000);
-        else if (p >= 90) estimated = 2000 + (99 - p) * 2500;
-        else estimated = 25000 + (90 - p) * 3000;
+        if (isNaN(p)) return res.status(400).json({ message: 'Invalid percentile' });
 
-        res.json({ percentile: p, estimatedRank: Math.round(estimated) });
+        // Search for actual rank data around this percentile (+/- 0.05)
+        const recentMatches = await Cutoff.find({
+            percentile: { $gte: p - 0.05, $lte: p + 0.05 },
+            rank: { $gt: 0 }
+        })
+            .select('rank')
+            .limit(10)
+            .sort({ createdAt: -1 })
+            .lean();
+
+        let estimated = 0;
+        if (recentMatches.length > 0) {
+            const sum = recentMatches.reduce((acc, m) => acc + m.rank, 0);
+            estimated = sum / recentMatches.length;
+        } else {
+            // Fallback to sophisticated math if no real data found
+            if (p >= 99) estimated = Math.max(1, (100 - p) * 2000);
+            else if (p >= 90) estimated = 2000 + (99 - p) * 2500;
+            else if (p >= 80) estimated = 25000 + (90 - p) * 3000;
+            else estimated = 55000 + (80 - p) * 4000;
+        }
+
+        const roundedRank = Math.round(estimated);
+        res.json({
+            percentile: p,
+            estimatedRank: roundedRank,
+            rank: roundedRank, // For frontend compatibility
+            source: recentMatches.length > 0 ? 'historical_data' : 'algorithm'
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
