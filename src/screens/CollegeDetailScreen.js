@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Linking, TouchableOpacity,
-    Alert, Image, Dimensions, Platform
+    Alert, Image, Dimensions, Platform, ActivityIndicator
 } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
-import { institutionAPI, cutoffAPI } from '../services/api';
-import { Colors, Shadows } from '../constants/theme';
 import {
     Globe, MapPin, Info, Award, ShieldCheck, ExternalLink, BookOpen,
     Wifi, Utensils, Library, FlaskConical, Dumbbell, Home, Car, Trees,
     CheckCircle2, LayoutGrid, Image as ImageIcon, BedDouble, GitBranch,
-    ChevronRight, Trash2, Edit, Maximize2, X as CloseIcon
+    ChevronRight, Trash2, Edit, Maximize2, X as CloseIcon, Star
 } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { authAPI, institutionAPI, cutoffAPI } from '../services/api';
+import { Colors, Shadows } from '../constants/theme';
 import { Modal } from 'react-native';
 
 const { width, height: screenHeight } = Dimensions.get('window');
@@ -68,7 +68,7 @@ const FACILITY_ICONS = { 'WiFi': Wifi, 'Canteen': Utensils, 'Library': Library, 
 
 const CollegeDetailScreen = ({ route, navigation }) => {
     const { id } = route.params;
-    const { user, socket } = useAuth();
+    const { user, socket, refreshUser } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [inst, setInst] = useState(null);
     const [cutoffs, setCutoffs] = useState([]);
@@ -115,6 +115,17 @@ const CollegeDetailScreen = ({ route, navigation }) => {
             setCutoffs(cutoffRes.data);
         } catch (error) { console.error(error); }
         finally { setLoading(false); }
+    };
+
+    const handleToggleSave = async () => {
+        try {
+            const res = await authAPI.toggleSave(id);
+            if (res.data.success) {
+                await refreshUser();
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to update saved list');
+        }
     };
 
     const handleDelete = async () => {
@@ -405,6 +416,8 @@ const CollegeDetailScreen = ({ route, navigation }) => {
         }
     };
 
+    const isSaved = user?.savedColleges?.some(c => (c._id === id || c === id));
+
     return (
         <MainLayout noPadding>
             {/*
@@ -429,6 +442,38 @@ const CollegeDetailScreen = ({ route, navigation }) => {
 
                 {/* 1 – Identity Section */}
                 <View style={styles.identitySection}>
+                    <View style={styles.headerRow}>
+                        <View style={{ flex: 1 }}>
+                            <View style={styles.badgeRow}>
+                                <View style={styles.premiumTag}>
+                                    <ShieldCheck size={13} color={Colors.primary} />
+                                    <Text style={styles.premiumTagText}>{inst.type}</Text>
+                                </View>
+                                {inst.rating?.value && (
+                                    <View style={styles.nirfBadge}>
+                                        <Award size={13} color="#B8860B" />
+                                        <Text style={styles.nirfText}>{inst.rating.value} {inst.rating.platform}</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={styles.name}>{inst.name}</Text>
+                        </View>
+
+                        {user?.role === 'student' && (
+                            <TouchableOpacity
+                                style={[styles.saveFab, isSaved && styles.saveFabActive]}
+                                onPress={handleToggleSave}
+                                activeOpacity={0.7}
+                            >
+                                <Star
+                                    size={24}
+                                    color={isSaved ? Colors.white : Colors.text.tertiary}
+                                    fill={isSaved ? Colors.white : 'transparent'}
+                                />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
                     {isAdmin && (
                         <View style={styles.adminBar}>
                             <TouchableOpacity style={styles.adminBtn} onPress={() => navigation.navigate('EditInstitution', { id })}>
@@ -440,19 +485,6 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                             </TouchableOpacity>
                         </View>
                     )}
-                    <View style={styles.badgeRow}>
-                        <View style={styles.premiumTag}>
-                            <ShieldCheck size={13} color={Colors.primary} />
-                            <Text style={styles.premiumTagText}>{inst.type}</Text>
-                        </View>
-                        {inst.rating?.value && (
-                            <View style={styles.nirfBadge}>
-                                <Award size={13} color="#B8860B" />
-                                <Text style={styles.nirfText}>{inst.rating.value} {inst.rating.platform}</Text>
-                            </View>
-                        )}
-                    </View>
-                    <Text style={styles.name}>{inst.name}</Text>
                     <View style={styles.uniRow}>
                         <BookOpen size={13} color={Colors.text.tertiary} />
                         <Text style={styles.uniText}>{inst.university}</Text>
@@ -512,6 +544,9 @@ const styles = StyleSheet.create({
     bannerImg: { width, height: 260, resizeMode: 'cover' },
 
     identitySection: { padding: 20, paddingBottom: 16, backgroundColor: Colors.white },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 15 },
+    saveFab: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.xs },
+    saveFabActive: { backgroundColor: '#F59E0B', borderColor: '#F59E0B' },
     badgeRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
     premiumTag: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.primary + '12', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: Colors.primary + '25' },
     premiumTagText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary, textTransform: 'uppercase' },
@@ -555,12 +590,40 @@ const styles = StyleSheet.create({
     catPercent: { fontSize: 14, fontWeight: 'bold', color: Colors.primary },
 
     // Branches
-    branchRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-    branchIndex: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.primary + '12', justifyContent: 'center', alignItems: 'center' },
-    branchIndexText: { fontSize: 13, fontWeight: 'bold', color: Colors.primary },
-    branchInfo: { flex: 1 },
-    branchRowName: { fontSize: 15, fontWeight: '600', color: Colors.text.primary, marginBottom: 2 },
-    branchCode: { fontSize: 12, color: Colors.text.tertiary, fontWeight: '500' },
+    branchRowContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        paddingVertical: 4
+    },
+    branchRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 12,
+    },
+    branchIndex: {
+        width: 30,
+        height: 30,
+        borderRadius: 8,
+        backgroundColor: Colors.primary + '12',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    branchIndexText: { fontSize: 12, fontWeight: 'bold', color: Colors.primary },
+    branchInfo: {
+        flex: 1,
+        marginRight: 8 // Space before the badge
+    },
+    branchRowName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.text.primary,
+        marginBottom: 2
+    },
+    branchCode: { fontSize: 11, color: Colors.text.tertiary, fontWeight: '500' },
 
     // Map
     mapActions: { position: 'absolute', bottom: 16, left: 16, right: 16, flexDirection: 'row', gap: 10, alignItems: 'center' },
@@ -596,7 +659,6 @@ const styles = StyleSheet.create({
     galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     galleryImg: { width: (width - 52) / 2, height: 160, borderRadius: 14, backgroundColor: '#E2E8F0' },
 
-    branchRowContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     deleteBranchBtn: { padding: 10, backgroundColor: Colors.error + '10', borderRadius: 10, borderWidth: 1, borderColor: Colors.error + '20' },
 
     // Shared empty

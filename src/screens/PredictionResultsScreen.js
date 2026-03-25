@@ -53,7 +53,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
             }
 
             item.matchScore = matchScore; // Attach score
-            return matchScore >= 90; // Only show 90-100% matches as requested
+            return true; // Show all returns from backend (already within tolerance)
         });
 
         if (sortBy === 'cutoff') {
@@ -160,14 +160,22 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         const matchScore = Math.round(item.matchScore || 0);
 
         return (
-            <TouchableOpacity onLongPress={drag} disabled={isActive} activeOpacity={0.9} style={styles.fullWidthItem}>
+            <TouchableOpacity
+                onLongPress={drag}
+                onPress={() => navigation.navigate('CollegeDetail', { id: item.collegeId?._id })}
+                disabled={isActive}
+                activeOpacity={0.9}
+                style={styles.fullWidthItem}
+            >
                 <Card style={[styles.resultCard, isActive && styles.activeCard]} elevated={isActive}>
                     <View style={styles.cardHeader}>
                         <View style={styles.numberTag}>
                             <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
                         </View>
                         <View style={styles.instHeader}>
-                            <Text style={styles.instName} numberOfLines={1}>{item.collegeId?.name || 'College'}</Text>
+                            <Text style={styles.instName} numberOfLines={2}>
+                                {item.collegeId?.name || 'Unknown Institution'}
+                            </Text>
                             <View style={styles.locRow}>
                                 <MapPin size={10} color={Colors.text.tertiary} />
                                 <Text style={styles.locText}>{item.collegeId?.location?.city || 'Verified'}</Text>
@@ -194,12 +202,12 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     <View style={styles.statsRow}>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.statLabel}>CUTOFF</Text>
-                            <Text style={styles.statVal}>{item.percentile}%</Text>
+                            <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
                             {item.rank && <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text>}
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.statLabel}>MY SCORE</Text>
-                            <Text style={styles.statVal}>{item.userPercentile}%</Text>
+                            <Text style={styles.statVal}>{Number(item.userPercentile).toFixed(2)}%</Text>
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.statLabel}>DIFF (+/-)</Text>

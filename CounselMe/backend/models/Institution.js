@@ -39,6 +39,8 @@ const institutionSchema = new mongoose.Schema({
     totalStudents: Number,
     // Campus area in acres
     campusArea: String,
+    isFeatured: { type: Boolean, default: false },
+    bannerUrl: String,
 }, { timestamps: true });
 
 const Institution = mongoose.model('Institution', institutionSchema);

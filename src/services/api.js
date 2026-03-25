@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
+const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 const API_BASE_URL = LOCAL_URL;
 
 const api = axios.create({
@@ -28,6 +29,8 @@ export const authAPI = {
     register: (userData) => api.post('auth/register', userData),
     getProfile: () => api.get('auth/profile'),
     updateProfile: (userData) => api.put('auth/profile', userData),
+    changePassword: (data) => api.post('auth/change-password', data),
+    toggleSave: (collegeId) => api.post('auth/toggle-save', { collegeId }),
 };
 
 export const institutionAPI = {
@@ -37,6 +40,8 @@ export const institutionAPI = {
     update: (id, data) => api.put(`institutions/${id}`, data),
     delete: (id) => api.delete(`institutions/${id}`),
     deleteBranch: (id, name) => api.delete(`institutions/${id}/branches/${encodeURIComponent(name)}`),
+    getFeatured: () => api.get('institutions/featured'),
+    toggleFeature: (id) => api.put(`institutions/${id}/feature`),
     parse: (text) => api.post('institutions/parse', { text }),
 };
 

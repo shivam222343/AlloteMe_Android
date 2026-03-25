@@ -21,6 +21,8 @@ const ProfileScreen = ({ navigation }) => {
     const [showKeyModal, setShowKeyModal] = useState(false);
     const [newGroqKey, setNewGroqKey] = useState(user?.groqApiKey || '');
     const [keyUpdating, setKeyUpdating] = useState(false);
+    const [bannerPreview, setBannerPreview] = useState(null);
+    const [profilePreview, setProfilePreview] = useState(null);
 
     const pickImage = async (type = 'profile') => {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -31,7 +33,10 @@ const ProfileScreen = ({ navigation }) => {
         });
 
         if (!result.canceled) {
-            handleUpload(result.assets[0].uri, type);
+            const uri = result.assets[0].uri;
+            if (type === 'banner') setBannerPreview(uri);
+            else setProfilePreview(uri);
+            handleUpload(uri, type);
         }
     };
 
@@ -145,6 +150,13 @@ const ProfileScreen = ({ navigation }) => {
         </View>
     );
 
+    const bannerAssets = {
+        'local-banner-1': require('../../assets/banners/blue_geometric.png'),
+        'local-banner-2': require('../../assets/banners/blue_abstract.png'),
+        'local-banner-3': require('../../assets/banners/blue_shapes.png'),
+        'local-banner-4': require('../../assets/banners/blue_cloud.png'),
+    };
+
     return (
         <MainLayout showHeader={false} noPadding>
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -152,7 +164,14 @@ const ProfileScreen = ({ navigation }) => {
                 <View style={styles.headerSection}>
                     <View style={styles.banner}>
                         <Image
-                            source={{ uri: user?.bannerUrl || 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1000' }}
+                            key={user?.bannerUrl || bannerPreview}
+                            source={
+                                bannerPreview
+                                    ? { uri: bannerPreview }
+                                    : (user?.bannerUrl && bannerAssets[user.bannerUrl]
+                                        ? bannerAssets[user.bannerUrl]
+                                        : { uri: user?.bannerUrl || 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1000' })
+                            }
                             style={styles.bannerImg}
                         />
                         <TouchableOpacity
@@ -167,7 +186,8 @@ const ProfileScreen = ({ navigation }) => {
                         <GradientBorder size={120} borderWidth={4}>
                             <View style={styles.avatarWrapper}>
                                 <Image
-                                    source={{ uri: user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
+                                    key={user?.preferences?.avatarUrl || profilePreview}
+                                    source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
                                     style={styles.avatarImg}
                                 />
                                 {uploading && (
@@ -215,10 +235,10 @@ const ProfileScreen = ({ navigation }) => {
                         <InfoRow icon={MapPin} label="Location" value={user?.location} />
                         <InfoRow icon={BookOpen} label="Expected Region" value={user?.expectedRegion} />
                         <TouchableOpacity style={styles.apiKeyRow} onPress={() => setShowKeyModal(true)}>
-                            <InfoRow 
-                                icon={Bot} 
-                                label="Groq API Key" 
-                                value={user?.groqApiKey ? '••••••••' + user.groqApiKey.slice(-4) : 'Not Configured (Using System)'} 
+                            <InfoRow
+                                icon={Bot}
+                                label="Groq API Key"
+                                value={user?.groqApiKey ? '••••••••' + user.groqApiKey.slice(-4) : 'Not Configured (Using System)'}
                             />
                             <Edit2 size={14} color={Colors.primary} />
                         </TouchableOpacity>
@@ -338,7 +358,7 @@ const ProfileScreen = ({ navigation }) => {
                                 <X size={20} color={Colors.text.tertiary} />
                             </TouchableOpacity>
                         </View>
-                        
+
                         <Text style={styles.keyInfoText}>
                             Your personal key avoids service interruptions. Keys are stored securely and never shared.
                         </Text>
@@ -348,8 +368,8 @@ const ProfileScreen = ({ navigation }) => {
                             <Text style={styles.guideStep}>1. Visit Groq Console</Text>
                             <Text style={styles.guideStep}>2. Click "API Keys" in sidebar</Text>
                             <Text style={styles.guideStep}>3. Create and Copy a new key</Text>
-                            
-                            <TouchableOpacity 
+
+                            <TouchableOpacity
                                 style={styles.webLink}
                                 onPress={() => Linking.openURL('https://console.groq.com/keys')}
                             >
@@ -378,9 +398,9 @@ const ProfileScreen = ({ navigation }) => {
                             loading={keyUpdating}
                             style={styles.saveKeyBtn}
                         />
-                        
-                        <TouchableOpacity 
-                            style={styles.removeBtn} 
+
+                        <TouchableOpacity
+                            style={styles.removeBtn}
                             onPress={async () => {
                                 setNewGroqKey('');
                                 try {
@@ -482,22 +502,22 @@ const styles = StyleSheet.create({
     loaderText: { fontSize: 14, color: Colors.text.secondary },
     refreshModalBtn: { marginBottom: 12 },
     apiKeyRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 12 },
-    centeredModal: { 
-        backgroundColor: Colors.white, 
-        margin: 20, 
-        borderRadius: 24, 
-        padding: 24, 
-        width: '90%', 
+    centeredModal: {
+        backgroundColor: Colors.white,
+        margin: 20,
+        borderRadius: 24,
+        padding: 24,
+        width: '90%',
         alignSelf: 'center',
         marginBottom: 'auto',
         marginTop: 'auto'
     },
     keyInfoText: { fontSize: 13, color: Colors.text.tertiary, marginBottom: 20, lineHeight: 18 },
-    inputWrapper: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        backgroundColor: Colors.background, 
-        borderRadius: 16, 
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.background,
+        borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 8,
         marginBottom: 20
@@ -507,7 +527,7 @@ const styles = StyleSheet.create({
     saveKeyBtn: { marginTop: 8 },
     removeBtn: { marginTop: 16, alignItems: 'center' },
     removeText: { color: Colors.error, fontSize: 12, fontWeight: '600' },
-    
+
     // Guide Styles
     guideBox: {
         backgroundColor: Colors.background,
@@ -519,11 +539,11 @@ const styles = StyleSheet.create({
     },
     guideTitle: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 10 },
     guideStep: { fontSize: 12, color: Colors.text.secondary, marginBottom: 4 },
-    webLink: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 6, 
-        marginTop: 12, 
+    webLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 12,
         paddingVertical: 8,
         borderTopWidth: 1,
         borderTopColor: Colors.divider

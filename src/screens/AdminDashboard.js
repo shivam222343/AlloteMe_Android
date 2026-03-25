@@ -5,7 +5,7 @@ import { Colors, Typography, Spacing, Shadows, BorderRadius } from '../constants
 import { useAuth } from '../contexts/AuthContext';
 import {
     PlusCircle, FileUp, Users, Settings,
-    BarChart3, ShieldCheck, ChevronRight
+    BarChart3, ShieldCheck, ChevronRight, Star
 } from 'lucide-react-native';
 
 const AdminDashboard = ({ navigation }) => {
@@ -39,11 +39,18 @@ const AdminDashboard = ({ navigation }) => {
             color: '#8B5CF6'
         },
         {
+            title: 'Featured Colleges',
+            desc: 'Manage colleges for dashboard slider',
+            icon: Star,
+            route: 'FeaturedColleges',
+            color: '#EC4899'
+        },
+        {
             title: 'Frequent Questions',
             desc: 'Set sliding question tags for chat',
             icon: Settings,
             route: 'FrequentQuestionsManager',
-            color: '#EC4899'
+            color: '#F97316'
         },
         {
             title: 'User Management',

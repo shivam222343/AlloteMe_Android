@@ -74,10 +74,11 @@ const SettingsScreen = ({ navigation, route }) => {
             };
 
             const res = await authAPI.updateProfile({
-                preferences
+                preferences,
+                bannerUrl: url // Also update the main profile banner
             });
 
-            if (res.success) {
+            if (res.data) {
                 await refreshUser();
                 setBannerModalVisible(false);
             } else {

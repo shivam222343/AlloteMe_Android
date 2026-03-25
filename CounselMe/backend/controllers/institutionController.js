@@ -179,4 +179,45 @@ const deleteBranch = async (req, res) => {
     }
 };
 
-module.exports = { createInstitution, parseInstitutionText, getInstitutions, getInstitutionById, updateInstitution, deleteInstitution, deleteBranch };
+// @desc    Toggle featured status of an institution
+// @route   PUT /api/institutions/:id/feature
+// @access  Private/Admin
+const toggleFeatureInstitution = async (req, res) => {
+    try {
+        const institution = await Institution.findById(req.params.id);
+        if (!institution) return res.status(404).json({ message: 'Institution not found' });
+
+        institution.isFeatured = !institution.isFeatured;
+        await institution.save();
+
+        emitUpdate('institution:updated', institution);
+        res.json(institution);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get featured institutions
+// @route   GET /api/institutions/featured
+// @access  Public
+const getFeaturedInstitutions = async (req, res) => {
+    try {
+        const institutions = await Institution.find({ isFeatured: true })
+            .sort({ 'rating.value': -1 });
+        res.json(institutions);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = {
+    createInstitution,
+    parseInstitutionText,
+    getInstitutions,
+    getInstitutionById,
+    updateInstitution,
+    deleteInstitution,
+    deleteBranch,
+    toggleFeatureInstitution,
+    getFeaturedInstitutions
+};

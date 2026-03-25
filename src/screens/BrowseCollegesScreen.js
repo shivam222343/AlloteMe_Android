@@ -76,7 +76,7 @@ const BrowseCollegesScreen = ({ navigation }) => {
                     <Image source={require('../assets/images/college_default.jpg')} style={styles.itemThumbnail} />
                 )}
                 <View style={styles.itemInfo}>
-                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.itemName}>{item.name}</Text>
                     <View style={styles.subInfoRow}>
                         <Text style={styles.itemUniversity}>{item.university || 'Affiliated'}</Text>
                         {item.dteCode && (

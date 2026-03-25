@@ -29,6 +29,7 @@ import EditInstitutionScreen from '../screens/EditInstitutionScreen';
 import BranchCutoffDetailScreen from '../screens/BranchCutoffDetailScreen';
 import AITrainingScreen from '../screens/AITrainingScreen';
 import FrequentQuestionsManager from '../screens/FrequentQuestionsManager';
+import FeaturedCollegesScreen from '../screens/FeaturedCollegesScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -71,6 +72,7 @@ const TabNavigator = () => {
             <Tab.Screen name="UploadCutoff" component={UploadCutoffScreen} />
             <Tab.Screen name="AITraining" component={AITrainingScreen} />
             <Tab.Screen name="FrequentQuestionsManager" component={FrequentQuestionsManager} />
+            <Tab.Screen name="FeaturedColleges" component={FeaturedCollegesScreen} />
             <Tab.Screen name="UserManagement" component={ComingSoonScreen} initialParams={{ title: 'User Management' }} />
             <Tab.Screen name="SystemAnalytics" component={ComingSoonScreen} initialParams={{ title: 'System Analytics' }} />
             <Tab.Screen name="Settings" component={SettingsScreen} />

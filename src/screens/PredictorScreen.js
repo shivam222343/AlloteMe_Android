@@ -42,7 +42,22 @@ const BRANCHES = [
     'Mining Engineering',
     'Printing Technology'
 ];
-const REGIONS = ['Pune', 'Mumbai', 'Nagpur', 'Nashik', 'Aurangabad', 'Amravati', 'Solapur', 'Kolhapur', 'Raigad', 'Other'];
+const REGIONS = [
+    'Pune Region',
+    'Mumbai Region',
+    'Raigad Region',
+    'Nashik Region',
+    'Aurangabad Region',
+    'Nagpur Region',
+    'Amravati Region',
+    'Solapur Region',
+    'Kolhapur Region',
+    'Western Maharashtra',
+    'Vidarbha Region',
+    'Marathwada Region',
+    'Konkan Region',
+    'North Maharashtra Region'
+];
 const INSTITUTION_TYPES = [
     'Government',
     'Government Autonomous',

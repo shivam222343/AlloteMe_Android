@@ -37,8 +37,9 @@ const registerUser = async (req, res) => {
             rank: user.rank,
             location: user.location,
             expectedRegion: user.expectedRegion,
+            bannerUrl: user.bannerUrl,
             preferences: user.preferences,
-            savedColleges: user.savedColleges || [],
+            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
             token: generateToken(user._id),
             groqApiKey: user.groqApiKey
         });
@@ -66,8 +67,9 @@ const loginUser = async (req, res) => {
             rank: user.rank,
             location: user.location,
             expectedRegion: user.expectedRegion,
+            bannerUrl: user.bannerUrl,
             preferences: user.preferences,
-            savedColleges: user.savedColleges || [],
+            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
             token: generateToken(user._id),
             groqApiKey: user.groqApiKey
         });
@@ -93,8 +95,9 @@ const getUserProfile = async (req, res) => {
             rank: user.rank,
             location: user.location,
             expectedRegion: user.expectedRegion,
+            bannerUrl: user.bannerUrl,
             preferences: user.preferences,
-            savedColleges: user.savedColleges || [],
+            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
             groqApiKey: user.groqApiKey
         });
     } else {
@@ -109,20 +112,21 @@ const updateUserProfile = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (user) {
-        user.displayName = req.body.displayName || user.displayName;
-        user.email = req.body.email || user.email;
+        if (req.body.displayName) user.displayName = req.body.displayName;
+        if (req.body.email) user.email = req.body.email;
         if (req.body.password) {
             user.password = req.body.password;
         }
 
         // Update new academic & key fields
-        user.examType = req.body.examType || user.examType;
-        user.percentile = req.body.percentile || user.percentile;
-        user.rank = req.body.rank || user.rank;
-        user.location = req.body.location || user.location;
-        user.expectedRegion = req.body.expectedRegion || user.expectedRegion;
-        user.preferences = req.body.preferences || user.preferences;
-        
+        if (req.body.examType) user.examType = req.body.examType;
+        if (req.body.percentile !== undefined) user.percentile = req.body.percentile;
+        if (req.body.rank !== undefined) user.rank = req.body.rank;
+        if (req.body.location !== undefined) user.location = req.body.location;
+        if (req.body.expectedRegion !== undefined) user.expectedRegion = req.body.expectedRegion;
+        if (req.body.bannerUrl !== undefined) user.bannerUrl = req.body.bannerUrl;
+        if (req.body.preferences) user.preferences = req.body.preferences;
+
         // Handle Groq API Key (can be null if removed)
         if (req.body.groqApiKey !== undefined) {
             user.groqApiKey = req.body.groqApiKey;
@@ -140,6 +144,7 @@ const updateUserProfile = async (req, res) => {
             rank: updatedUser.rank,
             location: updatedUser.location,
             expectedRegion: updatedUser.expectedRegion,
+            bannerUrl: updatedUser.bannerUrl,
             preferences: updatedUser.preferences,
             groqApiKey: updatedUser.groqApiKey,
             token: generateToken(updatedUser._id)
@@ -149,4 +154,35 @@ const updateUserProfile = async (req, res) => {
     }
 };
 
-module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile };
+const changePassword = async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (user && (await user.matchPassword(currentPassword))) {
+        user.password = newPassword;
+        await user.save();
+        res.json({ success: true, message: 'Password updated' });
+    } else {
+        res.status(400).json({ message: 'Invalid current password' });
+    }
+};
+
+const toggleSaveCollege = async (req, res) => {
+    const { collegeId } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+        const isSaved = user.savedColleges.includes(collegeId);
+        if (isSaved) {
+            user.savedColleges = user.savedColleges.filter(id => id.toString() !== collegeId);
+        } else {
+            user.savedColleges.push(collegeId);
+        }
+        await user.save();
+        res.json({ success: true, savedColleges: user.savedColleges });
+    } else {
+        res.status(404).json({ message: 'User not found' });
+    }
+};
+
+module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, changePassword, toggleSaveCollege };
