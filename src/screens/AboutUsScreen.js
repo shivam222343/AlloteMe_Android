@@ -9,6 +9,7 @@ import {
     Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Spacing } from '../constants/theme';
 

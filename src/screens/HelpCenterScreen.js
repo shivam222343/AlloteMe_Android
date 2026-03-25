@@ -19,16 +19,16 @@ const HelpCenterScreen = ({ navigation }) => {
             answer: "Go to the Predictor section, enter your percentile/score and select your category. The AI will show you colleges where you have a high chance based on historical cutoff data."
         },
         {
-            question: "How to browse all colleges?",
-            answer: "Go to the 'Explore Colleges' tab. You can search by name or university and filter results to find your preferred institutions."
+            question: "What are Round-wise cutoffs?",
+            answer: "DTE (Directorate of Technical Education) conducts multiple rounds of admission. Cutoffs generally lower slightly with each subsequent round (Round 1, Round 2, Round 3)."
         },
         {
             question: "Is the cutoff data accurate?",
-            answer: "We use official historical data from previous rounds. While it's highly indicative, actual cutoffs vary each year based on student performance."
+            answer: "We use official historical data from previous DTE rounds. While it's highly indicative, actual cutoffs vary each year based on state merit rankings."
         },
         {
-            question: "How can I contact a counselor?",
-            answer: "You can use the AI Counselor for instant help, or visit the 'Connect' section to find professional admission consultants."
+            question: "How can the AI Counselor help?",
+            answer: "Eta, our AI Assistant, can answer specific questions about admission eligibility, branch choice (e.g. CS vs AI-ML), and fee structures across Maharashtra."
         }
     ];
 

@@ -23,7 +23,7 @@ const PrivacyPolicyScreen = ({ navigation }) => {
         },
         {
             title: "Sharing of Information",
-            content: "Your data is used to provide accurate college predictions. We do not sell your personal data to third parties. Some data may be shared with educational consultants if you explicitly request a connection."
+            content: "Your academic data is used to provide accurate college predictions. AlloteMe utilizes official historical allotment data sourced from the Maharashtra State CET Cell and DTE (Directorate of Technical Education). We do not sell your personal data to third parties."
         },
         {
             title: "Data Security",

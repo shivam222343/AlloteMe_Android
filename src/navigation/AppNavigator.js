@@ -30,6 +30,9 @@ import BranchCutoffDetailScreen from '../screens/BranchCutoffDetailScreen';
 import AITrainingScreen from '../screens/AITrainingScreen';
 import FrequentQuestionsManager from '../screens/FrequentQuestionsManager';
 import FeaturedCollegesScreen from '../screens/FeaturedCollegesScreen';
+import AboutUsScreen from '../screens/AboutUsScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import HelpCenterScreen from '../screens/HelpCenterScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -96,6 +99,9 @@ const TabNavigator = () => {
                 component={BranchCutoffDetailScreen}
                 options={{ tabBarButton: () => null }}
             />
+            <Tab.Screen name="AboutUs" component={AboutUsScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="HelpCenter" component={HelpCenterScreen} options={{ tabBarButton: () => null }} />
         </Tab.Navigator>
     );
 };

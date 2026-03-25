@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
+    View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, KeyboardAvoidingView, Modal, FlatList,
     Alert, Pressable, ActivityIndicator, ScrollView, Image
 } from 'react-native';
@@ -16,7 +16,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
     const navigation = useNavigation();
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
-    
+
     // Fallback for devices/web where insets might be 0
     const topPadding = Math.max(insets.top, Platform.OS === 'ios' ? 0 : 20);
     const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 0 : 20);
@@ -76,10 +76,10 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
 
     return (
         <View style={[
-            styles.container, 
-            { 
-                paddingTop: showHeader ? 0 : topPadding, 
-                paddingBottom: botSafe ? 0 : bottomPadding 
+            styles.container,
+            {
+                paddingTop: showHeader ? 0 : topPadding,
+                paddingBottom: botSafe ? 0 : bottomPadding
             },
             style
         ]}>
@@ -145,8 +145,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 {scrollable ? (
-                    <ScrollView 
-                        style={{ flex: 1 }} 
+                    <ScrollView
+                        style={{ flex: 1 }}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 100 }}
                     >

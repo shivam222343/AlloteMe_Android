@@ -12,7 +12,7 @@ const CLOUDINARY_CLOUD_NAME = 'dmx7wqp5u'; // Placeholder - user should verify
 const CLOUDINARY_UPLOAD_PRESET = 'ml_default'; // Placeholder - user should verify
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
 
-const MAX_FILE_SIZE = Platform.OS === 'android' ? 8 * 1024 * 1024 : 20 * 1024 * 1024; // 8MB for Android, 20MB otherwise
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB for all platforms (Android can handle this easily now)
 
 /**
  * Validates and prepares file for upload
@@ -61,22 +61,25 @@ export const prepareFile = async (fileRef) => {
         }
 
         let type = 'image/jpeg'; // Default
-        if (['mp4', 'mov', 'avi', 'mkv'].includes(extension)) type = 'video/mp4';
-        else if (['pdf'].includes(extension)) type = 'application/pdf';
-        else if (['jpg', 'jpeg'].includes(extension)) type = 'image/jpeg';
-        else if (['png'].includes(extension)) type = 'image/png';
-        else if (['gif'].includes(extension)) type = 'image/gif';
-        else if (['webp'].includes(extension)) type = 'image/webp';
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'];
+        const videoExts = ['mp4', 'mov', 'avi', 'mkv', '3gp', 'webm'];
+        const docExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'];
+
+        if (videoExts.includes(extension)) type = `video/${extension === 'mov' ? 'quicktime' : 'mp4'}`;
+        else if (imageExts.includes(extension)) type = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+        else if (docExts.includes(extension)) type = extension === 'pdf' ? 'application/pdf' : 'application/octet-stream';
+        else type = 'application/octet-stream';
 
         const finalName = (fileName.toLowerCase().endsWith('.' + extension))
             ? fileName
             : `${fileName}.${extension}`;
 
-        // Remove file:// prefix for both platforms - FormData needs clean path
-        const cleanUri = uri.replace('file://', '');
+        // IMPORTANT FOR ANDROID: FormData REQUIRES 'file://' prefix to work correctly
+        // Removing it causes the upload to fail on Android.
+        const normalizedUri = Platform.OS === 'android' ? (uri.startsWith('file://') ? uri : `file://${uri}`) : uri;
 
         return {
-            uri: cleanUri,
+            uri: normalizedUri,
             type,
             name: finalName,
         };
@@ -104,20 +107,27 @@ export const uploadMedia = async (uri, direct = false, onProgress = null) => {
             formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
             formData.append('resource_type', 'auto');
 
-            const response = await axios.post(CLOUDINARY_URL, formData, {
-                onUploadProgress: (progressEvent) => {
-                    if (onProgress && progressEvent.total) {
-                        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                        onProgress(progress);
-                    }
+            const response = await fetch(CLOUDINARY_URL, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json',
                 },
             });
 
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('[CloudinaryService] API Error:', errorData);
+                throw new Error(errorData.error?.message || 'Upload failed');
+            }
+
+            const data = await response.json();
+
             return {
                 success: true,
-                url: response.data.secure_url,
-                publicId: response.data.public_id,
-                resourceType: response.data.resource_type,
+                url: data.secure_url,
+                publicId: data.public_id,
+                resourceType: data.resource_type,
             };
         } else {
             // Prepared for backend proxy (normalizing format)
