@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, ScrollView, Platform, LayoutAnimation } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, ScrollView, Platform, LayoutAnimation, Modal } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -7,7 +7,9 @@ import Input from '../components/ui/Input';
 import { cutoffAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Shadows } from '../constants/theme';
-import { Sparkles, Settings2, ChevronDown, ChevronUp, CheckCircle2, MapPin, GitBranch, Calendar, ShieldCheck } from 'lucide-react-native';
+import { Sparkles, Settings2, ChevronDown, ChevronUp, CheckCircle2, MapPin, GitBranch, Calendar, ShieldCheck, LucideShieldCheck } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Animatable from 'react-native-animatable';
 import Slider from '@react-native-community/slider';
 
 const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJNT', 'NT-B', 'NT-C', 'NT-D', 'EWS', 'TFWS'];
@@ -134,6 +136,27 @@ const PredictorScreen = ({ navigation }) => {
             setSelectedList([...selectedList, item]);
         }
     };
+
+    const [loadingMessage, setLoadingMessage] = useState('Searching best options...');
+    const loadingMessages = [
+        'Searching best options...',
+        'Analyzing cutoff trends...',
+        'Calculating admission chances...',
+        'Comparing with 2024 results...',
+        'Finalizing top choices for you...'
+    ];
+
+    React.useEffect(() => {
+        let timer;
+        if (loading) {
+            let i = 0;
+            timer = setInterval(() => {
+                i = (i + 1) % loadingMessages.length;
+                setLoadingMessage(loadingMessages[i]);
+            }, 1200);
+        }
+        return () => clearInterval(timer);
+    }, [loading]);
 
     const handlePredict = async () => {
         if (!percentile && !rank) {
@@ -340,6 +363,43 @@ const PredictorScreen = ({ navigation }) => {
                     </View>
                 </View>
             </View>
+
+            {/* Immersive Full Screen Loading Overlay */}
+            <Modal visible={loading} transparent animationType="fade">
+                <LinearGradient
+                    colors={[Colors.primary, '#003366']}
+                    style={styles.loadingOverlayFull}
+                >
+                    <Animatable.View
+                        animation="pulse"
+                        iterationCount="infinite"
+                        style={styles.loadingIconOuter}
+                    >
+                        <View style={styles.loadingIconInner}>
+                            <Sparkles size={48} color={Colors.primary} />
+                        </View>
+                    </Animatable.View>
+
+                    <Animatable.Text
+                        animation="fadeInUp"
+                        style={styles.loadingTitle}
+                    >
+                        AlloteMe AI Engine
+                    </Animatable.Text>
+
+                    <Animatable.View
+                        animation="fadeIn"
+                        duration={1000}
+                        style={styles.msgContainer}
+                    >
+                        <Text style={styles.loadingStepText}>
+                            {loadingMessage}
+                        </Text>
+                    </Animatable.View>
+
+                    <ActivityIndicator size="small" color={Colors.white} style={{ marginTop: 30 }} />
+                </LinearGradient>
+            </Modal>
         </MainLayout>
     );
 };
@@ -404,6 +464,14 @@ const styles = StyleSheet.create({
     perksRow: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingBottom: 40 },
     perk: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     perkText: { fontSize: 11, fontWeight: '600', color: Colors.text.tertiary },
+
+    // Loading Overlay (New Immersive Style)
+    loadingOverlayFull: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary },
+    loadingIconOuter: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    loadingIconInner: { width: 100, height: 100, borderRadius: 50, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadows.lg },
+    loadingTitle: { fontSize: 24, fontWeight: '900', color: Colors.white, marginTop: 30, letterSpacing: 1 },
+    msgContainer: { marginTop: 15, paddingHorizontal: 40, height: 40, justifyContent: 'center' },
+    loadingStepText: { fontSize: 16, color: 'rgba(255,255,255,0.8)', textAlign: 'center', fontWeight: '500' },
 });
 
 export default PredictorScreen;

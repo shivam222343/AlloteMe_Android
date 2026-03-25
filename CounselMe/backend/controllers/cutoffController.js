@@ -266,16 +266,25 @@ const predictColleges = async (req, res) => {
             .sort({ percentile: -1, rank: 1 })
             .lean();
 
-        const results = matches.map(m => {
-            const diff = parseFloat(percentile) - m.percentile;
-            let chanceLabel = 'Low Chance', chanceColor = '#EF4444';
-            if (diff >= 2) { chanceLabel = 'Safe'; chanceColor = '#10B981'; }
-            else if (diff >= 0) { chanceLabel = 'Fair'; chanceColor = '#6366F1'; }
-            else if (diff >= -1) { chanceLabel = 'Reach'; chanceColor = '#F59E0B'; }
-            else if (diff >= -3) { chanceLabel = 'High Reach'; chanceColor = '#F97316'; }
+        const results = matches
+            .filter(m => m.collegeId && typeof m.collegeId === 'object' && m.collegeId.name) // Ensure full object with name exists
+            .map(m => {
+                const diff = parseFloat(percentile) - m.percentile;
+                let chanceLabel = 'Low Chance', chanceColor = '#EF4444';
+                if (diff >= 2) { chanceLabel = 'Safe'; chanceColor = '#10B981'; }
+                else if (diff >= 0) { chanceLabel = 'Fair'; chanceColor = '#6366F1'; }
+                else if (diff >= -1) { chanceLabel = 'Reach'; chanceColor = '#F59E0B'; }
+                else if (diff >= -3) { chanceLabel = 'High Reach'; chanceColor = '#F97316'; }
 
-            return { ...m, chanceLabel, chanceColor, difference: diff.toFixed(2), userPercentile: percentile };
-        });
+                return {
+                    ...m,
+                    key: m._id.toString(),
+                    chanceLabel,
+                    chanceColor,
+                    difference: diff.toFixed(2),
+                    userPercentile: percentile
+                };
+            });
 
         res.json(results);
     } catch (error) {
