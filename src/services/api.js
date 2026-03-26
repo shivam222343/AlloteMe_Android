@@ -4,7 +4,8 @@ import { Platform } from 'react-native';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
-const API_BASE_URL = RENDER_URL;
+// Switch to LOCAL_URL for development, RENDER_URL for production
+const API_BASE_URL = __DEV__ ? LOCAL_URL : RENDER_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -29,8 +30,16 @@ export const authAPI = {
     register: (userData) => api.post('auth/register', userData),
     getProfile: () => api.get('auth/profile'),
     updateProfile: (userData) => api.put('auth/profile', userData),
+    deleteProfile: () => api.delete('auth/profile'),
     changePassword: (data) => api.post('auth/change-password', data),
     toggleSave: (collegeId) => api.post('auth/toggle-save', { collegeId }),
+    getAllUsers: () => api.get('auth/users'),
+    updateUserRole: (userId, data) => api.put(`auth/users/${userId}`, data),
+    deleteUser: (userId) => api.delete(`auth/users/${userId}`),
+    sendOTP: (phone) => api.post('auth/send-otp', { phone }),
+    verifyOTP: (otp) => api.post('auth/verify-otp', { otp }),
+    verifyPhone: (phone) => api.put('auth/verify-phone', { phone }),
+    getStats: () => api.get('auth/stats'),
 };
 
 export const institutionAPI = {

@@ -11,17 +11,26 @@ import {
     MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings
 } from 'lucide-react-native';
 import { institutionAPI } from '../services/api';
+import VerificationBanner from '../components/ui/VerificationBanner';
+import VerificationModal from '../components/ui/VerificationModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDER_WIDTH = SCREEN_WIDTH - 32;
 const CARD_WIDTH = (SCREEN_WIDTH - 32 - 12 - 4) / 2; // Extra buffer for rounding
 
 const StudentDashboard = ({ navigation }) => {
-    const { user, hasSkippedProfile } = useAuth();
+    const { user, hasSkippedProfile, refreshUser } = useAuth();
     const [featuredColleges, setFeaturedColleges] = useState([]);
     const [loadingFeatured, setLoadingFeatured] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
     const flatListRef = React.useRef(null);
+
+    useEffect(() => {
+        if (user && !user.isVerified) {
+            setShowVerificationModal(true);
+        }
+    }, [user?.isVerified]);
 
     useEffect(() => {
         if (user?.role === 'student' && !user?.preferences?.isProfileComplete && !hasSkippedProfile) {
@@ -154,7 +163,7 @@ const StudentDashboard = ({ navigation }) => {
     return (
         <MainLayout title="Dashboard" hideBack>
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                <View style={styles.welcomeSection}>
+                <View style={[styles.welcomeSection, { marginBottom: 16 }]}>
                     <Text style={styles.welcomeText}>Welcome back,</Text>
                     <Text style={styles.nameText}>{user?.displayName} 👋</Text>
                 </View>
@@ -222,6 +231,13 @@ const StudentDashboard = ({ navigation }) => {
 
                 <View style={{ height: 100 }} />
             </ScrollView>
+
+            <VerificationModal
+                visible={showVerificationModal}
+                user={user}
+                onVerified={refreshUser}
+                onClose={() => setShowVerificationModal(false)}
+            />
         </MainLayout>
     );
 };

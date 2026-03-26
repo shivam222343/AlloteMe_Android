@@ -5,7 +5,7 @@ import GradientBorder from '../ui/GradientBorder';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     Home, Search, LayoutGrid, Users, History, Bookmark,
-    Settings, LogOut, X, ChevronRight, User, Star
+    Settings, LogOut, X, ChevronRight, User, Star, PlusCircle, FileUp
 } from 'lucide-react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,13 +32,17 @@ const Sidebar = ({ navigation, state }) => {
     ];
 
     const AdminItems = [
-        { label: 'Institution Manager', icon: Settings, route: 'CreateInstitution' },
+        { label: 'Institution Manager', icon: PlusCircle, route: 'CreateInstitution' },
         { label: 'Featured Colleges', icon: Star, route: 'FeaturedColleges' },
-        { label: 'Cutoff Uploader', icon: Settings, route: 'UploadCutoff' },
-        { label: 'User Management', icon: Users, route: 'UserManagement' },
+        { label: 'Cutoff Uploader', icon: FileUp, route: 'UploadCutoff' },
+        { label: 'User Management', icon: Users, route: 'AdminUsers' },
         { label: 'System Analytics', icon: LayoutGrid, route: 'SystemAnalytics' },
-        { label: 'Settings', icon: Settings, route: 'Settings' },
     ];
+
+    // Filter out duplicate settings from main menu if admin
+    const filteredMenuItems = user?.role === 'admin'
+        ? MenuItems.filter(item => item.label !== 'Settings')
+        : MenuItems;
 
     const NavItem = ({ item }) => {
         const currentRoute = state?.routes[state.index];
@@ -82,7 +86,7 @@ const Sidebar = ({ navigation, state }) => {
                 <View style={styles.profileBox}>
                     <GradientBorder size={54} borderWidth={hasBanner ? 2 : 1}>
                         <Image
-                            source={{ uri: user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
+                            source={{ uri: user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=4f46e5&color=fff&size=100` }}
                             style={styles.avatarImg}
                         />
                     </GradientBorder>
@@ -105,7 +109,7 @@ const Sidebar = ({ navigation, state }) => {
 
             <ScrollView style={styles.menuList} showsVerticalScrollIndicator={false}>
                 <Text style={styles.sectionLabel}>MAIN MENU</Text>
-                {MenuItems.map((item, idx) => <NavItem key={idx} item={item} />)}
+                {filteredMenuItems.map((item, idx) => <NavItem key={idx} item={item} />)}
 
                 {user?.role === 'admin' && (
                     <>

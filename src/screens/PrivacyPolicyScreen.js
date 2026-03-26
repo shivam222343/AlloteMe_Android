@@ -43,7 +43,7 @@ const PrivacyPolicyScreen = ({ navigation }) => {
                 contentContainerStyle={{ paddingBottom: 60 }}
             >
                 <View style={styles.lastUpdated}>
-                    <Text style={styles.updatedText}>Last updated: March 23, 2026</Text>
+                    <Text style={styles.updatedText}>Last updated: March 27, 2026</Text>
                 </View>
 
                 <Text style={styles.introText}>
@@ -64,7 +64,7 @@ const PrivacyPolicyScreen = ({ navigation }) => {
                 <View style={styles.footer}>
                     <Ionicons name="shield-checkmark" size={40} color={Colors.primary} style={{ marginBottom: 15 }} />
                     <Text style={styles.footerText}>
-                        If you have any questions about this Privacy Policy, please contact us at privacy@alloteme.com
+                        If you have any questions about this Privacy Policy, please contact us at alloteme1@gmail.com
                     </Text>
                 </View>
             </ScrollView>

@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     searchContainer: {
+        marginTop: 28,
         marginBottom: 25,
     },
     searchBar: {

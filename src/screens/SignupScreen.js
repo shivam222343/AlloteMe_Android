@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius } from '../constants/theme';
-import { User, ShieldCheck } from 'lucide-react-native';
+import { User } from 'lucide-react-native';
 
 const SignupScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
@@ -44,20 +44,11 @@ const SignupScreen = ({ navigation }) => {
         }
     };
 
-    const RoleOption = ({ type, label, icon: Icon }) => (
-        <TouchableOpacity
-            style={[styles.roleCard, formData.role === type && styles.roleCardActive]}
-            onPress={() => setFormData({ ...formData, role: type })}
-        >
-            <Icon size={20} color={formData.role === type ? Colors.primary : Colors.text.tertiary} />
-            <Text style={[styles.roleText, formData.role === type && styles.roleTextActive]}>{label}</Text>
-        </TouchableOpacity>
-    );
-
     return (
         <MainLayout showHeader={false}>
             <View style={styles.container}>
                 <View style={styles.header}>
+                    <Image source={require('../../imgs/splash.png')} style={styles.logo} />
                     <Text style={styles.title}>Join AlloteMe</Text>
                     <Text style={styles.subtitle}>Start your counseling journey</Text>
                 </View>
@@ -86,12 +77,6 @@ const SignupScreen = ({ navigation }) => {
                         secureTextEntry
                     />
 
-                    <Text style={styles.label}>Register as</Text>
-                    <View style={styles.roleRow}>
-                        <RoleOption type="student" label="Student" icon={User} />
-                        <RoleOption type="admin" label="Admin" icon={ShieldCheck} />
-                    </View>
-
                     <Button title="Register" onPress={handleSignup} loading={loading} style={styles.mainBtn} />
                 </View>
 
@@ -108,16 +93,31 @@ const SignupScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { paddingVertical: Spacing.lg },
-    header: { marginBottom: 32 },
-    title: { fontSize: 28, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 4 },
-    subtitle: { fontSize: 14, color: Colors.text.tertiary },
+    header: {
+        marginBottom: 32,
+        alignItems: 'center',
+    },
+    logo: {
+        width: 380,
+        height: 100,
+        marginTop: 60,
+        marginBottom: 16,
+        resizeMode: 'contain',
+        borderRadius: 50,
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+        marginBottom: 4,
+        textAlign: 'center'
+    },
+    subtitle: {
+        fontSize: 14,
+        color: Colors.text.tertiary,
+        textAlign: 'center'
+    },
     form: { gap: 4 },
-    label: { fontSize: 14, fontWeight: '500', color: Colors.text.secondary, marginBottom: 12, marginTop: 8 },
-    roleRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-    roleCard: { flex: 1, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', backgroundColor: Colors.white, gap: 8 },
-    roleCardActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '08' },
-    roleText: { fontSize: 12, fontWeight: '600', color: Colors.text.secondary },
-    roleTextActive: { color: Colors.primary },
     mainBtn: { marginTop: 12 },
     footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
     footerText: { color: Colors.text.secondary },

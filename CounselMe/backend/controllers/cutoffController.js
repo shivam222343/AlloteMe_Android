@@ -216,6 +216,16 @@ const predictColleges = async (req, res) => {
         examType, category, round, year, branches, regions, institutionTypes, seatTypes
     } = req.query;
 
+    // Save preferences to user profile if authenticated
+    if (req.user) {
+        try {
+            const User = require('../models/User');
+            await User.findByIdAndUpdate(req.user._id, {
+                $set: { lastPredictorPreferences: req.query }
+            });
+        } catch (e) { console.error('Failed to save preferences', e); }
+    }
+
     branches = branches || req.query['branches[]'];
     regions = regions || req.query['regions[]'];
     institutionTypes = institutionTypes || req.query['institutionTypes[]'];

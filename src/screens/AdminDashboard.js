@@ -1,20 +1,39 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Typography, Spacing, Shadows, BorderRadius } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
+import { authAPI } from '../services/api';
 import {
     PlusCircle, FileUp, Users, Settings,
-    BarChart3, ShieldCheck, ChevronRight, Star
+    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare
 } from 'lucide-react-native';
 
 const AdminDashboard = ({ navigation }) => {
     const { user } = useAuth();
+    const [stats, setStats] = useState([
+        { label: 'Institutes', value: '-', icon: BarChart3, color: Colors.primary, key: 'institutions' },
+        { label: 'Users', value: '-', icon: Users, color: '#8B5CF6', key: 'users' },
+    ]);
+    const [loading, setLoading] = useState(true);
 
-    const stats = [
-        { label: 'Institutes', value: '42', icon: BarChart3, color: Colors.primary },
-        { label: 'Users', value: '1.2k', icon: Users, color: '#8B5CF6' },
-    ];
+    useEffect(() => {
+        fetchStats();
+    }, []);
+
+    const fetchStats = async () => {
+        try {
+            const res = await authAPI.getStats();
+            setStats(prev => prev.map(s => ({
+                ...s,
+                value: res.data[s.key]?.toString() || '0'
+            })));
+        } catch (error) {
+            console.error('Stats fetch error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const adminActions = [
         {
@@ -48,7 +67,7 @@ const AdminDashboard = ({ navigation }) => {
         {
             title: 'Frequent Questions',
             desc: 'Set sliding question tags for chat',
-            icon: Settings,
+            icon: MessageSquare,
             route: 'FrequentQuestionsManager',
             color: '#F97316'
         },
@@ -56,7 +75,7 @@ const AdminDashboard = ({ navigation }) => {
             title: 'User Management',
             desc: 'View and manage student registrations',
             icon: Users,
-            route: 'Dashboard',
+            route: 'AdminUsers',
             color: '#3B82F6'
         },
     ];

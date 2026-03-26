@@ -1,15 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getUserProfile, updateUserProfile, changePassword, toggleSaveCollege } = require('../controllers/authController');
-const { protect } = require('../middleware/authMiddleware');
+const {
+    registerUser, loginUser, getUserProfile, updateUserProfile,
+    changePassword, toggleSaveCollege, getAllUsers, updateUserRole,
+    sendOTP, verifyOTP, getDashboardStats, deleteAccount, deleteUser, setVerifiedPhone
+} = require('../controllers/authController');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.route('/profile')
     .get(protect, getUserProfile)
-    .put(protect, updateUserProfile);
+    .put(protect, updateUserProfile)
+    .delete(protect, deleteAccount);
 
 router.post('/change-password', protect, changePassword);
 router.post('/toggle-save', protect, toggleSaveCollege);
+
+router.get('/users', protect, authorize('admin'), getAllUsers);
+router.route('/users/:id')
+    .put(protect, authorize('admin'), updateUserRole)
+    .delete(protect, authorize('admin'), deleteUser);
+
+router.post('/send-otp', protect, sendOTP);
+router.post('/verify-otp', protect, verifyOTP);
+router.put('/verify-phone', protect, setVerifiedPhone);
+router.get('/stats', protect, authorize('admin'), getDashboardStats);
 
 module.exports = router;

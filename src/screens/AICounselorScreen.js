@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, Modal, ScrollView, ActivityIndicator, Animated, Easing, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MainLayout from '../components/layouts/MainLayout';
 import { aiAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -323,6 +324,9 @@ const AICounselorScreen = ({ navigation }) => {
     const [userMessageCount, setUserMessageCount] = useState(0);
     const [pastChats, setPastChats] = useState([]);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [loadingStatus, setLoadingStatus] = useState('Eta is thinking...');
+
+    const DEEP_QUERY_REGEX = /predict|chance|cutoff|can i get|get into|admission|percentile|rank|college|suggest|branch|coep|vjti|vit|ict/i;
 
     const uniqueQuestions = React.useMemo(() => {
         const seen = new Set();
@@ -363,39 +367,56 @@ const AICounselorScreen = ({ navigation }) => {
 
     const loadHistory = async () => {
         try {
-            const res = await aiAPI.getChats();
-            setPastChats(res.data || []);
+            const localData = await AsyncStorage.getItem('ALLOTEME_LOCAL_CHATS');
+            if (localData) {
+                setPastChats(JSON.parse(localData));
+            }
         } catch (e) {
-            console.log('Failed to load history');
+            console.log('Failed to load local history');
+        }
+    };
+
+    // Auto-save logic
+    React.useEffect(() => {
+        if (messages.length > 1) {
+            saveCurrentToLocal();
+        }
+    }, [messages]);
+
+    const saveCurrentToLocal = async () => {
+        try {
+            const currentChatId = chatId || `local_${Date.now()}`;
+            if (!chatId) setChatId(currentChatId);
+
+            const localData = await AsyncStorage.getItem('ALLOTEME_LOCAL_CHATS');
+            let chats = localData ? JSON.parse(localData) : [];
+
+            const existingIdx = chats.findIndex(c => c.id === currentChatId);
+            const chatObj = {
+                id: currentChatId,
+                title: messages[1]?.text?.substring(0, 35) || 'New Chat',
+                messages,
+                updatedAt: new Date().toISOString(),
+                isLocal: true
+            };
+
+            if (existingIdx > -1) {
+                chats[existingIdx] = chatObj;
+            } else {
+                chats.unshift(chatObj);
+            }
+
+            await AsyncStorage.setItem('ALLOTEME_LOCAL_CHATS', JSON.stringify(chats));
+            setPastChats(chats);
+        } catch (e) {
+            console.error('Local save error', e);
         }
     };
 
     React.useEffect(() => {
-        // Handle leaving screen - Confirm Save
-        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-            if (!isDirty || messages.length <= 1) return;
-
-            // Prevent default action
-            e.preventDefault();
-
-            Alert.alert(
-                'Save Conversation?',
-                'Would you like to save this chat history before leaving?',
-                [
-                    { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
-                    {
-                        text: 'Save', onPress: async () => {
-                            await handleSaveChat();
-                            navigation.dispatch(e.data.action);
-                        }
-                    },
-                    { text: 'Continue Chatting', style: 'cancel', onPress: () => { } }
-                ]
-            );
-        });
-
-        return unsubscribe;
-    }, [navigation, isDirty, messages.length]);
+        // Automatically stores locally – no need to ask or confirm anymore
+        return () => { };
+    }, []);
 
     const loadFrequentQuestions = React.useCallback(async () => {
         try {
@@ -426,13 +447,8 @@ const AICounselorScreen = ({ navigation }) => {
     }, [user?.displayName]);
 
     const handleSaveChat = React.useCallback(async () => {
-        try {
-            const history = messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
-            await aiAPI.saveChat({ chatId, messages: history });
-            setIsDirty(false);
-        } catch (e) {
-            Alert.alert('Error', 'Failed to save chat');
-        }
+        // Redundant with auto-save but kept for API consistency / No-op
+        saveCurrentToLocal();
     }, [messages, chatId]);
 
     const startListening = React.useCallback(async () => {
@@ -478,6 +494,27 @@ const AICounselorScreen = ({ navigation }) => {
             return newCount;
         });
 
+        const isDeepQuery = DEEP_QUERY_REGEX.test(textToSend);
+        let statusInterval;
+
+        if (isDeepQuery) {
+            const statuses = [
+                'Searching database...',
+                'Retrieving cutoffs...',
+                'Analyzing college trends...',
+                'Formatting best matches...',
+                'Finalizing response for you...'
+            ];
+            let sIdx = 0;
+            setLoadingStatus(statuses[0]);
+            statusInterval = setInterval(() => {
+                sIdx = (sIdx + 1) % statuses.length;
+                setLoadingStatus(statuses[sIdx]);
+            }, 1800);
+        } else {
+            setLoadingStatus('Eta is thinking...');
+        }
+
         try {
             const history = messages.slice(1).map(m => ({
                 role: m.sender === 'user' ? 'user' : 'assistant',
@@ -492,7 +529,8 @@ const AICounselorScreen = ({ navigation }) => {
                     examType: user?.examType,
                     percentile: user?.percentile,
                     rank: user?.rank,
-                    location: user?.location
+                    location: user?.location,
+                    expectedRegion: user?.expectedRegion
                 }
             });
 
@@ -514,6 +552,7 @@ const AICounselorScreen = ({ navigation }) => {
             };
             setMessages(prev => [...prev, errorMsg]);
         } finally {
+            if (statusInterval) clearInterval(statusInterval);
             setLoading(false);
         }
     }, [loading, messages, chatId, user]);
@@ -538,15 +577,19 @@ const AICounselorScreen = ({ navigation }) => {
 
     const openPastChat = async (id) => {
         try {
-            const chat = pastChats.find(c => c._id === id);
+            const chat = pastChats.find(c => (c.id || c._id) === id);
             if (chat) {
-                const formatted = chat.messages.map((m, i) => ({
-                    id: `old-${i}`,
-                    text: m.content,
-                    sender: m.role === 'user' ? 'user' : 'bot',
-                    timestamp: chat.updatedAt
-                }));
-                setMessages(formatted);
+                if (chat.isLocal) {
+                    setMessages(chat.messages);
+                } else {
+                    const formatted = chat.messages.map((m, i) => ({
+                        id: `old-${i}`,
+                        text: m.content,
+                        sender: m.role === 'user' ? 'user' : 'bot',
+                        timestamp: chat.updatedAt
+                    }));
+                    setMessages(formatted);
+                }
                 setChatId(id);
                 setShowHistoryModal(false);
             }
@@ -577,9 +620,14 @@ const AICounselorScreen = ({ navigation }) => {
                     )}
                     onTouchStart={() => Keyboard.dismiss()}
                     ListFooterComponent={loading && (
-                        <View style={[styles.messageContainer, styles.botContainer]}>
-                            <View style={[styles.bubble, styles.botBubble, { padding: 15, width: 80, alignItems: 'center' }]}>
-                                <ActivityIndicator size="small" color={Colors.primary} />
+                        <View style={[styles.messageContainer, styles.botContainer, { marginBottom: 20 }]}>
+                            <View style={[styles.bubble, styles.botBubble, { padding: 15, width: 220, alignItems: 'flex-start' }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <ActivityIndicator size="small" color={Colors.primary} />
+                                    <Text style={[styles.loadingText, { color: Colors.primary, fontSize: 13, fontWeight: '500' }]}>
+                                        {loadingStatus}
+                                    </Text>
+                                </View>
                             </View>
                         </View>
                     )}
@@ -637,18 +685,18 @@ const AICounselorScreen = ({ navigation }) => {
                                 {pastChats.length > 0 ? (
                                     <FlatList
                                         data={pastChats}
-                                        keyExtractor={item => item._id}
+                                        keyExtractor={item => item.id || item._id}
                                         renderItem={({ item }) => (
                                             <TouchableOpacity
                                                 style={styles.historyItem}
-                                                onPress={() => openPastChat(item._id)}
+                                                onPress={() => openPastChat(item.id || item._id)}
                                             >
                                                 <View style={styles.historyIcon}>
                                                     <Calendar size={18} color={Colors.primary} />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={styles.historyText} numberOfLines={1}>
-                                                        {item.messages[0]?.content || 'History Chat'}
+                                                        {item.title || (item.messages && item.messages[0]?.content) || 'History Chat'}
                                                     </Text>
                                                     <Text style={styles.historyTime}>
                                                         {new Date(item.updatedAt).toLocaleDateString()}

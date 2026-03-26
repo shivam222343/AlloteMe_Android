@@ -37,50 +37,79 @@ const AboutUsScreen = ({ navigation }) => {
 
                 <View style={styles.body}>
                     <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>Our Story</Text>
+                        <Text style={styles.sectionTitle}>Our Mission</Text>
                         <Text style={styles.text}>
-                            AlloteMe was born out of a simple idea: that navigating college admissions shouldn't be a nightmare.
-                            We provide smart tools for students to predict their chances and for institutions to manage their data efficiently.
+                            AlloteMe is dedicated to empowering students across Maharashtra to navigate the complex world of technical admissions.
+                            We bridge the gap between historical cutoff data and real-time student aspirations through advanced AI modeling and intuitive allocation analysis.
                         </Text>
                     </View>
 
+                    <Text style={styles.sectionTitle}>Meet our Founders</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.foundersScroll}>
+                        <View style={styles.founderCardContainer}>
+                            <Image
+                                source={require('../../assets/founders/shivam.png')}
+                                style={styles.founderAvatar}
+                            />
+                            <Text style={styles.founderName}>Shivam Dombe</Text>
+                            <Text style={styles.founderRole}>Lead Architect</Text>
+                        </View>
+                        <View style={styles.founderCardContainer}>
+                            <Image
+                                source={require('../../assets/founders/rohan.png')}
+                                style={styles.founderAvatar}
+                            />
+                            <Text style={styles.founderName}>Rohan Mane</Text>
+                            <Text style={styles.founderRole}>Technical Director</Text>
+                        </View>
+                        <View style={styles.founderCardContainer}>
+                            <Image
+                                source={require('../../assets/founders/tejas.png')}
+                                style={styles.founderAvatar}
+                            />
+                            <Text style={styles.founderName}>Tejas Choudhari</Text>
+                            <Text style={styles.founderRole}>Innovation Lead</Text>
+                        </View>
+                    </ScrollView>
+
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>50k+</Text>
-                            <Text style={styles.statLabel}>Students</Text>
+                            <Text style={styles.statNumber}>100k+</Text>
+                            <Text style={styles.statLabel}>Data Points</Text>
                         </View>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>200+</Text>
+                            <Text style={styles.statNumber}>500+</Text>
                             <Text style={styles.statLabel}>Colleges</Text>
                         </View>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>1M+</Text>
-                            <Text style={styles.statLabel}>Predictions</Text>
+                            <Text style={styles.statNumber}>AI</Text>
+                            <Text style={styles.statLabel}>Enabled</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.sectionTitle}>Our Values</Text>
+                    <Text style={styles.sectionTitle}>Our Core Values</Text>
                     <View style={styles.valuesGrid}>
                         <View style={styles.valueCard}>
                             <Ionicons name="flash-outline" size={32} color={Colors.primary} />
-                            <Text style={styles.valueTitle}>Innovation</Text>
+                            <Text style={styles.valueTitle}>Precision</Text>
                         </View>
                         <View style={styles.valueCard}>
                             <Ionicons name="heart-outline" size={32} color={Colors.error} />
-                            <Text style={styles.valueTitle}>Community</Text>
-                        </View>
-                        <View style={styles.valueCard}>
-                            <Ionicons name="shield-outline" size={32} color={Colors.success} />
                             <Text style={styles.valueTitle}>Integrity</Text>
                         </View>
                         <View style={styles.valueCard}>
+                            <Ionicons name="shield-outline" size={32} color={Colors.success} />
+                            <Text style={styles.valueTitle}>Security</Text>
+                        </View>
+                        <View style={styles.valueCard}>
                             <Ionicons name="globe-outline" size={32} color={Colors.accent} />
-                            <Text style={styles.valueTitle}>Diversity</Text>
+                            <Text style={styles.valueTitle}>Impact</Text>
                         </View>
                     </View>
 
                     <View style={styles.footer}>
-                        <Text style={styles.footerText}>Made with ❤️ by AlloteMe Team</Text>
+                        <Text style={styles.footerText}>Developed by AlloteMe Engineers</Text>
+                        <Text style={styles.footerText}>&copy; 2026 AlloteMe</Text>
                     </View>
                 </View>
             </ScrollView>
@@ -228,6 +257,40 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
         fontSize: 14,
         fontWeight: '500',
+    },
+    foundersScroll: {
+        marginBottom: 30,
+        marginHorizontal: -20,
+        paddingLeft: 20,
+    },
+    founderCardContainer: {
+        width: 160,
+        marginRight: 20,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        padding: 15,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    founderAvatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        marginBottom: 12,
+        backgroundColor: '#F8FAFC',
+    },
+    founderName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1E293B',
+        textAlign: 'center',
+    },
+    founderRole: {
+        fontSize: 12,
+        color: Colors.primary,
+        fontWeight: '600',
+        marginTop: 2,
     }
 });
 

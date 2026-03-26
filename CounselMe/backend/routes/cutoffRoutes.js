@@ -22,7 +22,7 @@ router.post('/parse-bulk', protect, authorize('admin'), parseBulkCutoffData);
 
 router.delete('/:institutionId/branch/:branchName', protect, authorize('admin'), deleteCutoffs);
 
-router.get('/predict', predictColleges);
+router.get('/predict', protect, predictColleges);
 router.get('/:institutionId', getCutoffsByInstitution);
 
 module.exports = router;

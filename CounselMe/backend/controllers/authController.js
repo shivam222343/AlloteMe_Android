@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Institution = require('../models/Institution');
+const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
 
 // @desc    Register a new user
@@ -98,7 +100,9 @@ const getUserProfile = async (req, res) => {
             bannerUrl: user.bannerUrl,
             preferences: user.preferences,
             savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
-            groqApiKey: user.groqApiKey
+            groqApiKey: user.groqApiKey,
+            isVerified: user.isVerified,
+            phoneNumber: user.phoneNumber
         });
     } else {
         res.status(404).json({ message: 'User not found' });
@@ -147,6 +151,8 @@ const updateUserProfile = async (req, res) => {
             bannerUrl: updatedUser.bannerUrl,
             preferences: updatedUser.preferences,
             groqApiKey: updatedUser.groqApiKey,
+            isVerified: updatedUser.isVerified,
+            phoneNumber: updatedUser.phoneNumber,
             token: generateToken(updatedUser._id)
         });
     } else {
@@ -185,4 +191,157 @@ const toggleSaveCollege = async (req, res) => {
     }
 };
 
-module.exports = { registerUser, loginUser, getUserProfile, updateUserProfile, changePassword, toggleSaveCollege };
+// @desc    Get all users (Admin only)
+// @route   GET /api/auth/users
+// @access  Private/Admin
+const getAllUsers = async (req, res) => {
+    const users = await User.find({}).select('-password');
+    res.json(users);
+};
+
+// @desc    Update user role (Admin only)
+// @route   PUT /api/auth/users/:id/role
+// @access  Private/Admin
+const updateUserRole = async (req, res) => {
+    const user = await User.findById(req.params.id);
+
+    if (user) {
+        if (user._id.toString() === req.user._id.toString()) {
+            return res.status(400).json({ message: 'You cannot change your own role' });
+        }
+        user.role = req.body.role || user.role;
+        const updatedUser = await user.save();
+        res.json({
+            _id: updatedUser._id,
+            displayName: updatedUser.displayName,
+            role: updatedUser.role
+        });
+    } else {
+        res.status(404).json({ message: 'User not found' });
+    }
+};
+
+// @desc    Send OTP via WhatsApp (Placeholder)
+// @route   POST /api/auth/send-otp
+// @access  Private
+const sendOTP = async (req, res) => {
+    const { phoneNumber } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+        const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4 digit OTP
+        user.phoneNumber = phoneNumber;
+        user.otp = otp;
+        await user.save();
+
+        // In a real app, send WhatsApp message here
+        console.log(`[WhatsApp] Sending code ${otp} to ${phoneNumber} from AlloteMe (+91 8010961216)`);
+
+        res.json({ success: true, message: 'OTP sent successfully', otp }); // Returning OTP for testing convenience
+    } else {
+        res.status(404).json({ message: 'User not found' });
+    }
+};
+
+// @desc    Verify OTP
+// @route   POST /api/auth/verify-otp
+// @access  Private
+const verifyOTP = async (req, res) => {
+    const { otp } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+        if (user.otp === otp) {
+            user.isVerified = true;
+            user.otp = null;
+            await user.save();
+            res.json({ success: true, message: 'User verified' });
+        } else {
+            res.status(400).json({ message: 'Invalid OTP' });
+        }
+    } else {
+        res.status(404).json({ message: 'User not found' });
+    }
+};
+
+// @desc    Get dashboard stats (Admin only)
+// @route   GET /api/auth/stats
+// @access  Private/Admin
+const getDashboardStats = async (req, res) => {
+    try {
+        const userCount = await User.countDocuments();
+        const institutionCount = await Institution.countDocuments();
+
+        res.json({
+            users: userCount,
+            institutions: institutionCount
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch stats' });
+    }
+};
+
+// @desc    Delete user account
+// @route   DELETE /api/auth/profile
+// @access  Private
+const deleteAccount = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        await User.findByIdAndDelete(req.user._id);
+        res.json({ success: true, message: 'Account deleted permanently' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to delete account' });
+    }
+};
+
+// @desc    Delete any user account (Admin only)
+// @route   DELETE /api/auth/users/:id
+// @access  Private/Admin
+const deleteUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: 'User permanent removed successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to delete user' });
+    }
+};
+
+const setVerifiedPhone = async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone || phone.length < 10) return res.status(400).json({ message: 'Invalid phone number' });
+        const user = await User.findById(req.user._id);
+        user.phoneNumber = phone;
+        user.isVerified = true;
+        await user.save();
+        res.json({ success: true, user: { isVerified: true, phoneNumber: phone } });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update phone' });
+    }
+};
+
+module.exports = {
+    registerUser,
+    loginUser,
+    getUserProfile,
+    updateUserProfile,
+    changePassword,
+    toggleSaveCollege,
+    getAllUsers,
+    updateUserRole,
+    sendOTP,
+    verifyOTP,
+    setVerifiedPhone,
+    getDashboardStats,
+    deleteAccount,
+    deleteUser
+};

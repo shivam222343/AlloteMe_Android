@@ -6,8 +6,8 @@ import { Colors, Spacing, Shadows } from '../constants/theme';
 import { Phone, MessageSquare, Star, ArrowRight } from 'lucide-react-native';
 
 const counselors = [
-    { id: '1', name: 'Dr. Sameer Patil', exp: '12 yrs', rating: '4.9', specialized: 'MHTCET/JEE', image: 'https://i.pravatar.cc/150?u=1' },
-    { id: '2', name: 'Priya Sharma', exp: '8 yrs', rating: '4.8', specialized: 'NEET/Medical', image: 'https://i.pravatar.cc/150?u=2' },
+    { id: '1', name: 'Priya Sharma', exp: '12 yrs', rating: '4.9', specialized: 'MHTCET/JEE', image: 'https://i.pravatar.cc/150?u=1' },
+    { id: '2', name: 'Dr. Sameer Patil', exp: '8 yrs', rating: '4.8', specialized: 'NEET/Medical', image: 'https://i.pravatar.cc/150?u=2' },
 ];
 
 const ConnectCounselorScreen = () => {

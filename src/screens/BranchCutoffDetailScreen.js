@@ -163,7 +163,7 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
     );
 
     return (
-        <MainLayout style={styles.container} title="Cutoff Details">
+        <MainLayout style={styles.container} title="Cutoff Details" noPadding>
             {loading ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color={Colors.primary} />
@@ -173,8 +173,9 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
                     data={filteredData}
                     keyExtractor={(item, index) => index.toString()}
                     renderItem={renderItem}
+                    showsVerticalScrollIndicator={false}
                     ListHeaderComponent={() => (
-                        <View style={{ backgroundColor: '#F8FAFC' }}>
+                        <View style={{ backgroundColor: '#F8FAFC', paddingHorizontal: 16 }}>
                             {renderHeader()}
                             <View style={styles.tableHeader}>
                                 <Text style={[styles.th, { flex: 2 }]}>Category</Text>
@@ -190,14 +191,14 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
                         </View>
                     )}
                     ListFooterComponent={() => (
-                        <View style={styles.infoBox}>
+                        <View style={[styles.infoBox, { marginHorizontal: 16 }]}>
                             <Filter size={14} color={Colors.text.tertiary} />
                             <Text style={styles.infoText}>
                                 Data is based on official allotment lists. Cutoffs vary each year based on difficulty and applicant volume.
                             </Text>
                         </View>
                     )}
-                    contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+                    contentContainerStyle={{ paddingBottom: 60 }}
                     stickyHeaderIndices={[0]} // Pin the table header
                 />
             )}
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
     tableContainer: { marginTop: 10, backgroundColor: Colors.white, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0' },
     tableHeader: { flexDirection: 'row', backgroundColor: '#EFF6FF', padding: 12, borderBottomWidth: 1, borderBottomColor: '#DBEAFE' },
     th: { fontSize: 10, fontWeight: '800', color: '#0F172A', textTransform: 'uppercase', letterSpacing: 0.5 },
-    tableRow: { flexDirection: 'row', padding: 14, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+    tableRow: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     zebraRow: { backgroundColor: '#F8FAFC' },
     td: { fontSize: 13, color: Colors.text.primary, lineHeight: 18 },
 

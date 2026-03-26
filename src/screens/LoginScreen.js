@@ -47,6 +47,7 @@ const LoginScreen = ({ navigation }) => {
                 style={styles.content}
             >
                 <View style={styles.header}>
+                    <Image source={require('../../imgs/splash.png')} style={styles.logo} />
                     <Text style={styles.title}>Welcome Back</Text>
                     <Text style={styles.subtitle}>Sign in to continue your counseling journey</Text>
                 </View>
@@ -102,16 +103,26 @@ const styles = StyleSheet.create({
     },
     header: {
         marginBottom: 40,
+        alignItems: 'center',
+    },
+    logo: {
+        width: 380,
+        height: 100,
+        marginBottom: 16,
+        resizeMode: 'contain',
+        borderRadius: 50,
     },
     title: {
         fontSize: Typography.fontSize['3xl'],
         fontWeight: Typography.fontWeight.bold,
         color: Colors.text.primary,
         marginBottom: 8,
+        textAlign: 'center',
     },
     subtitle: {
         fontSize: Typography.fontSize.base,
         color: Colors.text.secondary,
+        textAlign: 'center',
     },
     forgotPassword: {
         alignSelf: 'flex-end',

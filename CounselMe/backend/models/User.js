@@ -11,6 +11,19 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
+    phoneNumber: {
+        type: String,
+        unique: true,
+        sparse: true // Allows null/empty for users who haven't entered it yet
+    },
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    otp: {
+        type: String,
+        default: null
+    },
     password: {
         type: String,
         required: true
@@ -48,6 +61,10 @@ const userSchema = new mongoose.Schema({
     groqApiKey: {
         type: String,
         default: null
+    },
+    lastPredictorPreferences: {
+        type: Object,
+        default: {}
     }
 }, {
     timestamps: true

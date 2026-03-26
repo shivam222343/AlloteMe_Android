@@ -298,7 +298,8 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     }}
                     keyExtractor={(item) => item.key}
                     renderItem={renderItem}
-                    contentContainerStyle={{ paddingBottom: 100 }}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 60 }}
                     containerStyle={{ flex: 1 }}
                     activationDistance={10}
                     ListEmptyComponent={

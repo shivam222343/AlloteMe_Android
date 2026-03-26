@@ -27,10 +27,21 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(cors({
-    origin: ['https://alloteme.netlify.app', 'http://localhost:5100', 'http://10.0.2.2:5100'],
+    origin: [
+        'https://alloteme.netlify.app',
+        'http://localhost:5100',
+        'http://localhost:8081',
+        'http://localhost:8080',
+        'http://10.0.2.2:5100', // Android Emulator
+        'http://10.0.2.2:8081',
+        'http://localhost:19006', // Expo web
+        'http://localhost:8082',
+        'http://127.0.0.1:8081',
+        'http://127.0.0.1:8080'
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 app.use(express.json());
 app.use(morgan('dev'));

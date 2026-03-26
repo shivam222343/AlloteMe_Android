@@ -7,7 +7,7 @@ import Input from '../components/ui/Input';
 import { Colors, Spacing, Shadows, BorderRadius } from '../constants/theme';
 import GradientBorder from '../components/ui/GradientBorder';
 import { useAuth } from '../contexts/AuthContext';
-import { Camera, Edit2, Mail, MapPin, Award, BookOpen, LogOut, Hash, Target, RefreshCw, Bot, Check, X, Image as ImageIcon } from 'lucide-react-native';
+import { Camera, Edit2, Mail, MapPin, Award, BookOpen, LogOut, Hash, Target, RefreshCw, Bot, Check, X, Image as ImageIcon, Settings, Phone } from 'lucide-react-native';
 import { authAPI, uploadAPI } from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
@@ -187,7 +187,7 @@ const ProfileScreen = ({ navigation }) => {
                             <View style={styles.avatarWrapper}>
                                 <Image
                                     key={user?.preferences?.avatarUrl || profilePreview}
-                                    source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
+                                    source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=6366f1&color=fff&size=200` }}
                                     style={styles.avatarImg}
                                 />
                                 {uploading && (
@@ -233,6 +233,7 @@ const ProfileScreen = ({ navigation }) => {
                         <InfoRow icon={Hash} label="Percentile" value={user?.percentile} />
                         <InfoRow icon={Target} label="Rank" value={user?.rank} />
                         <InfoRow icon={MapPin} label="Location" value={user?.location} />
+                        <InfoRow icon={Phone} label="Contact Number" value={user?.phoneNumber} />
                         <InfoRow icon={BookOpen} label="Expected Region" value={user?.expectedRegion} />
                         <TouchableOpacity style={styles.apiKeyRow} onPress={() => setShowKeyModal(true)}>
                             <InfoRow
@@ -282,6 +283,13 @@ const ProfileScreen = ({ navigation }) => {
                         onPress={() => navigation.navigate('CompleteProfile')}
                         style={styles.editBtn}
                     />
+                    <TouchableOpacity
+                        style={styles.settingsBtn}
+                        onPress={() => navigation.navigate('Settings')}
+                    >
+                        <Settings size={20} color={Colors.primary} />
+                        <Text style={styles.settingsText}>App Settings</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
                         <LogOut size={20} color={Colors.error} />
                         <Text style={styles.logoutText}>Log Out</Text>
@@ -486,6 +494,19 @@ const styles = StyleSheet.create({
     rotating: { opacity: 0.5 },
     logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, padding: 16 },
     logoutText: { color: Colors.error, fontWeight: 'bold' },
+    settingsBtn: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: Colors.divider,
+        marginBottom: 12,
+        backgroundColor: Colors.white
+    },
+    settingsText: { color: Colors.primary, fontWeight: 'bold' },
 
     // Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

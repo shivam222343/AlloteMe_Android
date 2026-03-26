@@ -171,7 +171,11 @@ const SettingsScreen = ({ navigation, route }) => {
 
     return (
         <MainLayout title="Settings" scrollable={false}>
-            <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+            <ScrollView
+                style={styles.container}
+                contentContainerStyle={styles.content}
+                showsVerticalScrollIndicator={false}
+            >
 
                 <Text style={styles.sectionHeader}>Preferences</Text>
                 <View style={styles.section}>
@@ -262,6 +266,41 @@ const SettingsScreen = ({ navigation, route }) => {
                         type="link"
                         onPress={() => navigation.navigate('AboutUs')}
                     />
+                </View>
+
+                <Text style={styles.sectionHeader}>Account Actions</Text>
+                <View style={styles.section}>
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => {
+                            Alert.alert(
+                                'Delete Account',
+                                'Are you sure you want to permanently delete your account? This action cannot be undone.',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                        text: 'Delete Permanently',
+                                        style: 'destructive',
+                                        onPress: async () => {
+                                            try {
+                                                await authAPI.deleteProfile();
+                                                logout();
+                                            } catch (e) {
+                                                Alert.alert('Error', 'Failed to delete account');
+                                            }
+                                        }
+                                    }
+                                ]
+                            );
+                        }}
+                    >
+                        <View style={styles.settingLeft}>
+                            <View style={[styles.iconBox, { backgroundColor: '#FEF2F2' }]}>
+                                <Ionicons name="trash-outline" size={22} color="#EF4444" />
+                            </View>
+                            <Text style={[styles.settingTitle, { color: '#EF4444', fontWeight: 'bold' }]}>Delete Account Permanently</Text>
+                        </View>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.footer}>

@@ -16,7 +16,7 @@ const BottomBar = ({ state, navigation }) => {
     const currentRoute = state.routes[state.index].name;
 
     // Hide bar for specific screens
-    if (currentRoute === 'PredictionResults' || currentRoute === 'CollegeDetail') {
+    if (currentRoute === 'PredictionResults' || currentRoute === 'CollegeDetail' || currentRoute === 'AdminUserDetail') {
         return null;
     }
 

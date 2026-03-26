@@ -33,6 +33,9 @@ import FeaturedCollegesScreen from '../screens/FeaturedCollegesScreen';
 import AboutUsScreen from '../screens/AboutUsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import HelpCenterScreen from '../screens/HelpCenterScreen';
+import AdminUsersScreen from '../screens/AdminUsersScreen';
+import AdminUserDetailScreen from '../screens/AdminUserDetailScreen';
+import TermsConditionsScreen from '../screens/TermsConditionsScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -76,7 +79,8 @@ const TabNavigator = () => {
             <Tab.Screen name="AITraining" component={AITrainingScreen} />
             <Tab.Screen name="FrequentQuestionsManager" component={FrequentQuestionsManager} />
             <Tab.Screen name="FeaturedColleges" component={FeaturedCollegesScreen} />
-            <Tab.Screen name="UserManagement" component={ComingSoonScreen} initialParams={{ title: 'User Management' }} />
+            <Tab.Screen name="AdminUsers" component={AdminUsersScreen} />
+            <Tab.Screen name="AdminUserDetail" component={AdminUserDetailScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="SystemAnalytics" component={ComingSoonScreen} initialParams={{ title: 'System Analytics' }} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
             <Tab.Screen
@@ -101,6 +105,7 @@ const TabNavigator = () => {
             />
             <Tab.Screen name="AboutUs" component={AboutUsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="TermsConditions" component={TermsConditionsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="HelpCenter" component={HelpCenterScreen} options={{ tabBarButton: () => null }} />
         </Tab.Navigator>
     );

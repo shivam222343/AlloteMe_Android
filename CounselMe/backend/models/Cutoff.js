@@ -44,15 +44,20 @@ const cutoffSchema = new mongoose.Schema({
 });
 
 // Compound unique index as specified by DB
-cutoffSchema.index({ 
-    collegeId: 1, 
-    examType: 1, 
-    year: 1, 
-    round: 1, 
-    branch: 1, 
-    category: 1, 
-    seatType: 1 
+cutoffSchema.index({
+    collegeId: 1,
+    examType: 1,
+    year: 1,
+    round: 1,
+    branch: 1,
+    category: 1,
+    seatType: 1
 }, { unique: true });
+
+// Performance indexes for AI/Predictor
+cutoffSchema.index({ percentile: -1 });
+cutoffSchema.index({ branch: 'text' });
+cutoffSchema.index({ category: 1 });
 
 const Cutoff = mongoose.model('Cutoff', cutoffSchema);
 module.exports = Cutoff;
