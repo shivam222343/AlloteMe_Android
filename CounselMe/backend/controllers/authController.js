@@ -273,8 +273,8 @@ const toggleSaveCollege = async (req, res) => {
             const { sendNotification } = require('../services/notificationService');
             sendNotification(
                 req.user._id,
-                "College Saved",
-                "Great choice! Saving colleges helps our prediction engine learn your interests.",
+                "College Saved ⭐",
+                "Great choice! Saving colleges helps our prediction engine learn your interests. ❤️",
                 "success"
             );
         }

@@ -22,8 +22,8 @@ router.post('/log', async (req, res) => {
         const { sendNotification } = require('../services/notificationService');
         sendNotification(
             userId,
-            `${action === 'chat' ? 'WhatsApp' : 'Call'} Logged`,
-            "Inquiry successfully recorded. Our counselor will review your profile details.",
+            `${action === 'chat' ? 'WhatsApp 💬' : 'Call 📞'} Logged`,
+            "Inquiry successfully recorded. Our counselor will review your profile details. ✅",
             "info"
         );
 

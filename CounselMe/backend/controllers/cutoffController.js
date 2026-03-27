@@ -318,8 +318,8 @@ const predictColleges = async (req, res) => {
                 const { sendNotification } = require('../services/notificationService');
                 sendNotification(
                     decoded.id,
-                    "Analysis Complete",
-                    `Found ${cleaned.length} colleges matching your profile. Compare them to find your best fit!`,
+                    "Analysis Complete 📊",
+                    `Found ${cleaned.length} colleges matching your profile. Compare them to find your best fit! ✨`,
                     "info"
                 );
             } catch (e) { /* ignore invalid auth for public routes */ }

@@ -42,24 +42,30 @@ const sendNotification = async (userId, title, message, type = 'info') => {
 
 const GREETINGS = {
     morning: [
-        "Good Morning! Start your college search with a positive vibe.",
-        "Rise and shine! New prediction cutoffs are waiting for you.",
-        "Morning! Have you checked the latest featured institutions?"
+        "Good Morning! Start your college search with a positive vibe. ☀️",
+        "Rise and shine! New prediction cutoffs are waiting for you. 🚀",
+        "Morning! Have you checked the latest featured institutions? 🏫"
     ],
     afternoon: [
-        "Good Afternoon! Taking a break? Browse some top-rated colleges.",
-        "Hello! Stay focused on your goals. We're here to help.",
-        "Afternoon! Need help with your prediction results?"
+        "Good Afternoon! Taking a break? Browse some top-rated colleges. 🥤",
+        "Hello! Stay focused on your goals. We're here to help. 🎯",
+        "Afternoon! Need help with your prediction results? 📊"
     ],
     evening: [
-        "Good Evening! Reflect on your career choices today.",
-        "Evening! Don't forget to save the colleges you liked.",
-        "Relaxing? Why not chat with our AI counselor for advice?"
+        "Good Evening! Reflect on your career choices today. 🌙",
+        "Evening! Don't forget to save the colleges you liked. ⭐",
+        "Relaxing? Why not chat with our AI counselor for advice? 💬"
     ]
 };
 
 const sendRandomGreeting = async () => {
-    const hour = new Date().getHours();
+    // Convert to IST (UTC + 5:30)
+    const now = new Date();
+    const utcOffset = now.getTimezoneOffset(); // in minutes
+    const istOffset = 330; // 5 hours 30 mins
+    const istTime = new Date(now.getTime() + (istOffset + utcOffset) * 60000);
+    const hour = istTime.getHours();
+
     let timeSlot = '';
 
     if (hour >= 5 && hour < 12) timeSlot = 'morning';
@@ -70,10 +76,10 @@ const sendRandomGreeting = async () => {
 
     const messages = GREETINGS[timeSlot];
     const message = messages[Math.floor(Math.random() * messages.length)];
-    const title = timeSlot.charAt(0).toUpperCase() + timeSlot.slice(1) + ' Greeting';
+    const emojiMap = { morning: '☀️', afternoon: '🌤️', evening: '🌙' };
+    const title = `${emojiMap[timeSlot]} ${timeSlot.charAt(0).toUpperCase() + timeSlot.slice(1)} Greeting`;
 
     // To preserve resources, we only send to active users (mocked here as simple broadcast)
-    // In a real app, maybe only to those who haven't seen one in 6 hours
     await sendNotification('all', title, message, 'info');
 };
 
