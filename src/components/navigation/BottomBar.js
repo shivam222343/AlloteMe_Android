@@ -29,7 +29,7 @@ const BottomBar = ({ state, navigation }) => {
         { name: 'Dashboard', icon: Home, label: 'Home' },
         { name: 'BrowseColleges', icon: Search, label: 'Browse' },
         { name: 'AICounselor', icon: Bot, label: 'AS AI' },
-        { name: 'ConnectCounselor', icon: User, label: 'Experts' },
+        { name: 'Counselors', icon: User, label: 'Experts' },
     ];
 
     return (

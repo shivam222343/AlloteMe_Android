@@ -36,7 +36,10 @@ export const counselorAPI = {
     getAll: () => api.get('counselors'),
     getById: (id) => api.get(`counselors/${id}`),
     add: (data) => api.post('counselors', data),
+    update: (id, data) => api.put(`counselors/${id}`, data),
     delete: (id) => api.delete(`counselors/${id}`),
+    logAction: (data) => api.post('counselors/log', data),
+    getLogs: (id) => api.get(`counselors/${id}/logs`),
 };
 
 export const institutionAPI = {
@@ -46,9 +49,7 @@ export const institutionAPI = {
     add: (data) => api.post('institutions', data),
     update: (id, data) => api.put(`institutions/${id}`, data),
     delete: (id) => api.delete(`institutions/${id}`),
-    uploadImage: (formData) => api.post('upload/image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    uploadImage: (formData) => api.post('upload/image', formData),
 };
 
 export const cutoffAPI = {
@@ -57,9 +58,7 @@ export const cutoffAPI = {
     estimateRank: (percentile) => api.get('cutoffs/estimate-rank', { params: { percentile } }),
     getByInstitution: (id) => api.get(`cutoffs/${id}`),
     add: (data) => api.post('cutoffs', data),
-    importExcel: (formData) => api.post('cutoffs/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    importExcel: (formData) => api.post('cutoffs/import', formData),
 };
 
 export const notificationsAPI = {
@@ -69,8 +68,10 @@ export const notificationsAPI = {
 };
 
 export const aiAPI = {
-    chat: (message, context) => api.post('ai/chat', { message, context }),
-    getRecommendation: (preferences) => api.post('ai/recommend', { preferences }),
+    counsel: (data) => api.post('ai/counsel', data),
+    getChats: () => api.get('ai/chats'),
+    saveChat: (data) => api.post('ai/chats', data),
+    getFrequentQuestions: () => api.get('ai/frequent-questions'),
 };
 
 export default {

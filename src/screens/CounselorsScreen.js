@@ -38,10 +38,11 @@ const CounselorsScreen = ({ navigation }) => {
         fetchCounselors();
     };
 
-    const filteredCounselors = counselors.filter(c =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.field.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredCounselors = counselors.filter(c => {
+        const nameMatch = c.name?.toLowerCase().includes(searchQuery.toLowerCase());
+        const fieldMatch = c.field?.toLowerCase().includes(searchQuery.toLowerCase());
+        return nameMatch || fieldMatch;
+    });
 
     const renderCard = ({ item }) => (
         <TouchableOpacity
@@ -68,7 +69,9 @@ const CounselorsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.metaItem}>
                             <MapPin size={14} color="#64748b" />
-                            <Text style={styles.metaText}>{item.location}</Text>
+                            <Text style={styles.metaText}>
+                                {item.cityName || (typeof item.location === 'string' ? item.location : 'Expert')}
+                            </Text>
                         </View>
                     </View>
                 </View>

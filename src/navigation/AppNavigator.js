@@ -38,6 +38,7 @@ import HelpCenterScreen from '../screens/HelpCenterScreen';
 import AdminUsersScreen from '../screens/AdminUsersScreen';
 import AdminUserDetailScreen from '../screens/AdminUserDetailScreen';
 import TermsConditionsScreen from '../screens/TermsConditionsScreen';
+import AdminCounselorLogsScreen from '../screens/AdminCounselorLogsScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -91,6 +92,7 @@ const TabNavigator = () => {
             <Tab.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="TermsConditions" component={TermsConditionsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="HelpCenter" component={HelpCenterScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="AdminCounselorLogs" component={AdminCounselorLogsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="SystemAnalytics" component={ComingSoonScreen} initialParams={{ title: 'System Analytics' }} />
         </Tab.Navigator>
     );

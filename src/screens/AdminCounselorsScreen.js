@@ -14,12 +14,13 @@ const AdminCounselorsScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [editingId, setEditingId] = useState(null);
 
     // Form State
     const [name, setName] = useState('');
     const [field, setField] = useState('');
     const [experience, setExperience] = useState('');
-    const [location, setLocation] = useState('');
+    const [cityName, setCityName] = useState('');
     const [contact, setContact] = useState('');
     const [email, setEmail] = useState('');
     const [description, setDescription] = useState('');
@@ -53,7 +54,7 @@ const AdminCounselorsScreen = ({ navigation }) => {
         }
     };
 
-    const handleAdd = async () => {
+    const handleSave = async () => {
         if (!name || !field || !experience || !contact) {
             Alert.alert("Error", "Please fill required fields (Name, Field, Exp, Contact)");
             return;
@@ -61,32 +62,45 @@ const AdminCounselorsScreen = ({ navigation }) => {
 
         setSubmitting(true);
         try {
-            let imageUrl = 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=200';
+            let imageUrl = image;
 
-            if (image) {
+            if (image && !image.startsWith('http')) {
+                console.log('Uploading local image:', image);
                 const formData = new FormData();
+
+                // Fix for Android URI format if needed
+                const uri = Platform.OS === 'android' ? image : image.replace('file://', '');
+
                 formData.append('image', {
-                    uri: image,
-                    name: 'counselor_profile.jpg',
+                    uri: image, // Expo Picked URI is usually fine as is
+                    name: `counselor_${Date.now()}.jpg`,
                     type: 'image/jpeg',
                 });
                 const uploadRes = await institutionAPI.uploadImage(formData);
                 imageUrl = uploadRes.data.url;
+            } else if (!image) {
+                imageUrl = 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=200';
             }
 
             const data = {
-                name,
-                field,
-                experience,
-                location: location || "India",
-                contactNumber: contact,
-                email,
-                description,
+                name: name.trim(),
+                field: field.trim(),
+                experience: experience.trim(),
+                cityName: (cityName || "India").trim(),
+                contactNumber: contact.trim(),
+                email: (email || "").trim(),
+                description: (description || "").trim(),
                 profileImage: imageUrl
             };
 
-            await counselorAPI.add(data);
-            Alert.alert("Success", "Counselor added successfully");
+            if (editingId) {
+                await counselorAPI.update(editingId, data);
+                Alert.alert("Success", "Counselor updated successfully");
+            } else {
+                await counselorAPI.add(data);
+                Alert.alert("Success", "Counselor added successfully");
+            }
+
             setModalVisible(false);
             resetForm();
             fetchCounselors();
@@ -110,15 +124,29 @@ const AdminCounselorsScreen = ({ navigation }) => {
         ]);
     };
 
+    const handleEdit = (c) => {
+        setEditingId(c._id);
+        setName(c.name);
+        setField(c.field);
+        setExperience(c.experience);
+        setCityName(c.cityName || c.location || '');
+        setContact(c.contactNumber);
+        setEmail(c.email || '');
+        setDescription(c.description || '');
+        setImage(c.profileImage);
+        setModalVisible(true);
+    };
+
     const resetForm = () => {
-        setName(''); setField(''); setExperience(''); setLocation('');
+        setEditingId(null);
+        setName(''); setField(''); setExperience(''); setCityName('');
         setContact(''); setEmail(''); setDescription(''); setImage(null);
     };
 
     return (
         <MainLayout title="Manage Counselors">
             <View style={styles.container}>
-                <TouchableOpacity style={styles.addBtn} onPress={() => setModalVisible(true)}>
+                <TouchableOpacity style={styles.addBtn} onPress={() => { resetForm(); setModalVisible(true); }}>
                     <Plus size={20} color="white" />
                     <Text style={styles.addBtnText}>Add New Counselor</Text>
                 </TouchableOpacity>
@@ -130,17 +158,27 @@ const AdminCounselorsScreen = ({ navigation }) => {
                         data={counselors}
                         keyExtractor={item => item._id}
                         renderItem={({ item }) => (
-                            <View style={styles.card}>
+                            <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('AdminCounselorLogs', { counselor: item })}>
                                 <Image source={{ uri: item.profileImage }} style={styles.cardImg} />
                                 <View style={styles.cardInfo}>
-                                    <Text style={styles.cardName}>{item.name}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <Text style={styles.cardName}>{item.name}</Text>
+                                        <View style={{ backgroundColor: Colors.primary + '10', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                                            <Text style={{ fontSize: 10, color: Colors.primary, fontWeight: 'bold' }}>Analytics</Text>
+                                        </View>
+                                    </View>
                                     <View style={styles.cardRow}><Briefcase size={12} color="#64748b" /><Text style={styles.cardSub}>{item.field}</Text></View>
                                     <View style={styles.cardRow}><Award size={12} color="#64748b" /><Text style={styles.cardSub}>{item.experience}</Text></View>
                                 </View>
-                                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item._id)}>
-                                    <Trash2 size={20} color="#ef4444" />
-                                </TouchableOpacity>
-                            </View>
+                                <View style={styles.cardActions}>
+                                    <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(item)}>
+                                        <Award size={20} color={Colors.primary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item._id)}>
+                                        <Trash2 size={20} color="#ef4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableOpacity>
                         )}
                         ListEmptyComponent={<Text style={styles.empty}>No counselors added yet.</Text>}
                     />
@@ -149,7 +187,7 @@ const AdminCounselorsScreen = ({ navigation }) => {
 
             {/* Add Modal */}
             <Modal visible={modalVisible} animationType="slide">
-                <MainLayout title="New Counselor">
+                <MainLayout title={editingId ? "Edit Counselor" : "New Counselor"}>
                     <ScrollView style={styles.modalScroll}>
                         <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
                             {image ? (
@@ -189,7 +227,7 @@ const AdminCounselorsScreen = ({ navigation }) => {
 
                         <View style={styles.inputBox}>
                             <Text style={styles.label}>Location</Text>
-                            <TextInput style={styles.input} placeholder="e.g. Pune, Maharashtra" value={location} onChangeText={setLocation} />
+                            <TextInput style={styles.input} placeholder="e.g. Pune, Maharashtra" value={cityName} onChangeText={setCityName} />
                         </View>
 
                         <View style={styles.inputBox}>
@@ -199,8 +237,8 @@ const AdminCounselorsScreen = ({ navigation }) => {
 
                         <View style={styles.modalBtns}>
                             <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}><Text style={styles.cancelBtnText}>Cancel</Text></TouchableOpacity>
-                            <TouchableOpacity style={styles.saveBtn} onPress={handleAdd} disabled={submitting}>
-                                {submitting ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Save Counselor</Text>}
+                            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={submitting}>
+                                {submitting ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>{editingId ? "Update Info" : "Save Counselor"}</Text>}
                             </TouchableOpacity>
                         </View>
                         <View style={{ height: 40 }} />
@@ -221,6 +259,8 @@ const styles = StyleSheet.create({
     cardName: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
     cardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
     cardSub: { fontSize: 12, color: '#64748b' },
+    cardActions: { flexDirection: 'row', gap: 5 },
+    editBtn: { padding: 10, marginRight: 5 },
     deleteBtn: { padding: 10 },
     empty: { textAlign: 'center', marginTop: 50, color: '#94a3b8' },
     modalScroll: { flex: 1, padding: 20 },

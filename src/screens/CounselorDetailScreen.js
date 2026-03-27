@@ -22,6 +22,20 @@ const CounselorDetailScreen = ({ route, navigation }) => {
         fetchCounselor();
     }, [id]);
 
+    const logInteraction = async (action) => {
+        try {
+            if (user?._id) {
+                await counselorAPI.logAction({
+                    counselorId: id,
+                    userId: user._id,
+                    action
+                });
+            }
+        } catch (e) {
+            console.log('Log failed', e);
+        }
+    };
+
     const fetchCounselor = async () => {
         try {
             const res = await counselorAPI.getById(id);
@@ -35,12 +49,14 @@ const CounselorDetailScreen = ({ route, navigation }) => {
 
     const handleCall = () => {
         if (counselor?.contactNumber) {
+            logInteraction('call');
             Linking.openURL(`tel:${counselor.contactNumber}`);
         }
     };
 
     const handleWhatsApp = () => {
         if (counselor?.contactNumber) {
+            logInteraction('chat');
             const phoneNumber = counselor.contactNumber.startsWith('+91')
                 ? counselor.contactNumber
                 : `+91${counselor.contactNumber}`;
@@ -127,7 +143,9 @@ const CounselorDetailScreen = ({ route, navigation }) => {
                         <Text style={styles.sectionTitle}>Contact Information</Text>
                         <View style={styles.contactItem}>
                             <MapPin size={20} color="#64748b" />
-                            <Text style={styles.contactText}>{counselor.location}</Text>
+                            <Text style={styles.contactText}>
+                                {counselor.cityName || (typeof counselor.location === 'string' ? counselor.location : 'Expert Support')}
+                            </Text>
                         </View>
                         {counselor.email && (
                             <View style={styles.contactItem}>

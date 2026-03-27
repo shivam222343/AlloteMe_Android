@@ -17,7 +17,7 @@ const counselorSchema = new mongoose.Schema({
         type: String, // e.g. "Engineering", "Medical", "Career"
         required: true
     },
-    location: {
+    cityName: {
         type: String,
         required: true
     },
