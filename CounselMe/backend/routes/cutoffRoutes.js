@@ -20,7 +20,7 @@ router.post('/bulk', protect, authorize('admin'), bulkAddCutoffData);
 router.post('/parse', protect, authorize('admin'), parseCutoffData);
 router.post('/parse-bulk', protect, authorize('admin'), parseBulkCutoffData);
 
-router.delete('/:institutionId/branch/:branchName', protect, authorize('admin'), deleteCutoffs);
+router.delete('/:institutionId/branch', protect, authorize('admin'), deleteCutoffs);
 
 router.post('/predict', protect, predictColleges);
 router.get('/:institutionId', getCutoffsByInstitution);

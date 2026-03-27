@@ -11,9 +11,7 @@ const { initSocket } = require('./utils/socket');
 const app = express();
 const server = http.createServer(app);
 
-// Connect to Databases
-connectDB();
-connectRedis();
+// Pre-startup initialization (Sockets, etc.)
 
 // Initialize Socket.io
 const io = initSocket(server);
@@ -43,7 +41,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(morgan('dev'));
 
 // Custom logging middleware to ensure we see every hit
@@ -64,21 +63,27 @@ app.get('/', (req, res) => {
     res.send('CounselMe API is running...');
 });
 
-const { sendRandomGreeting } = require('./services/notificationService');
-
 const PORT = process.env.PORT || 5100;
 
-server.listen(PORT, () => {
-    console.log(`Server (with Sockets) running on port ${PORT}`);
+// Initialize Connections & Start Server
+const startServer = async () => {
+    try {
+        await connectDB();
+        await connectRedis();
 
-    // Random greetings logic: Check every 4 hours
-    // (Actual sending logic inside check times of day)
-    setInterval(() => {
-        sendRandomGreeting();
-    }, 4 * 60 * 60 * 1000);
+        server.listen(PORT, () => {
+            console.log(`Server (with Sockets) running on port ${PORT}`);
 
-    // Send one shortly after start for testing/immediate impact
-    setTimeout(() => {
-        sendRandomGreeting();
-    }, 1000 * 60 * 5); // 5 mins after start
-});
+            // Random greetings logic: Check every 4 hours
+            setInterval(() => {
+                const { sendRandomGreeting } = require('./services/notificationService');
+                sendRandomGreeting();
+            }, 4 * 60 * 60 * 1000);
+        });
+    } catch (error) {
+        console.error('Fatal: Server failed to start:', error.message);
+        process.exit(1);
+    }
+};
+
+startServer();

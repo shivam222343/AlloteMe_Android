@@ -1,5 +1,6 @@
 const Cutoff = require('../models/Cutoff');
 const Institution = require('../models/Institution');
+const Groq = require('groq-sdk');
 
 // Category Mapping for Maharashtra DTE Data
 const CATEGORY_ALIASES = {
@@ -383,28 +384,168 @@ const addCutoffData = async (req, res) => {
 
 const bulkAddCutoffData = async (req, res) => {
     try {
-        const results = await Cutoff.insertMany(req.body);
-        res.status(201).json(results);
+        const { institutionId, items } = req.body;
+
+        if (!institutionId || !items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ message: 'institutionId and items array are required' });
+        }
+
+        // Flatten branches -> individual Cutoff documents
+        const documents = [];
+        for (const item of items) {
+            const { branchName, examType, year, round, cutoffData } = item;
+            if (!branchName || !examType || !year || !round || !Array.isArray(cutoffData)) continue;
+
+            for (const entry of cutoffData) {
+                if (!entry.category || entry.percentile == null) continue;
+                documents.push({
+                    collegeId: institutionId,
+                    branch: branchName,
+                    examType,
+                    year: parseInt(year),
+                    round: parseInt(round),
+                    category: entry.category,
+                    percentile: parseFloat(entry.percentile),
+                    rank: entry.rank || null,
+                    seatType: entry.seatType || null
+                });
+            }
+        }
+
+        if (documents.length === 0) {
+            return res.status(400).json({ message: 'No valid cutoff documents to insert. Check your data format.' });
+        }
+
+        // ordered: false = continue inserting valid docs even if some are duplicates
+        let inserted = 0;
+        let skipped = 0;
+        try {
+            const result = await Cutoff.insertMany(documents, { ordered: false });
+            inserted = result.length;
+        } catch (bulkErr) {
+            if (bulkErr.code === 11000 || bulkErr.name === 'MongoBulkWriteError') {
+                inserted = bulkErr.result?.insertedCount || 0;
+                skipped = documents.length - inserted;
+            } else {
+                throw bulkErr;
+            }
+        }
+
+        res.status(201).json({
+            message: `Inserted ${inserted} cutoff entries${skipped > 0 ? `, skipped ${skipped} duplicates` : ''}.`,
+            inserted,
+            skipped
+        });
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        console.error('Bulk Insert Error:', error.message);
+        res.status(500).json({ message: error.message });
     }
 };
 
 const parseCutoffData = async (req, res) => {
-    res.json({ message: "Parser not implemented" });
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ message: 'No text provided' });
+
+    const userKey = req.user?.groqApiKey;
+    const apiKey = (userKey && userKey.trim() !== '') ? userKey : process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({ message: 'Groq API Key not configured. Please add it to your profile.' });
+    }
+
+    const groq = new Groq({ apiKey });
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are a data extraction assistant. Extract EVERY single cutoff point from the provided text.
+Return a JSON object: { "cutoffData": [ { "category": string, "percentile": number } ] }
+Guidelines:
+1. Extract ALL categories found (OPEN, OBC, SC, ST, NT, EWS, TFWS, etc).
+2. Use ONLY the percentile value (e.g. 98.45). Skip ranks.
+3. If thousands of entries exist, return them ALL. Do not summarize.`
+                },
+                {
+                    role: 'user',
+                    content: text
+                }
+            ],
+            model: 'llama-3.3-70b-versatile',
+            response_format: { type: 'json_object' }
+        });
+
+        const extractedData = JSON.parse(chatCompletion.choices[0].message.content);
+        res.json(extractedData);
+    } catch (error) {
+        console.error('Groq Error:', error);
+        res.status(500).json({ message: 'Error parsing cutoff text' });
+    }
 };
 
 const parseBulkCutoffData = async (req, res) => {
-    res.json({ message: "Bulk parser not implemented" });
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ message: 'No text provided' });
+
+    const userKey = req.user?.groqApiKey;
+    const apiKey = (userKey && userKey.trim() !== '') ? userKey : process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({ message: 'Groq API Key not configured. Please add it to your profile.' });
+    }
+
+    const groq = new Groq({ apiKey });
+
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are a data extraction assistant. Extract multiple branch cutoffs from the provided text.
+Return a JSON object: { "branches": [ { "branchName": string, "cutoffData": [ { "category": string, "percentile": number } ] } ] }
+Detailed Rules:
+1. Detect ALL branch names accurately.
+2. For each branch, extract ALL categories and percentiles.
+3. Handle large amounts of text by being thorough. Do not truncate the list.
+4. Ensure the output is valid JSON.`
+                },
+                {
+                    role: 'user',
+                    content: text
+                }
+            ],
+            model: 'llama-3.3-70b-versatile',
+            response_format: { type: 'json_object' }
+        });
+
+        const extractedData = JSON.parse(chatCompletion.choices[0].message.content);
+        res.json(extractedData);
+    } catch (error) {
+        console.error('Groq Error:', error);
+        res.status(500).json({ message: 'Error parsing bulk cutoff text' });
+    }
 };
 
 const deleteCutoffs = async (req, res) => {
     try {
-        await Cutoff.deleteMany({
+        const { branch, examType, year, round } = req.query;
+
+        if (!branch) {
+            return res.status(400).json({ message: 'branch query parameter is required' });
+        }
+
+        const query = {
             collegeId: req.params.institutionId,
-            branch: req.params.branchName
-        });
-        res.json({ message: "Cutoffs deleted" });
+            branch: decodeURIComponent(branch)
+        };
+
+        if (examType) query.examType = examType;
+        if (year) query.year = parseInt(year);
+        if (round) query.round = parseInt(round);
+
+        const result = await Cutoff.deleteMany(query);
+        res.json({ message: `Deleted ${result.deletedCount} cutoff(s)` });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

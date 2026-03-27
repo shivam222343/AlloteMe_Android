@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 // Switch to LOCAL_URL for development, RENDER_URL for production
-const API_BASE_URL = RENDER_URL;
+const API_BASE_URL = LOCAL_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -53,10 +53,12 @@ export const institutionAPI = {
     getFeatured: () => api.get('institutions/featured'),
     getById: (id) => api.get(`institutions/${id}`),
     add: (data) => api.post('institutions', data),
+    create: (data) => api.post('institutions', data), // Alias for consistency
     update: (id, data) => api.put(`institutions/${id}`, data),
     delete: (id) => api.delete(`institutions/${id}`),
     toggleFeature: (id) => api.put(`institutions/${id}/feature`),
     uploadImage: (formData) => api.post('upload/image', formData),
+    parse: (text) => api.post('institutions/parse', { text }),
 };
 
 export const cutoffAPI = {
@@ -65,7 +67,11 @@ export const cutoffAPI = {
     estimateRank: (percentile) => api.get('cutoffs/estimate-rank', { params: { percentile } }),
     getByInstitution: (id) => api.get(`cutoffs/${id}`),
     add: (data) => api.post('cutoffs', data),
+    bulkAdd: (data) => api.post('cutoffs/bulk', data),
+    delete: (institutionId, branch, params) => api.delete(`cutoffs/${institutionId}/branch`, { params: { branch, ...params } }),
     importExcel: (formData) => api.post('cutoffs/import', formData),
+    parse: (text) => api.post('cutoffs/parse', { text }),
+    parseBulk: (text) => api.post('cutoffs/parse-bulk', { text }),
 };
 
 export const notificationsAPI = {
@@ -82,6 +88,8 @@ export const aiAPI = {
     getChats: () => api.get('ai/chats'),
     saveChat: (data) => api.post('ai/chats', data),
     getFrequentQuestions: () => api.get('ai/frequent-questions'),
+    trainAI: (data) => api.post('ai/train', data),
+    setFrequentQuestion: (data) => api.post('ai/frequent-questions', data),
 };
 
 export default {
