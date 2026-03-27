@@ -4,6 +4,7 @@ import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { MapPin, Star, Building2, ChevronRight, Bookmark } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import OptimizedImage from '../components/ui/OptimizedImage';
 
 const SavedCollegesScreen = ({ navigation }) => {
     const { user, refreshUser } = useAuth();
@@ -51,7 +52,10 @@ const SavedCollegesScreen = ({ navigation }) => {
         >
             <View style={styles.itemHeader}>
                 {item.galleryImages && item.galleryImages[0] ? (
-                    <Image source={{ uri: item.galleryImages[0] }} style={styles.itemThumbnail} />
+                    <OptimizedImage
+                        source={{ uri: item.galleryImages[0] }}
+                        style={styles.itemThumbnail}
+                    />
                 ) : (
                     <Image source={require('../assets/images/college_default.jpg')} style={styles.itemThumbnail} />
                 )}

@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://localhost:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
-const API_BASE_URL = LOCAL_URL;
+const API_BASE_URL = RENDER_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -87,6 +87,36 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const toggleSaveOptimistic = async (collegeId) => {
+        if (!user) return;
+
+        // Optimistic State Update
+        const prevSaved = [...(user.savedColleges || [])];
+        const isCurrentlySaved = prevSaved.some(c => (c._id === collegeId || c === collegeId));
+
+        // Immediate local UI change
+        let newSaved;
+        if (isCurrentlySaved) {
+            newSaved = prevSaved.filter(c => (c._id !== collegeId && c !== collegeId));
+        } else {
+            newSaved = [...prevSaved, collegeId];
+        }
+
+        setUser(prev => ({ ...prev, savedColleges: newSaved }));
+
+        try {
+            const res = await authAPI.toggleSave(collegeId);
+            if (res.data.success) {
+                // Final sync with server-side populated entities
+                setUser(prev => ({ ...prev, savedColleges: res.data.savedColleges }));
+            }
+        } catch (error) {
+            console.error('[AuthContext] Toggle save error:', error);
+            // Rollback on error
+            setUser(prev => ({ ...prev, savedColleges: prevSaved }));
+        }
+    };
+
     return (
         <AuthContext.Provider value={{
             isAuthenticated: !!user,
@@ -96,6 +126,7 @@ export const AuthProvider = ({ children }) => {
             register,
             logout,
             refreshUser,
+            toggleSaveOptimistic,
             hasSkippedProfile,
             setHasSkippedProfile,
             socket,

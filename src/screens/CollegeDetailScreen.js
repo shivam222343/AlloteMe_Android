@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, institutionAPI, cutoffAPI } from '../services/api';
 import { Colors, Shadows } from '../constants/theme';
+import OptimizedImage from '../components/ui/OptimizedImage';
 import { Modal } from 'react-native';
 
 const { width, height: screenHeight } = Dimensions.get('window');
@@ -48,7 +49,7 @@ body { font-family:sans-serif; background:#f0f4f8; }
 <script>
 var map = L.map('map').setView([${lat}, ${lng}], 16);
 var layers = {
-  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OSM', maxZoom:19 }),
+  street: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution:'&copy; CARTO', maxZoom:19 }),
   satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'Tiles &copy; Esri', maxZoom:19 }),
   terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenTopoMap', maxZoom:17 })
 };
@@ -68,7 +69,7 @@ const FACILITY_ICONS = { 'WiFi': Wifi, 'Canteen': Utensils, 'Library': Library, 
 
 const CollegeDetailScreen = ({ route, navigation }) => {
     const { id } = route.params;
-    const { user, socket, refreshUser } = useAuth();
+    const { user, socket, refreshUser, toggleSaveOptimistic } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [inst, setInst] = useState(null);
     const [cutoffs, setCutoffs] = useState([]);
@@ -120,14 +121,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
     };
 
     const handleToggleSave = async () => {
-        try {
-            const res = await authAPI.toggleSave(id);
-            if (res.data.success) {
-                await refreshUser();
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to update saved list');
-        }
+        await toggleSaveOptimistic(id);
     };
 
     const handleDelete = async () => {
@@ -399,7 +393,13 @@ const CollegeDetailScreen = ({ route, navigation }) => {
         return (
             <View style={styles.tabContent}>
                 <View style={styles.galleryGrid}>
-                    {images.map((img, i) => <Image key={i} source={{ uri: img }} style={styles.galleryImg} />)}
+                    {images.map((img, i) => (
+                        <OptimizedImage
+                            key={i}
+                            source={{ uri: img }}
+                            style={styles.galleryImg}
+                        />
+                    ))}
                 </View>
                 <View style={{ height: 40 }} />
             </View>
@@ -436,7 +436,13 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                 {/* 0 – Image Carousel */}
                 <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.carousel}>
                     {inst.galleryImages && inst.galleryImages.length > 0 ? (
-                        inst.galleryImages.map((img, i) => <Image key={i} source={{ uri: img }} style={styles.bannerImg} />)
+                        inst.galleryImages.map((img, i) => (
+                            <OptimizedImage
+                                key={i}
+                                source={{ uri: img }}
+                                style={styles.bannerImg}
+                            />
+                        ))
                     ) : (
                         <Image source={require('../assets/images/college_default.jpg')} style={styles.bannerImg} />
                     )}

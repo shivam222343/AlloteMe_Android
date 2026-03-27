@@ -11,6 +11,7 @@ import { Colors, Shadows } from '../constants/theme';
 import { MapPin, Navigation, Maximize2, X, Route, Star, Clock, RefreshCcw, Map as MapIcon, ChevronRight, SlidersHorizontal, AlertCircle, Info } from 'lucide-react-native';
 import { institutionAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import OptimizedImage from '../components/ui/OptimizedImage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -240,7 +241,9 @@ const NearbyCollegesScreen = ({ navigation }) => {
                 <div id="map"></div>
                 <script>
                     var map = L.map('map').setView([${location.latitude}, ${location.longitude}], 12);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap &copy; CARTO'
+                    }).addTo(map);
                     L.marker([${location.latitude}, ${location.longitude}], { icon: L.divIcon({ className:'u-mark', iconSize:[16,16]}) }).addTo(map);
                     var markers = ${JSON.stringify(collegeMarkers)};
                     function safeSend(msg) { try { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg); else window.parent.postMessage({ nativeEvent: { data: msg } }, "*"); } catch(e){} }
@@ -465,7 +468,10 @@ const NearbyCollegesScreen = ({ navigation }) => {
                             filteredColleges.map((item) => (
                                 <TouchableOpacity key={item._id} style={styles.collegeCard} onPress={() => navigation.navigate('CollegeDetail', { id: item._id })}>
                                     <View style={styles.cardTop}>
-                                        <Image source={{ uri: item.galleryImages?.[0] || 'https://images.unsplash.com/photo-1541339907198-e08756eaa589?q=80&w=200' }} style={styles.collegeImage} />
+                                        <OptimizedImage
+                                            source={{ uri: item.galleryImages?.[0] || 'https://images.unsplash.com/photo-1541339907198-e08756eaa589?q=80&w=200' }}
+                                            style={styles.collegeImage}
+                                        />
                                         <View style={styles.collegeMain}>
                                             <Text style={styles.collegeTitle}>{item.name}</Text>
                                             <Text style={styles.subtitle}>{item.university}</Text>

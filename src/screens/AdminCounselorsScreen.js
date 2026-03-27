@@ -83,18 +83,19 @@ const AdminCounselorsScreen = ({ navigation }) => {
             }
 
             const data = {
-                name: name.trim(),
-                field: field.trim(),
-                experience: experience.trim(),
+                name: (name || "").trim(),
+                field: (field || "").trim(),
+                experience: (experience || "").trim(),
                 cityName: (cityName || "India").trim(),
-                contactNumber: contact.trim(),
+                contactNumber: (contact || "").trim(), // Ensure this matches model
                 email: (email || "").trim(),
                 description: (description || "").trim(),
                 profileImage: imageUrl
             };
 
             if (editingId) {
-                await counselorAPI.update(editingId, data);
+                const res = await counselorAPI.update(editingId, data);
+                console.log('[CounselorUpdate] Response:', res.data);
                 Alert.alert("Success", "Counselor updated successfully");
             } else {
                 await counselorAPI.add(data);
@@ -169,10 +170,12 @@ const AdminCounselorsScreen = ({ navigation }) => {
                                     </View>
                                     <View style={styles.cardRow}><Briefcase size={12} color="#64748b" /><Text style={styles.cardSub}>{item.field}</Text></View>
                                     <View style={styles.cardRow}><Award size={12} color="#64748b" /><Text style={styles.cardSub}>{item.experience}</Text></View>
+                                    <View style={styles.cardRow}><Phone size={12} color="#64748b" /><Text style={styles.cardSub}>{item.contactNumber}</Text></View>
+                                    <View style={styles.cardRow}><MapPin size={12} color="#64748b" /><Text style={styles.cardSub}>{item.cityName}</Text></View>
                                 </View>
                                 <View style={styles.cardActions}>
                                     <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(item)}>
-                                        <Award size={20} color={Colors.primary} />
+                                        <Briefcase size={20} color={Colors.primary} />
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item._id)}>
                                         <Trash2 size={20} color="#ef4444" />

@@ -63,10 +63,27 @@ router.post('/', async (req, res) => {
 // Update a counselor
 router.put('/:id', async (req, res) => {
     try {
-        const counselor = await Counselor.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
-            runValidators: true
-        });
+        const { name, profileImage, experience, field, cityName, contactNumber, email, description } = req.body;
+
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (profileImage !== undefined) updateData.profileImage = profileImage;
+        if (experience !== undefined) updateData.experience = experience;
+        if (field !== undefined) updateData.field = field;
+        if (cityName !== undefined) updateData.cityName = cityName;
+        if (contactNumber !== undefined) updateData.contactNumber = contactNumber;
+        if (email !== undefined) updateData.email = email;
+        if (description !== undefined) updateData.description = description;
+
+        console.log(`[CounselorUpdate] Updating ${req.params.id} with:`, updateData);
+
+        const counselor = await Counselor.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        );
+
+        if (!counselor) return res.status(404).json({ message: "Counselor not found" });
         res.json(counselor);
     } catch (error) {
         console.error('Update Counselor Error:', error);

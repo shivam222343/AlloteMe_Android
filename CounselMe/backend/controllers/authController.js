@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Institution = require('../models/Institution');
 const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
+const { client: redis } = require('../config/redis');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -84,28 +85,43 @@ const loginUser = async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 const getUserProfile = async (req, res) => {
-    const user = await User.findById(req.user._id);
+    try {
+        const cacheKey = `user_profile_${req.user._id}`;
+        const cachedData = await redis.get(cacheKey);
 
-    if (user) {
-        res.json({
-            _id: user._id,
-            displayName: user.displayName,
-            email: user.email,
-            role: user.role,
-            examType: user.examType,
-            percentile: user.percentile,
-            rank: user.rank,
-            location: user.location,
-            expectedRegion: user.expectedRegion,
-            bannerUrl: user.bannerUrl,
-            preferences: user.preferences,
-            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
-            groqApiKey: user.groqApiKey,
-            isVerified: user.isVerified,
-            phoneNumber: user.phoneNumber
-        });
-    } else {
-        res.status(404).json({ message: 'User not found' });
+        if (cachedData) {
+            console.log(`[Redis] Hit: ${cacheKey}`);
+            return res.json(JSON.parse(cachedData));
+        }
+
+        const user = await User.findById(req.user._id);
+
+        if (user) {
+            const profileData = {
+                _id: user._id,
+                displayName: user.displayName,
+                email: user.email,
+                role: user.role,
+                examType: user.examType,
+                percentile: user.percentile,
+                rank: user.rank,
+                location: user.location,
+                expectedRegion: user.expectedRegion,
+                bannerUrl: user.bannerUrl,
+                preferences: user.preferences,
+                savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
+                groqApiKey: user.groqApiKey,
+                isVerified: user.isVerified,
+                phoneNumber: user.phoneNumber
+            };
+
+            await redis.set(cacheKey, JSON.stringify(profileData), { EX: 3600 }); // Cache for 1 hour
+            res.json(profileData);
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -137,6 +153,9 @@ const updateUserProfile = async (req, res) => {
         }
 
         const updatedUser = await user.save();
+
+        // Invalidate cache
+        await redis.del(`user_profile_${req.user._id}`);
 
         res.json({
             _id: updatedUser._id,
@@ -187,6 +206,9 @@ const toggleSaveCollege = async (req, res) => {
             user.savedColleges.push(collegeId);
         }
         await user.save();
+
+        // Invalidate cache
+        await redis.del(`user_profile_${req.user._id}`);
 
         // Return populated saved colleges to sync frontend state
         const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university');

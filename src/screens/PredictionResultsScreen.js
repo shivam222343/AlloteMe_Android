@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
 import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck, Star } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
+import OptimizedImage from '../components/ui/OptimizedImage';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -217,35 +218,24 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                             <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
                         </View>
                         <View style={styles.instHeader}>
-                            <Text style={styles.instName} numberOfLines={2}>
-                                {item.collegeId?.name || 'Unknown Institution'}
-                            </Text>
-                            <View style={styles.locRow}>
-                                <MapPin size={10} color={Colors.text.tertiary} />
-                                <Text style={styles.locText}>{item.collegeId?.location?.city || 'Verified'}</Text>
-                                <View style={styles.sep} />
-                                <Text style={styles.dteText}>DTE: {item.collegeId?.dteCode || '—'}</Text>
+                            <View style={styles.instBasicRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.instName} numberOfLines={2}>
+                                        {item.collegeId?.name || 'Unknown Institution'}
+                                    </Text>
+                                    <View style={styles.locRow}>
+                                        <MapPin size={10} color={Colors.text.tertiary} />
+                                        <Text style={styles.locText}>{item.collegeId?.location?.city || 'Verified'}</Text>
+                                        <View style={styles.sep} />
+                                        <Text style={styles.dteText}>DTE: {item.collegeId?.dteCode || '—'}</Text>
+                                    </View>
+                                </View>
                             </View>
                         </View>
+
                         <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: item.chanceColor + '10' }]}>
                             <Text style={[styles.matchPercent, { color: item.chanceColor }]}>{item.chanceLabel}</Text>
                         </View>
-
-                        {user?.role === 'student' && (
-                            <TouchableOpacity
-                                onPress={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleSave(item.collegeId?._id);
-                                }}
-                                style={{ padding: 6, marginRight: 4 }}
-                            >
-                                <Star
-                                    size={20}
-                                    color={isSaved ? "#F59E0B" : "#CBD5E1"}
-                                    fill={isSaved ? "#F59E0B" : "transparent"}
-                                />
-                            </TouchableOpacity>
-                        )}
 
                         <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDelete(item.key); }} style={styles.deleteBtn}>
                             <X size={16} color="#94a3b8" />
@@ -391,6 +381,8 @@ const styles = StyleSheet.create({
     numberTag: { width: 24, height: 24, borderRadius: 6, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center', marginRight: 8 },
     numberText: { fontSize: 10, fontWeight: '800', color: Colors.primary },
     instHeader: { flex: 1 },
+    instBasicRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    collegeThumb: { width: 40, height: 40, borderRadius: 8 },
     instName: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary },
     locRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
     locText: { fontSize: 10, color: Colors.text.tertiary },

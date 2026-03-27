@@ -6,9 +6,10 @@ import { institutionAPI, authAPI } from '../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { Search, MapPin, Star, Pencil } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import OptimizedImage from '../components/ui/OptimizedImage';
 
 const BrowseCollegesScreen = ({ navigation }) => {
-    const { user, socket, refreshUser } = useAuth();
+    const { user, socket, refreshUser, toggleSaveOptimistic } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [institutions, setInstitutions] = useState([]);
     const [filtered, setFiltered] = useState([]);
@@ -65,18 +66,7 @@ const BrowseCollegesScreen = ({ navigation }) => {
     };
 
     const handleToggleSave = async (id) => {
-        if (savingId) return;
-        setSavingId(id);
-        try {
-            const res = await authAPI.toggleSave(id);
-            if (res.data.success) {
-                await refreshUser();
-            }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setSavingId(null);
-        }
+        await toggleSaveOptimistic(id);
     };
 
     const InstitutionCard = ({ item }) => {
@@ -90,7 +80,10 @@ const BrowseCollegesScreen = ({ navigation }) => {
             >
                 <View style={styles.itemHeader}>
                     {item.galleryImages && item.galleryImages[0] ? (
-                        <Image source={{ uri: item.galleryImages[0] }} style={styles.itemThumbnail} />
+                        <OptimizedImage
+                            source={{ uri: item.galleryImages?.[0] || 'https://images.unsplash.com/photo-1541339907198-e08756eaa589?q=80&w=400' }}
+                            style={styles.itemThumbnail}
+                        />
                     ) : (
                         <Image source={require('../assets/images/college_default.jpg')} style={styles.itemThumbnail} />
                     )}

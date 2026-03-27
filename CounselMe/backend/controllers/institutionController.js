@@ -2,6 +2,7 @@ const Institution = require('../models/Institution');
 const Cutoff = require('../models/Cutoff');
 const Groq = require('groq-sdk');
 const { emitUpdate } = require('../utils/socket');
+const { client: redis } = require('../config/redis');
 
 // @desc    Create new institution
 // @route   POST /api/institutions
@@ -10,6 +11,11 @@ const createInstitution = async (req, res) => {
     try {
         const institution = new Institution(req.body);
         const createdInstitution = await institution.save();
+
+        // Invalidate lists cache
+        await redis.del('institutions_all');
+        await redis.del('institutions_featured');
+
         emitUpdate('institution:created', createdInstitution);
         res.status(201).json(createdInstitution);
     } catch (error) {
@@ -88,20 +94,43 @@ Only include facilities from the provided list. Extract as much as possible from
 // @route   GET /api/institutions
 // @access  Public
 const getInstitutions = async (req, res) => {
-    const institutions = await Institution.find({});
-    res.json(institutions);
+    try {
+        const cachedData = await redis.get('institutions_all');
+        if (cachedData) {
+            console.log('[Redis] Hit: institutions_all');
+            return res.json(JSON.parse(cachedData));
+        }
+
+        const institutions = await Institution.find({});
+        await redis.set('institutions_all', JSON.stringify(institutions), { EX: 86400 }); // Cache for 24 hours
+        res.json(institutions);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 };
 
 // @desc    Get institution by ID
 // @route   GET /api/institutions/:id
 // @access  Public
 const getInstitutionById = async (req, res) => {
-    const institution = await Institution.findById(req.params.id);
+    try {
+        const cacheKey = `institution_${req.params.id}`;
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            console.log(`[Redis] Hit: ${cacheKey}`);
+            return res.json(JSON.parse(cachedData));
+        }
 
-    if (institution) {
-        res.json(institution);
-    } else {
-        res.status(404).json({ message: 'Institution not found' });
+        const institution = await Institution.findById(req.params.id);
+
+        if (institution) {
+            await redis.set(cacheKey, JSON.stringify(institution), { EX: 86400 }); // 24 hours
+            res.json(institution);
+        } else {
+            res.status(404).json({ message: 'Institution not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
@@ -132,6 +161,12 @@ const updateInstitution = async (req, res) => {
             { $set: req.body },
             { new: true, runValidators: true }
         );
+
+        // Invalidate specific and list caches
+        await redis.del(`institution_${req.params.id}`);
+        await redis.del('institutions_all');
+        await redis.del('institutions_featured');
+
         emitUpdate('institution:updated', institution);
         res.json(institution);
     } catch (error) {
@@ -149,6 +184,11 @@ const deleteInstitution = async (req, res) => {
 
         // Also delete all cutoffs associated with this institution
         await Cutoff.deleteMany({ collegeId: req.params.id });
+
+        // Invalidate caches
+        await redis.del(`institution_${req.params.id}`);
+        await redis.del('institutions_all');
+        await redis.del('institutions_featured');
 
         emitUpdate('institution:deleted', institution._id);
         res.json({ message: 'Institution and associated cutoffs removed' });
@@ -202,8 +242,16 @@ const toggleFeatureInstitution = async (req, res) => {
 // @access  Public
 const getFeaturedInstitutions = async (req, res) => {
     try {
+        const cachedData = await redis.get('institutions_featured');
+        if (cachedData) {
+            console.log('[Redis] Hit: institutions_featured');
+            return res.json(JSON.parse(cachedData));
+        }
+
         const institutions = await Institution.find({ isFeatured: true })
             .sort({ 'rating.value': -1 });
+
+        await redis.set('institutions_featured', JSON.stringify(institutions), { EX: 86400 });
         res.json(institutions);
     } catch (error) {
         res.status(500).json({ message: error.message });
