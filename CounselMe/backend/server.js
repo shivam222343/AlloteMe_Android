@@ -27,6 +27,9 @@ app.use((req, res, next) => {
 app.use(cors({
     origin: [
         'https://alloteme.netlify.app',
+        'https://alloteme.com',
+        'https://alloteme.in',
+        'https://alloteme.online',
         'http://localhost:5100',
         'http://localhost:8081',
         'http://localhost:8080',
