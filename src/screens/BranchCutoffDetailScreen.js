@@ -19,6 +19,7 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
     // Available filters derived from data
     const [availableYears, setAvailableYears] = useState([2025, 2024, 2023, 2022]);
     const [availableRounds, setAvailableRounds] = useState([1, 2, 3]);
+    const [selectedExamType, setSelectedExamType] = useState('MHTCET');
 
     // Current selection
     const [selectedYear, setSelectedYear] = useState(2025);
@@ -46,6 +47,15 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
             if (uniqueYears.length > 0 && !uniqueYears.includes(selectedYear)) setSelectedYear(uniqueYears[0]);
             if (uniqueRounds.length > 0 && !uniqueRounds.includes(selectedRound)) setSelectedRound(uniqueRounds[0]);
 
+            // Pick the most common examType from the data
+            const examTypes = rawData.map(c => c.examType).filter(Boolean);
+            if (examTypes.length > 0) {
+                const mode = examTypes.sort((a, b) =>
+                    examTypes.filter(v => v === a).length - examTypes.filter(v => v === b).length
+                ).pop();
+                setSelectedExamType(mode);
+            }
+
             setAllCutoffs(rawData);
         } catch (error) {
             console.error('Failed to fetch cutoffs', error);
@@ -67,6 +77,7 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
                         try {
                             setLoading(true);
                             await cutoffAPI.delete(institutionId, branchName, {
+                                examType: selectedExamType,
                                 year: selectedYear,
                                 round: selectedRound
                             });

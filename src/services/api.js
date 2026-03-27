@@ -74,6 +74,12 @@ export const cutoffAPI = {
     parseBulk: (text) => api.post('cutoffs/parse-bulk', { text }),
 };
 
+export const uploadAPI = {
+    upload: (formData) => api.post('upload/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+};
+
 export const notificationsAPI = {
     getAll: () => api.get('notifications'),
     getUnreadCount: () => api.get('notifications/unread-count'),
@@ -98,5 +104,6 @@ export default {
     cutoffAPI,
     notificationsAPI,
     aiAPI,
-    counselorAPI
+    counselorAPI,
+    uploadAPI
 };
