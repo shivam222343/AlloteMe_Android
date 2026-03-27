@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView, Image } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
-import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X } from 'lucide-react-native';
+import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck } from 'lucide-react-native';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -15,7 +15,6 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const [results, setResults] = useState(resultsParam);
 
-    // Sync state with params when they update (fixes stale data bug)
     useEffect(() => {
         if (resultsParam) {
             setResults(resultsParam);
@@ -24,42 +23,56 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
-
-    // Sort & Filter states
     const [searchText, setSearchText] = useState('');
     const [isSearchVisible, setIsSearchVisible] = useState(false);
-    const [sortBy, setSortBy] = useState('none'); // 'cutoff', 'reach', 'name'
+    const [sortBy, setSortBy] = useState('none');
 
     const userPerc = useMemo(() => parseFloat(percentile) || 0, [percentile]);
 
     const processedResults = useMemo(() => {
-        let filtered = results.filter(item => {
-            const matchesSearch = item.collegeId?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-                item.branch?.toLowerCase().includes(searchText.toLowerCase()) ||
-                item.collegeId?.location?.city?.toLowerCase().includes(searchText.toLowerCase());
+        let mapped = results.map(item => {
+            const itemPerc = parseFloat(item.percentile) || 0;
+            const diff = (userPerc - itemPerc).toFixed(2);
+            let chanceLabel = 'Low';
+            let chanceColor = '#ef4444';
 
-            if (!matchesSearch) return false;
-
-            // Strict Preference Match Threshold (90%+)
-            const diff = userPerc - item.percentile;
-            let matchScore = 0;
-            if (diff >= 0) {
-                matchScore = 100; // Safe
-            } else {
-                // If diff is -1 (cutoff is 1% higher), score falls. 
-                // We want 90% match to be roughly within 1% of the cutoff in Maharashtra terms.
-                // Formula: 100 - (Math.abs(diff) * 10)
-                matchScore = Math.max(0, 100 - (Math.abs(diff) * 10));
+            const numericDiff = parseFloat(diff);
+            if (numericDiff >= 2) {
+                chanceLabel = 'Very High';
+                chanceColor = '#10b981';
+            } else if (numericDiff >= 0) {
+                chanceLabel = 'High';
+                chanceColor = '#22c55e';
+            } else if (numericDiff >= -2) {
+                chanceLabel = 'Medium';
+                chanceColor = '#f59e0b';
             }
 
-            item.matchScore = matchScore; // Attach score
-            return true; // Show all returns from backend (already within tolerance)
+            return {
+                ...item,
+                userPercentile: userPerc,
+                difference: diff,
+                chanceLabel,
+                chanceColor,
+                matchScore: Math.max(0, 100 - (Math.abs(numericDiff) * 10)),
+                key: item._id || item.key || Math.random().toString()
+            };
+        });
+
+        let filtered = mapped.filter(item => {
+            const name = item.collegeId?.name || 'Unknown Institution';
+            const branch = item.branch || '';
+            const city = item.collegeId?.location?.city || '';
+
+            return name.toLowerCase().includes(searchText.toLowerCase()) ||
+                branch.toLowerCase().includes(searchText.toLowerCase()) ||
+                city.toLowerCase().includes(searchText.toLowerCase());
         });
 
         if (sortBy === 'cutoff') {
-            filtered.sort((a, b) => b.percentile - a.percentile);
+            filtered.sort((a, b) => (parseFloat(b.percentile) || 0) - (parseFloat(a.percentile) || 0));
         } else if (sortBy === 'reach') {
-            filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+            filtered.sort((a, b) => b.matchScore - a.matchScore);
         } else if (sortBy === 'name') {
             filtered.sort((a, b) => (a.collegeId?.name || '').localeCompare(b.collegeId?.name || ''));
         }
@@ -78,7 +91,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     style: "destructive",
                     onPress: () => {
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        setResults(prev => prev.filter(item => item.key !== key));
+                        setResults(prev => prev.filter(item => item._id !== key && item.key !== key));
                     }
                 }
             ]
@@ -118,24 +131,21 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                                 <th>Branch</th>
                                 <th>Cutoff %</th>
                                 <th>Rank</th>
-                                <th>Match</th>
+                                <th>Chance</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${processedResults.map((item, index) => {
-                const score = Math.round(item.matchScore || 0);
-                return `
-                                    <tr>
-                                        <td>${index + 1}</td>
-                                        <td style="color:#0A66C2; font-weight:bold;">${item.collegeId?.dteCode || '—'}</td>
-                                        <td><b>${item.collegeId?.name}</b></td>
-                                        <td>${item.branch}</td>
-                                        <td>${Number(item.percentile).toFixed(2)}%</td>
-                                        <td>${item.rank || '—'}</td>
-                                        <td>${score}%</td>
-                                    </tr>
-                                `;
-            }).join('')}
+                            ${processedResults.map((item, index) => `
+                                <tr>
+                                    <td>${index + 1}</td>
+                                    <td style="color:#0A66C2; font-weight:bold;">${item.collegeId?.dteCode || '—'}</td>
+                                    <td><b>${item.collegeId?.name || 'Unknown'}</b></td>
+                                    <td>${item.branch}</td>
+                                    <td>${Number(item.percentile).toFixed(2)}%</td>
+                                    <td>${item.rank || '—'}</td>
+                                    <td>${item.chanceLabel}</td>
+                                </tr>
+                            `).join('')}
                         </tbody>
                     </table>
                     <div class="footer">
@@ -159,15 +169,10 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         if (processedResults.length === 0) return;
         setExportingCSV(true);
         try {
-            let csv = 'No,DTE Code,College,Branch,Cutoff%,Rank,Match%\n';
+            let csv = 'No,DTE Code,College,Branch,Cutoff%,Rank,Chance\n';
             processedResults.forEach((item, idx) => {
-                const score = Math.round(item.matchScore || 0);
-                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${item.collegeId?.name}","${item.branch}",${item.percentile},${item.rank || ''},${score}%\n`;
+                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${item.collegeId?.name || 'Unknown'}","${item.branch}",${item.percentile},${item.rank || ''},${item.chanceLabel}\n`;
             });
-            csv += '\n\nAlloteMe Information\n';
-            csv += 'Support Contact,8010961216\n';
-            csv += 'Note,Actual allotments depend on current year merit lists.\n';
-
             const fileUri = `${FileSystem.cacheDirectory}AlloteMe_Predictions.csv`;
             await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
             await Sharing.shareAsync(fileUri);
@@ -177,9 +182,6 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const renderItem = ({ item, drag, isActive, getIndex }) => {
         const index = getIndex();
-        const diff = (userPerc - item.percentile).toFixed(2);
-        const isSafe = parseFloat(diff) >= 0;
-        const matchScore = Math.round(item.matchScore || 0);
 
         return (
             <TouchableOpacity
@@ -189,7 +191,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 activeOpacity={0.9}
                 style={styles.fullWidthItem}
             >
-                <Card style={[styles.resultCard, isActive && styles.activeCard]} elevated={isActive}>
+                <Card style={[styles.resultCard, isActive && styles.activeCard]}>
                     <View style={styles.cardHeader}>
                         <View style={styles.numberTag}>
                             <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
@@ -209,7 +211,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                             <Text style={[styles.matchPercent, { color: item.chanceColor }]}>{item.chanceLabel}</Text>
                         </View>
                         <TouchableOpacity onPress={() => handleDelete(item.key)} style={styles.deleteBtn}>
-                            <X size={16} color={Colors.text.tertiary} />
+                            <X size={16} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
 
@@ -218,6 +220,18 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                         <View style={styles.badgeRow}>
                             <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
                             <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
+                            {item.seatType && (
+                                <View style={[
+                                    styles.badge,
+                                    { backgroundColor: item.seatType.toUpperCase().startsWith('L') ? '#ecfdf5' : '#f0f9ff' }
+                                ]}>
+                                    <ShieldCheck size={10} color={item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1'} />
+                                    <Text style={[
+                                        styles.badgeText,
+                                        { color: item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1' }
+                                    ]}>{item.seatType}</Text>
+                                </View>
+                            )}
                         </View>
                     </View>
 
@@ -229,7 +243,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.statLabel}>MY SCORE</Text>
-                            <Text style={styles.statVal}>{Number(item.userPercentile).toFixed(2)}%</Text>
+                            <Text style={styles.statVal}>{(parseFloat(item.userPercentile) || 0).toFixed(2)}%</Text>
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.statLabel}>DIFF (+/-)</Text>
@@ -304,7 +318,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     activationDistance={10}
                     ListEmptyComponent={
                         <View style={styles.center}>
-                            <Info size={40} color={Colors.divider} />
+                            <Info size={40} color="#cbd5e1" />
                             <Text style={styles.emptyText}>No results match your filters.</Text>
                         </View>
                     }
@@ -324,22 +338,18 @@ const styles = StyleSheet.create({
     headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     actionIcon: { padding: 8 },
     exportBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center' },
-
     searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, margin: 12, paddingHorizontal: 12, height: 44, borderRadius: 12, ...Shadows.xs },
     searchInput: { flex: 1, marginLeft: 10, fontSize: 14, color: Colors.text.primary },
-
     sortBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     sortLabel: { fontSize: 12, fontWeight: 'bold', color: Colors.text.tertiary, marginRight: 10 },
-    sortScroll: { gap: 8 },
-    sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F1F5F9' },
+    sortScroll: { gap: 8, paddingBottom: 5 },
+    sortChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F1F5F9', marginRight: 8 },
     sortChipActive: { backgroundColor: Colors.primary },
     sortChipText: { fontSize: 11, fontWeight: '600', color: Colors.text.secondary },
     sortChipTextActive: { color: Colors.white },
-
     fullWidthItem: { width: '100%' },
     resultCard: { marginVertical: 0.5, padding: 14, borderRadius: 0, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     activeCard: { backgroundColor: '#F0F9FF', zIndex: 10, ...Shadows.lg },
-
     cardHeader: { flexDirection: 'row', alignItems: 'center' },
     numberTag: { width: 24, height: 24, borderRadius: 6, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center', marginRight: 8 },
     numberText: { fontSize: 10, fontWeight: '800', color: Colors.primary },
@@ -352,7 +362,6 @@ const styles = StyleSheet.create({
     matchBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', marginRight: 8 },
     matchPercent: { fontSize: 10, fontWeight: 'bold' },
     deleteBtn: { padding: 4 },
-
     branchSection: { marginVertical: 8 },
     branchName: { fontSize: 13, fontWeight: '700', color: Colors.text.primary },
     badgeRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
@@ -360,17 +369,11 @@ const styles = StyleSheet.create({
     roundBadge: { backgroundColor: Colors.primary + '10' },
     yearBadge: { backgroundColor: Colors.secondary + '10' },
     badgeText: { fontSize: 8, fontWeight: 'bold' },
-
     statsRow: { flexDirection: 'row', gap: 20, marginTop: 6, alignItems: 'center' },
-    statBox: { flex: 1 },
     statLabel: { fontSize: 8, fontWeight: 'bold', color: Colors.text.tertiary, marginBottom: 2 },
     statVal: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary },
-    chanceBarContainer: { height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, marginTop: 4, overflow: 'hidden' },
-    chanceBarFill: { height: '100%', borderRadius: 3 },
-    scoreText: { fontSize: 10, fontWeight: '800', color: Colors.primary, marginLeft: 4 },
-    safeText: { color: Colors.success },
-    riskText: { color: Colors.error },
-
+    safeText: { color: "#10b981" },
+    riskText: { color: "#ef4444" },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 300 },
     emptyText: { marginTop: 10, color: Colors.text.tertiary }
 });

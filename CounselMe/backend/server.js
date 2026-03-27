@@ -59,6 +59,7 @@ app.use('/api/cutoffs', require('./routes/cutoffRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/counselors', require('./routes/counselorRoutes'));
 app.get('/', (req, res) => {
     res.send('CounselMe API is running...');
 });

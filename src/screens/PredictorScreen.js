@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import Slider from '@react-native-community/slider';
 
-const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJNT', 'NT-B', 'NT-C', 'NT-D', 'EWS', 'TFWS'];
+const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJ', 'NT1', 'NT2', 'NT3', 'SEBC', 'EWS', 'DEF', 'PWD', 'ORPHAN', 'TFWS'];
 const BRANCHES = [
     'Bio Technology',
     'Civil Engineering',
@@ -89,6 +89,7 @@ const PredictorScreen = ({ navigation }) => {
     const [category, setCategory] = useState(user?.category || 'OPEN');
     const [pTolerance, setPTolerance] = useState(10);
     const [rTolerance, setRTolerance] = useState(500);
+    const [isFemale, setIsFemale] = useState(false);
 
     // Advanced Settings
     const [showAdvance, setShowAdvance] = useState(false);
@@ -177,7 +178,8 @@ const PredictorScreen = ({ navigation }) => {
                 institutionTypes: selectedTypes.join(','),
                 seatTypes: selectedSeatTypes.join(','),
                 year: selectedYear,
-                round: 1
+                round: 1,
+                isFemale
             });
 
             const cleanData = res.data.map((item, index) => ({
@@ -288,6 +290,19 @@ const PredictorScreen = ({ navigation }) => {
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
+
+                    <View style={styles.genderRow}>
+                        <View>
+                            <Text style={styles.genderLabel}>Are you a Female Candidate?</Text>
+                            <Text style={styles.genderSub}>Include Ladies (L) category seats in results</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.toggleBase, isFemale && styles.toggleActive]}
+                            onPress={() => setIsFemale(!isFemale)}
+                        >
+                            <View style={[styles.toggleCircle, isFemale ? { right: 4 } : { left: 4 }]} />
+                        </TouchableOpacity>
+                    </View>
 
                     <View style={styles.sliderContainer}>
                         <View style={styles.sliderLabelRow}>
@@ -406,7 +421,7 @@ const PredictorScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFC' },
-    topHeader: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 25, backgroundColor: Colors.white, ...Shadows.sm },
+    topHeader: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 20, backgroundColor: Colors.white, ...Shadows.sm },
     title: { fontSize: 28, fontWeight: 'bold', color: Colors.text.primary },
     subtitle: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
 
@@ -420,6 +435,13 @@ const styles = StyleSheet.create({
     catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
     catChipText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },
     catChipTextActive: { color: Colors.white },
+
+    genderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#F1F5F9' },
+    genderLabel: { fontSize: 13, fontWeight: 'bold', color: Colors.text.primary },
+    genderSub: { fontSize: 10, color: Colors.text.tertiary, marginTop: 2 },
+    toggleBase: { width: 50, height: 26, borderRadius: 13, backgroundColor: '#E2E8F0', paddingHorizontal: 4, justifyContent: 'center' },
+    toggleActive: { backgroundColor: Colors.primary },
+    toggleCircle: { width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.white, position: 'absolute' },
 
     sliderContainer: { marginBottom: 20 },
     sliderLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },

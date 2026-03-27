@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 // Switch to LOCAL_URL for development, RENDER_URL for production
-const API_BASE_URL = __DEV__ ? LOCAL_URL : RENDER_URL;
+const API_BASE_URL = RENDER_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -20,68 +20,64 @@ api.interceptors.request.use(
         }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 export const authAPI = {
     login: (credentials) => api.post('auth/login', credentials),
-    register: (userData) => api.post('auth/register', userData),
+    signup: (userData) => api.post('auth/signup', userData),
+    verifyOtp: (data) => api.post('auth/verify-otp', data),
     getProfile: () => api.get('auth/profile'),
-    updateProfile: (userData) => api.put('auth/profile', userData),
-    deleteProfile: () => api.delete('auth/profile'),
-    changePassword: (data) => api.post('auth/change-password', data),
-    toggleSave: (collegeId) => api.post('auth/toggle-save', { collegeId }),
-    getAllUsers: () => api.get('auth/users'),
-    updateUserRole: (userId, data) => api.put(`auth/users/${userId}`, data),
-    deleteUser: (userId) => api.delete(`auth/users/${userId}`),
-    sendOTP: (phone) => api.post('auth/send-otp', { phone }),
-    verifyOTP: (otp) => api.post('auth/verify-otp', { otp }),
-    verifyPhone: (phone) => api.put('auth/verify-phone', { phone }),
+    updateProfile: (data) => api.put('auth/profile', data),
     getStats: () => api.get('auth/stats'),
+};
+
+export const counselorAPI = {
+    getAll: () => api.get('counselors'),
+    getById: (id) => api.get(`counselors/${id}`),
+    add: (data) => api.post('counselors', data),
+    delete: (id) => api.delete(`counselors/${id}`),
 };
 
 export const institutionAPI = {
     getAll: () => api.get('institutions'),
+    getFeatured: () => api.get('institutions/featured'),
     getById: (id) => api.get(`institutions/${id}`),
-    create: (data) => api.post('institutions', data),
+    add: (data) => api.post('institutions', data),
     update: (id, data) => api.put(`institutions/${id}`, data),
     delete: (id) => api.delete(`institutions/${id}`),
-    deleteBranch: (id, name) => api.delete(`institutions/${id}/branches/${encodeURIComponent(name)}`),
-    getFeatured: () => api.get('institutions/featured'),
-    toggleFeature: (id) => api.put(`institutions/${id}/feature`),
-    parse: (text) => api.post('institutions/parse', { text }),
+    uploadImage: (formData) => api.post('upload/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 export const cutoffAPI = {
-    add: (data) => api.post('cutoffs', data),
-    bulkAdd: (data) => api.post('cutoffs/bulk', data),
-    getByInstitution: (id) => api.get(`cutoffs/${id}`),
-    predict: (params) => api.get('cutoffs/predict', { params }),
-    parse: (text) => api.post('cutoffs/parse', { text }),
-    parseBulk: (text) => api.post('cutoffs/parse-bulk', { text }),
-    delete: (id, branch, params) => api.delete(`cutoffs/${id}/branch/${branch}`, { params }),
+    getAll: () => api.get('cutoffs'),
+    predict: (data) => api.post('cutoffs/predict', data),
     estimateRank: (percentile) => api.get('cutoffs/estimate-rank', { params: { percentile } }),
+    getByInstitution: (id) => api.get(`cutoffs/${id}`),
+    add: (data) => api.post('cutoffs', data),
+    importExcel: (formData) => api.post('cutoffs/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+};
+
+export const notificationsAPI = {
+    getAll: () => api.get('notifications'),
+    getUnreadCount: () => api.get('notifications/unread-count'),
+    markAsRead: (id) => api.put(`notifications/${id}/read`),
 };
 
 export const aiAPI = {
-    counsel: (payload) => api.post('ai/counsel', payload),
-    getChats: () => api.get('ai/chats'),
-    saveChat: (data) => api.post('ai/chats', data),
-    trainAI: (data) => api.post('ai/train', data),
-    getFrequentQuestions: () => api.get('ai/frequent-questions'),
-    setFrequentQuestion: (data) => api.post('ai/frequent-questions', data),
+    chat: (message, context) => api.post('ai/chat', { message, context }),
+    getRecommendation: (preferences) => api.post('ai/recommend', { preferences }),
 };
 
-export const notificationAPI = {
-    getAll: () => api.get('notifications'),
-    markAllRead: () => api.put('notifications/read-all'),
-    deleteAll: () => api.delete('notifications/all'),
+export default {
+    authAPI,
+    institutionAPI,
+    cutoffAPI,
+    notificationsAPI,
+    aiAPI,
+    counselorAPI
 };
-
-export const uploadAPI = {
-    upload: (formData, config = {}) => api.post('upload', formData, config),
-};
-
-export default api;

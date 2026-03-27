@@ -6,7 +6,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
 
-// Screens
+// Fixed imports - removing the broken counselor references
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import StudentDashboard from '../screens/StudentDashboard';
@@ -20,7 +20,9 @@ import AICounselorScreen from '../screens/AICounselorScreen';
 import CollegeDetailScreen from '../screens/CollegeDetailScreen';
 import NearbyCollegesScreen from '../screens/NearbyCollegesScreen';
 import SavedCollegesScreen from '../screens/SavedCollegesScreen';
-import ConnectCounselorScreen from '../screens/ConnectCounselorScreen';
+import CounselorsScreen from '../screens/CounselorsScreen';
+import CounselorDetailScreen from '../screens/CounselorDetailScreen';
+import AdminCounselorsScreen from '../screens/AdminCounselorsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
@@ -55,7 +57,6 @@ const TabNavigator = () => {
             screenOptions={{ headerShown: false }}
             backBehavior="history"
         >
-            {/* Main Tabs (Visible in BottomBar) */}
             <Tab.Screen
                 name="Dashboard"
                 component={isAdmin ? AdminDashboard : StudentDashboard}
@@ -64,16 +65,16 @@ const TabNavigator = () => {
             <Tab.Screen name="AICounselor" component={AICounselorScreen} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
 
-            {/* Sub-Screens (Hidden from BottomBar, but keep BottomBar visible) */}
+            {/* Counselors Flow */}
+            <Tab.Screen name="Counselors" component={CounselorsScreen} />
+            <Tab.Screen name="CounselorDetail" component={CounselorDetailScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="AdminCounselors" component={AdminCounselorsScreen} />
+
+            {/* Other Sub-Screens */}
             <Tab.Screen name="Predictor" component={PredictorScreen} />
-            <Tab.Screen
-                name="PredictionResults"
-                component={PredictionResultsScreen}
-                options={{ tabBarButton: () => null }}
-            />
+            <Tab.Screen name="PredictionResults" component={PredictionResultsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="NearbyColleges" component={NearbyCollegesScreen} />
             <Tab.Screen name="SavedColleges" component={SavedCollegesScreen} />
-            <Tab.Screen name="ConnectCounselor" component={ConnectCounselorScreen} />
             <Tab.Screen name="CreateInstitution" component={CreateInstitutionScreen} />
             <Tab.Screen name="UploadCutoff" component={UploadCutoffScreen} />
             <Tab.Screen name="AITraining" component={AITrainingScreen} />
@@ -81,32 +82,16 @@ const TabNavigator = () => {
             <Tab.Screen name="FeaturedColleges" component={FeaturedCollegesScreen} />
             <Tab.Screen name="AdminUsers" component={AdminUsersScreen} />
             <Tab.Screen name="AdminUserDetail" component={AdminUserDetailScreen} options={{ tabBarButton: () => null }} />
-            <Tab.Screen name="SystemAnalytics" component={ComingSoonScreen} initialParams={{ title: 'System Analytics' }} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
-            <Tab.Screen
-                name="CompleteProfile"
-                component={CompleteProfileScreen}
-                options={{ tabBarButton: () => null }}
-            />
-            <Tab.Screen
-                name="CollegeDetail"
-                component={CollegeDetailScreen}
-                options={{ tabBarButton: () => null }}
-            />
-            <Tab.Screen
-                name="EditInstitution"
-                component={EditInstitutionScreen}
-                options={{ tabBarButton: () => null }}
-            />
-            <Tab.Screen
-                name="BranchCutoffDetail"
-                component={BranchCutoffDetailScreen}
-                options={{ tabBarButton: () => null }}
-            />
+            <Tab.Screen name="CompleteProfile" component={CompleteProfileScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="CollegeDetail" component={CollegeDetailScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="EditInstitution" component={EditInstitutionScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="BranchCutoffDetail" component={BranchCutoffDetailScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="AboutUs" component={AboutUsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="TermsConditions" component={TermsConditionsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="HelpCenter" component={HelpCenterScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="SystemAnalytics" component={ComingSoonScreen} initialParams={{ title: 'System Analytics' }} />
         </Tab.Navigator>
     );
 };

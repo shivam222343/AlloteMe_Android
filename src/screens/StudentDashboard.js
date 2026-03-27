@@ -87,7 +87,7 @@ const StudentDashboard = ({ navigation }) => {
         { label: 'College Predictor', icon: LayoutGrid, sub: 'Check your chances', route: 'Predictor' },
         { label: 'AI Counselor', icon: Cpu, sub: '24/7 AI Guidance', route: 'AICounselor' },
         { label: 'Nearby Colleges', icon: MapPin, sub: 'Find local institutes', route: 'NearbyColleges' },
-        { label: 'Connect Counselor', icon: MessageSquare, sub: 'Chat with experts', route: 'ConnectCounselor' },
+        { label: 'Connect Counselor', icon: MessageSquare, sub: 'Chat with experts', route: 'Counselors' },
         { label: 'App Settings', icon: Settings, sub: 'Profile & Preferences', route: 'Settings' },
     ];
 
@@ -222,7 +222,7 @@ const StudentDashboard = ({ navigation }) => {
                     <View style={styles.promoInfo}>
                         <Text style={styles.promoTitle}>Need Admission Help?</Text>
                         <Text style={styles.promoSub}>Connect with senior counselors for direct guidance.</Text>
-                        <TouchableOpacity style={styles.promoBtn} onPress={() => navigation.navigate('ConnectCounselor')}>
+                        <TouchableOpacity style={styles.promoBtn} onPress={() => navigation.navigate('Counselors')}>
                             <Text style={styles.promoBtnText}>Contact Now</Text>
                         </TouchableOpacity>
                     </View>

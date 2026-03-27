@@ -78,6 +78,13 @@ const AdminDashboard = ({ navigation }) => {
             route: 'AdminUsers',
             color: '#3B82F6'
         },
+        {
+            title: 'Manage Counselors',
+            desc: 'Add and manage professional experts',
+            icon: ShieldCheck,
+            route: 'AdminCounselors',
+            color: '#06B6D4'
+        },
     ];
 
     const ActionCard = ({ item }) => {
