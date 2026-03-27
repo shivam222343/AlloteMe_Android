@@ -56,7 +56,11 @@ const userSchema = new mongoose.Schema({
             default: false
         },
         avatarUrl: String,
-        avatarSeed: String
+        avatarSeed: String,
+        hasConfirmedAvatar: {
+            type: Boolean,
+            default: false
+        }
     },
     groqApiKey: {
         type: String,

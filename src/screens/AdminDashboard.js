@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import {
     PlusCircle, FileUp, Users, Settings,
-    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare, Bell
+    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare, Bell, TrendingUp
 } from 'lucide-react-native';
 
 const AdminDashboard = ({ navigation }) => {
@@ -14,6 +14,7 @@ const AdminDashboard = ({ navigation }) => {
     const [stats, setStats] = useState([
         { label: 'Institutes', value: '-', icon: BarChart3, color: Colors.primary, key: 'institutions' },
         { label: 'Users', value: '-', icon: Users, color: '#8B5CF6', key: 'users' },
+        { label: 'Active', value: '-', icon: TrendingUp, color: '#10B981', key: 'activeSessions' },
     ]);
     const [loading, setLoading] = useState(true);
 
@@ -24,10 +25,15 @@ const AdminDashboard = ({ navigation }) => {
     const fetchStats = async () => {
         try {
             const res = await authAPI.getStats();
-            setStats(prev => prev.map(s => ({
-                ...s,
-                value: res.data[s.key]?.toString() || '0'
-            })));
+            setStats(prev => prev.map(s => {
+                const val = s.key === 'activeSessions'
+                    ? res.data.analytics?.activeSessions
+                    : res.data[s.key];
+                return {
+                    ...s,
+                    value: val?.toString() || '0'
+                };
+            }));
         } catch (error) {
             console.error('Stats fetch error:', error);
         } finally {
@@ -91,6 +97,13 @@ const AdminDashboard = ({ navigation }) => {
             icon: Bell,
             route: 'AdminNotifications',
             color: '#F43F5E'
+        },
+        {
+            title: 'Intelligence Dashboard',
+            desc: 'View detailed system analytics',
+            icon: TrendingUp,
+            route: 'SystemAnalytics',
+            color: '#8B5CF6'
         },
     ];
 

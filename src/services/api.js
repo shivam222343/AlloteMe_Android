@@ -34,6 +34,7 @@ export const authAPI = {
     getAllUsers: () => api.get('auth/users'),
     updateUserRole: (id, data) => api.put(`auth/users/${id}`, data),
     deleteUser: (id) => api.delete(`auth/users/${id}`),
+    updateAvatarPreference: (data) => api.post('auth/update-avatar', data),
 };
 
 export const counselorAPI = {
@@ -69,6 +70,8 @@ export const notificationsAPI = {
     getAll: () => api.get('notifications'),
     getUnreadCount: () => api.get('notifications/unread-count'),
     markAsRead: (id) => api.put(`notifications/${id}/read`),
+    markAllRead: () => api.put('notifications/read-all'),
+    deleteAll: () => api.delete('notifications/all'),
     sendAdminNotification: (data) => api.post('notifications/admin/send', data),
 };
 

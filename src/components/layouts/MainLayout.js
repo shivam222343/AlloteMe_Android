@@ -9,12 +9,13 @@ import { Colors, Shadows } from '../../constants/theme';
 import { Menu, ChevronLeft, Bell, X, CheckCheck, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import GradientBorder from '../ui/GradientBorder';
+import AvatarSelectionPopup from '../ui/AvatarSelectionPopup';
 import { notificationsAPI } from '../../services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPadding = false, style, botSafe = false, scrollable = false }) => {
     const navigation = useNavigation();
-    const { user, unreadCount, setUnreadCount } = useAuth();
+    const { user, unreadCount, setUnreadCount, showAvatarPopup, setShowAvatarPopup } = useAuth();
     const insets = useSafeAreaInsets();
 
     // Fallback for devices/web where insets might be 0
@@ -162,6 +163,12 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                 )}
             </KeyboardAvoidingView>
 
+            <AvatarSelectionPopup
+                visible={showAvatarPopup}
+                onClose={() => setShowAvatarPopup(false)}
+                initialAvatar={user?.preferences?.avatarUrl}
+            />
+
             {/* Notification Drawer Modal */}
             <Modal
                 visible={showNotifs}
@@ -208,8 +215,23 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                         if (item.type === 'warning') { Icon = AlertTriangle; iconColor = '#F59E0B'; }
                                         if (item.type === 'error') { Icon = AlertCircle; iconColor = Colors.error; }
 
+                                        const handleItemPress = async () => {
+                                            if (!item.isRead) {
+                                                try {
+                                                    await notificationsAPI.markAsRead(item._id);
+                                                    setUnreadCount(prev => Math.max(0, prev - 1));
+                                                    fetchNotifications();
+                                                } catch (error) {
+                                                    console.error(error);
+                                                }
+                                            }
+                                        };
+
                                         return (
-                                            <TouchableOpacity style={[styles.notifItem, !item.isRead && styles.unreadNotif]}>
+                                            <TouchableOpacity
+                                                style={[styles.notifItem, !item.isRead && styles.unreadNotif]}
+                                                onPress={handleItemPress}
+                                            >
                                                 <View style={[styles.notifIcon, { backgroundColor: iconColor + '10' }]}>
                                                     <Icon size={18} color={iconColor} />
                                                 </View>

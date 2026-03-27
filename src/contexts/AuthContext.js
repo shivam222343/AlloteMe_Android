@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
     const [hasSkippedProfile, setHasSkippedProfile] = useState(false);
     const [socket, setSocket] = useState(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [showAvatarPopup, setShowAvatarPopupState] = useState(false);
 
     useEffect(() => {
         loadUser();
@@ -75,9 +76,10 @@ export const AuthProvider = ({ children }) => {
     const login = async (credentials) => {
         try {
             const response = await authAPI.login(credentials);
-            const { token, ...userData } = response.data;
+            const { token, showAvatarPopup, ...userData } = response.data;
             await AsyncStorage.setItem('userToken', token);
             setUser(userData);
+            if (showAvatarPopup) setShowAvatarPopupState(true);
             return { success: true };
         } catch (error) {
             return { success: false, message: error.response?.data?.message || 'Login failed' };
@@ -87,9 +89,10 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             const response = await authAPI.register(userData);
-            const { token, ...data } = response.data;
+            const { token, showAvatarPopup, ...data } = response.data;
             await AsyncStorage.setItem('userToken', token);
             setUser(data);
+            if (showAvatarPopup) setShowAvatarPopupState(true);
             return { success: true };
         } catch (error) {
             return { success: false, message: error.response?.data?.message || 'Registration failed' };
@@ -146,6 +149,8 @@ export const AuthProvider = ({ children }) => {
             socket,
             unreadCount,
             setUnreadCount,
+            showAvatarPopup,
+            setShowAvatarPopup: setShowAvatarPopupState,
             unreadMessageCount: 0,
             refreshUnreadCount: async () => {
                 const { notificationsAPI } = require('../services/api');
