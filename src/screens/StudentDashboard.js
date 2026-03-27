@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
     Dimensions, FlatList, Image, ActivityIndicator
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,12 +20,32 @@ const SLIDER_WIDTH = SCREEN_WIDTH - 32;
 const CARD_WIDTH = (SCREEN_WIDTH - 32 - 12 - 4) / 2; // Extra buffer for rounding
 
 const StudentDashboard = ({ navigation }) => {
-    const { user, hasSkippedProfile, refreshUser } = useAuth();
+    useFocusEffect(
+        useCallback(() => {
+            fetchFeatured();
+        }, [])
+    );
+
+    const { user, hasSkippedProfile, socket, refreshUser } = useAuth();
     const [featuredColleges, setFeaturedColleges] = useState([]);
     const [loadingFeatured, setLoadingFeatured] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const flatListRef = React.useRef(null);
+
+    useEffect(() => {
+        if (socket) {
+            const handleRefresh = () => fetchFeatured();
+            socket.on('institution:updated', handleRefresh);
+            socket.on('institution:created', handleRefresh);
+            socket.on('institution:deleted', handleRefresh);
+            return () => {
+                socket.off('institution:updated', handleRefresh);
+                socket.off('institution:created', handleRefresh);
+                socket.off('institution:deleted', handleRefresh);
+            };
+        }
+    }, [socket]);
 
     useEffect(() => {
         if (user && !user.isVerified) {
@@ -36,8 +57,13 @@ const StudentDashboard = ({ navigation }) => {
         if (user?.role === 'student' && !user?.preferences?.isProfileComplete && !hasSkippedProfile) {
             navigation.navigate('CompleteProfile');
         }
-        fetchFeatured();
     }, [user, hasSkippedProfile]);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchFeatured();
+        }, [])
+    );
 
     useEffect(() => {
         if (featuredColleges.length > 0) {

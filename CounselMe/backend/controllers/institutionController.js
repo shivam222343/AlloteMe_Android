@@ -247,16 +247,19 @@ const toggleFeatureInstitution = async (req, res) => {
 // @access  Public
 const getFeaturedInstitutions = async (req, res) => {
     try {
+        // Temporarily bypassing cache for debugging featured list
+        /*
         const cachedData = await redis.get('institutions_featured');
         if (cachedData) {
             console.log('[Redis] Hit: institutions_featured');
             return res.json(JSON.parse(cachedData));
         }
+        */
 
         const institutions = await Institution.find({ isFeatured: true })
             .sort({ 'rating.value': -1 });
 
-        await redis.set('institutions_featured', JSON.stringify(institutions), { EX: 86400 });
+        // await redis.set('institutions_featured', JSON.stringify(institutions), { EX: 86400 });
         res.json(institutions);
     } catch (error) {
         res.status(500).json({ message: error.message });
