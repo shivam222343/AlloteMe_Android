@@ -64,8 +64,21 @@ app.get('/', (req, res) => {
     res.send('CounselMe API is running...');
 });
 
+const { sendRandomGreeting } = require('./services/notificationService');
+
 const PORT = process.env.PORT || 5100;
 
 server.listen(PORT, () => {
     console.log(`Server (with Sockets) running on port ${PORT}`);
+
+    // Random greetings logic: Check every 4 hours
+    // (Actual sending logic inside check times of day)
+    setInterval(() => {
+        sendRandomGreeting();
+    }, 4 * 60 * 60 * 1000);
+
+    // Send one shortly after start for testing/immediate impact
+    setTimeout(() => {
+        sendRandomGreeting();
+    }, 1000 * 60 * 5); // 5 mins after start
 });

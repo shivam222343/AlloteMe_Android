@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import {
     PlusCircle, FileUp, Users, Settings,
-    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare
+    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare, Bell
 } from 'lucide-react-native';
 
 const AdminDashboard = ({ navigation }) => {
@@ -84,6 +84,13 @@ const AdminDashboard = ({ navigation }) => {
             icon: ShieldCheck,
             route: 'AdminCounselors',
             color: '#06B6D4'
+        },
+        {
+            title: 'Broadcast Center',
+            desc: 'Send real-time alerts to all users',
+            icon: Bell,
+            route: 'AdminNotifications',
+            color: '#F43F5E'
         },
     ];
 

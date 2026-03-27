@@ -12,6 +12,18 @@ const getNotifications = async (req, res) => {
     }
 };
 
+// @desc    Get unread count
+// @route   GET /api/notifications/unread-count
+// @access  Private
+const getUnreadCount = async (req, res) => {
+    try {
+        const count = await Notification.countDocuments({ user: req.user._id, isRead: false });
+        res.json({ count });
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 // @desc    Mark all notifications as read
 // @route   PUT /api/notifications/read-all
 // @access  Private
@@ -36,8 +48,35 @@ const deleteAll = async (req, res) => {
     }
 };
 
+const { sendNotification: serviceSendNotification } = require('../services/notificationService');
+
+// @desc    Admin send notification
+// @route   POST /api/notifications/admin/send
+// @access  Admin/Private
+const adminSendNotification = async (req, res) => {
+    try {
+        const { targetUserId, title, message, type } = req.body;
+
+        if (!title || !message) {
+            return res.status(400).json({ message: 'Title and message are required' });
+        }
+
+        const result = await serviceSendNotification(targetUserId || 'all', title, message, type || 'info');
+
+        if (result.success) {
+            res.json({ message: 'Notification sent successfully', result });
+        } else {
+            res.status(500).json({ message: 'Failed to send notification', error: result.error });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     getNotifications,
+    getUnreadCount,
     markAllRead,
-    deleteAll
+    deleteAll,
+    adminSendNotification
 };

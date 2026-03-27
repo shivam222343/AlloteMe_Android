@@ -18,6 +18,15 @@ router.post('/log', async (req, res) => {
     try {
         const { counselorId, userId, action } = req.body;
         const log = await CounselorLog.create({ counselorId, userId, action });
+
+        const { sendNotification } = require('../services/notificationService');
+        sendNotification(
+            userId,
+            `${action === 'chat' ? 'WhatsApp' : 'Call'} Logged`,
+            "Inquiry successfully recorded. Our counselor will review your profile details.",
+            "info"
+        );
+
         res.status(201).json(log);
     } catch (error) {
         res.status(400).json({ message: error.message });

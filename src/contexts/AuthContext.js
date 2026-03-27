@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [hasSkippedProfile, setHasSkippedProfile] = useState(false);
     const [socket, setSocket] = useState(null);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {
         loadUser();
@@ -26,6 +27,14 @@ export const AuthProvider = ({ children }) => {
 
         newSocket.on('connect', () => {
             console.log('[Socket] Connected to backend:', newSocket.id);
+            if (user?._id) {
+                newSocket.emit('join', user._id);
+            }
+        });
+
+        newSocket.on('notification:received', (data) => {
+            console.log('[Socket] New notification:', data);
+            setUnreadCount(prev => prev + 1);
         });
 
         setSocket(newSocket);
@@ -50,6 +59,11 @@ export const AuthProvider = ({ children }) => {
             if (token) {
                 const response = await authAPI.getProfile();
                 setUser(response.data);
+
+                // Fetch initial unread count
+                const { notificationsAPI } = require('../services/api');
+                const nRes = await notificationsAPI.getUnreadCount();
+                setUnreadCount(nRes.data.count || 0);
             }
         } catch (error) {
             console.error('Failed to load user', error);
@@ -130,9 +144,14 @@ export const AuthProvider = ({ children }) => {
             hasSkippedProfile,
             setHasSkippedProfile,
             socket,
-            unreadCount: 0,
+            unreadCount,
+            setUnreadCount,
             unreadMessageCount: 0,
-            refreshUnreadCount: () => { }
+            refreshUnreadCount: async () => {
+                const { notificationsAPI } = require('../services/api');
+                const nRes = await notificationsAPI.getUnreadCount();
+                setUnreadCount(nRes.data.count || 0);
+            }
         }}>
             {children}
         </AuthContext.Provider>

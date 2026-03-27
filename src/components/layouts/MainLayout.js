@@ -9,12 +9,12 @@ import { Colors, Shadows } from '../../constants/theme';
 import { Menu, ChevronLeft, Bell, X, CheckCheck, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import GradientBorder from '../ui/GradientBorder';
-import { notificationAPI } from '../../services/api';
+import { notificationsAPI } from '../../services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPadding = false, style, botSafe = false, scrollable = false }) => {
     const navigation = useNavigation();
-    const { user } = useAuth();
+    const { user, unreadCount, setUnreadCount } = useAuth();
     const insets = useSafeAreaInsets();
 
     // Fallback for devices/web where insets might be 0
@@ -28,8 +28,9 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
     const fetchNotifications = async () => {
         setNotifLoading(true);
         try {
-            const res = await notificationAPI.getAll();
+            const res = await notificationsAPI.getAll();
             setNotifications(res.data || []);
+            // After viewing, we can reset local count or wait for mark read
         } catch (error) {
             console.error('Failed to fetch notifications', error);
         } finally {
@@ -43,7 +44,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
 
     const handleMarkAllRead = async () => {
         try {
-            await notificationAPI.markAllRead();
+            await notificationsAPI.markAllRead();
+            setUnreadCount(0);
             fetchNotifications();
         } catch (error) {
             Alert.alert('Error', 'Failed to mark notifications as read');
@@ -61,7 +63,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await notificationAPI.deleteAll();
+                            await notificationsAPI.deleteAll();
+                            setUnreadCount(0);
                             fetchNotifications();
                         } catch (error) {
                             Alert.alert('Error', 'Failed to delete notifications');
@@ -72,7 +75,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         );
     };
 
-    const unreadCount = (notifications || []).filter(n => !n.isRead).length;
+
 
     return (
         <View style={[

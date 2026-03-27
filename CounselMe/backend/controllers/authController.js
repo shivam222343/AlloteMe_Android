@@ -210,6 +210,16 @@ const toggleSaveCollege = async (req, res) => {
         // Invalidate cache
         await redis.del(`user_profile_${req.user._id}`);
 
+        if (!isSaved) {
+            const { sendNotification } = require('../services/notificationService');
+            sendNotification(
+                req.user._id,
+                "College Saved",
+                "Great choice! Saving colleges helps our prediction engine learn your interests.",
+                "success"
+            );
+        }
+
         // Return populated saved colleges to sync frontend state
         const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university');
         res.json({ success: true, savedColleges: updatedUser.savedColleges });

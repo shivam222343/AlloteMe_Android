@@ -308,6 +308,22 @@ const predictColleges = async (req, res) => {
             }));
 
         res.json(cleaned);
+
+        // Optional: Send background notification if user logged in
+        if (req.headers.authorization) {
+            try {
+                const jwt = require('jsonwebtoken');
+                const token = req.headers.authorization.split(' ')[1];
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const { sendNotification } = require('../services/notificationService');
+                sendNotification(
+                    decoded.id,
+                    "Analysis Complete",
+                    `Found ${cleaned.length} colleges matching your profile. Compare them to find your best fit!`,
+                    "info"
+                );
+            } catch (e) { /* ignore invalid auth for public routes */ }
+        }
     } catch (error) {
         console.error('Prediction Engine Failure:', error);
         res.status(500).json({ message: "Prediction failed", error: error.message });

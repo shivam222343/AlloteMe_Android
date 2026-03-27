@@ -39,6 +39,7 @@ import AdminUsersScreen from '../screens/AdminUsersScreen';
 import AdminUserDetailScreen from '../screens/AdminUserDetailScreen';
 import TermsConditionsScreen from '../screens/TermsConditionsScreen';
 import AdminCounselorLogsScreen from '../screens/AdminCounselorLogsScreen';
+import AdminNotificationsScreen from '../screens/AdminNotificationsScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -93,6 +94,7 @@ const TabNavigator = () => {
             <Tab.Screen name="TermsConditions" component={TermsConditionsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="HelpCenter" component={HelpCenterScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="AdminCounselorLogs" component={AdminCounselorLogsScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
             <Tab.Screen name="SystemAnalytics" component={ComingSoonScreen} initialParams={{ title: 'System Analytics' }} />
         </Tab.Navigator>
     );
