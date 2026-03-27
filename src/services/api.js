@@ -54,6 +54,7 @@ export const institutionAPI = {
     add: (data) => api.post('institutions', data),
     update: (id, data) => api.put(`institutions/${id}`, data),
     delete: (id) => api.delete(`institutions/${id}`),
+    toggleFeature: (id) => api.put(`institutions/${id}/feature`),
     uploadImage: (formData) => api.post('upload/image', formData),
 };
 

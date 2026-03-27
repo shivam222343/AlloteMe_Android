@@ -230,6 +230,11 @@ const toggleFeatureInstitution = async (req, res) => {
         institution.isFeatured = !institution.isFeatured;
         await institution.save();
 
+        // Invalidate specific and list caches
+        await redis.del(`institution_${req.params.id}`);
+        await redis.del('institutions_all');
+        await redis.del('institutions_featured');
+
         emitUpdate('institution:updated', institution);
         res.json(institution);
     } catch (error) {
