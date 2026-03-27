@@ -17,8 +17,9 @@ const CompleteProfileScreen = ({ navigation }) => {
         rank: '',
         location: '',
         expectedRegion: '',
-        examType: 'MHTCET' ,// Default
-        groqApiKey: ''
+        examType: 'MHTCET',// Default
+        groqApiKey: '',
+        phoneNumber: user?.phoneNumber || ''
     });
 
     const handleSubmit = async () => {
@@ -36,6 +37,7 @@ const CompleteProfileScreen = ({ navigation }) => {
                 location: formData.location,
                 expectedRegion: formData.expectedRegion,
                 groqApiKey: formData.groqApiKey,
+                phoneNumber: formData.phoneNumber,
                 preferences: {
                     ...(user?.preferences || {}),
                     isProfileComplete: true
@@ -103,6 +105,15 @@ const CompleteProfileScreen = ({ navigation }) => {
                             onChangeText={(t) => setFormData({ ...formData, location: t })}
                             placeholder="e.g. Mumbai"
                             leftIcon={<MapPin size={18} color={Colors.text.tertiary} />}
+                        />
+
+                        <Input
+                            label="WhatsApp Phone Number"
+                            value={formData.phoneNumber}
+                            onChangeText={(t) => setFormData({ ...formData, phoneNumber: t })}
+                            placeholder="e.g. 8010XXXXXX"
+                            keyboardType="phone-pad"
+                            maxLength={10}
                         />
 
                         <Input

@@ -35,6 +35,7 @@ export const authAPI = {
     updateUserRole: (id, data) => api.put(`auth/users/${id}`, data),
     deleteUser: (id) => api.delete(`auth/users/${id}`),
     updateAvatarPreference: (data) => api.post('auth/update-avatar', data),
+    verifyPhone: (phone) => api.put('auth/verify-phone', { phone }),
 };
 
 export const counselorAPI = {

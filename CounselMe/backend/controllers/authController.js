@@ -211,6 +211,10 @@ const updateUserProfile = async (req, res) => {
             user.groqApiKey = req.body.groqApiKey;
         }
 
+        if (req.body.phoneNumber !== undefined) {
+            user.phoneNumber = req.body.phoneNumber;
+        }
+
         const updatedUser = await user.save();
 
         // Invalidate cache
