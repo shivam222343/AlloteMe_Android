@@ -6,9 +6,10 @@ import { MapPin, Star, Building2, ChevronRight, Bookmark } from 'lucide-react-na
 import { useAuth } from '../contexts/AuthContext';
 
 const SavedCollegesScreen = ({ navigation }) => {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const [activeTab, setActiveTab] = useState('All');
     const [filtered, setFiltered] = useState([]);
+    const [savingId, setSavingId] = useState(null);
 
     const tabs = ['All', 'Autonomous', 'Government', 'Private', 'Deemed'];
     const saved = user?.savedColleges || [];
@@ -23,6 +24,22 @@ const SavedCollegesScreen = ({ navigation }) => {
             setFiltered(saved);
         } else {
             setFiltered(saved.filter(item => item.type?.includes(tab)));
+        }
+    };
+
+    const handleToggleSave = async (id) => {
+        if (!id || savingId) return;
+        setSavingId(id);
+        try {
+            const { authAPI } = require('../services/api');
+            const res = await authAPI.toggleSave(id);
+            if (res.data.success) {
+                await refreshUser();
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setSavingId(null);
         }
     };
 
@@ -60,7 +77,15 @@ const SavedCollegesScreen = ({ navigation }) => {
                     </View>
                 )}
                 <View style={{ flex: 1 }} />
-                <Star size={20} color="#F59E0B" fill="#F59E0B" />
+                <TouchableOpacity
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        handleToggleSave(item._id);
+                    }}
+                    style={{ padding: 4 }}
+                >
+                    <Star size={24} color="#F59E0B" fill="#F59E0B" />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.itemFooter}>

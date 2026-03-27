@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 // Switch to LOCAL_URL for development, RENDER_URL for production
-const API_BASE_URL = RENDER_URL;
+const API_BASE_URL = LOCAL_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -29,7 +29,11 @@ export const authAPI = {
     verifyOtp: (data) => api.post('auth/verify-otp', data),
     getProfile: () => api.get('auth/profile'),
     updateProfile: (data) => api.put('auth/profile', data),
+    toggleSave: (collegeId) => api.post('auth/toggle-save', { collegeId }),
     getStats: () => api.get('auth/stats'),
+    getAllUsers: () => api.get('auth/users'),
+    updateRole: (id, data) => api.put(`auth/users/${id}`, data),
+    deleteUser: (id) => api.delete(`auth/users/${id}`),
 };
 
 export const counselorAPI = {

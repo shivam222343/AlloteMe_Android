@@ -27,11 +27,128 @@ const BRANCH_EXPANSION_MAP = {
 };
 
 const REGION_CITY_MAP = {
-    'Pune Region': ['Pune', 'Ahmednagar', 'Nashik', 'Solapur', 'Sangli', 'Satara', 'Kolhapur'],
-    'Mumbai Region': ['Mumbai', 'Thane', 'Palghar', 'Raigad', 'Ratnagiri', 'Sindhudurg'],
-    'Vidarbha Region': ['Nagpur', 'Amravati', 'Akola', 'Yavatmal', 'Bhandara', 'Gondia', 'Chandrapur', 'Gadchiroli', 'Buldhana', 'Wardha'],
-    'Marathwada Region': ['Aurangabad', 'Jalna', 'Parbhani', 'Hingoli', 'Nanded', 'Beed', 'Latur', 'Osmanabad'],
-    'North Maharashtra Region': ['Jalgaon', 'Dhule', 'Nandurbar', 'Nashik']
+    'Kolhapur Region': [
+        'Kolhapur',
+        'Sangli',
+        'Miraj',
+        'Ichalkaranji',
+        'Karad',
+        'Ashta',          // Engg college (Dange College)
+        'Islampur',
+        'Vita',
+        'Tasgaon'
+    ],
+
+    'Pune Region': [
+        'Pune',
+        'Pimpri-Chinchwad',
+        'Baramati',       // Engg college
+        'Loni (Pravaranagar)',  // Engg college
+        'Ahmednagar',
+        'Shirur',
+        'Indapur',
+        'Satara',
+        'Phaltan',
+        'Wai',
+        'Solapur'
+    ],
+
+    'Mumbai Region': [
+        'Mumbai',
+        'Navi Mumbai',
+        'Thane',
+        'Mira Road',
+        'Kalyan',
+        'Dombivli',
+        'Ambernath',      // Karav area college
+        'Panvel',
+        'Karjat',
+        'Ulhasnagar'
+    ],
+
+    'Konkan Region': [
+        'Raigad',
+        'Ratnagiri',
+        'Sindhudurg',
+        'Chiplun',
+        'Kudal',
+        'Alibag'
+    ],
+
+    'Nashik Region': [
+        'Nashik',
+        'Adgaon',         // MET college
+        'Sinnar',
+        'Dhule',
+        'Nandurbar',
+        'Malegaon',
+        'Jalgaon',
+        'Chopda'          // Engg college
+    ],
+
+    'North Maharashtra Region': [
+        'Jalgaon',
+        'Dhule',
+        'Nandurbar',
+        'Chopda',
+        'Bhusawal'
+    ],
+
+    'Marathwada Region': [
+        'Aurangabad',
+        'Chhatrapati Sambhajinagar',
+        'Jalna',
+        'Beed',
+        'Latur',
+        'Nanded',
+        'Parbhani',
+        'Hingoli',
+        'Osmanabad'
+    ],
+
+    'Vidarbha Region': [
+        'Nagpur',
+        'Wardha',
+        'Bhandara',
+        'Gondia',
+        'Chandrapur',
+        'Gadchiroli',
+        'Amravati',
+        'Akola',
+        'Yavatmal',
+        'Buldhana',
+        'Washim',
+        'Shegaon'         // Engg college
+    ],
+
+    'Amravati Region': [
+        'Amravati',
+        'Yavatmal',
+        'Akola',
+        'Buldhana',
+        'Washim',
+        'Shegaon'
+    ],
+
+    'Nagpur Region': [
+        'Nagpur',
+        'Wardha',
+        'Bhandara',
+        'Gondia',
+        'Chandrapur',
+        'Gadchiroli'
+    ],
+
+    'Aurangabad Region': [
+        'Aurangabad',
+        'Jalna',
+        'Beed',
+        'Osmanabad',
+        'Latur',
+        'Nanded',
+        'Parbhani',
+        'Hingoli'
+    ]
 };
 
 // @desc    Predict colleges based on percentile/rank with tolerance
@@ -101,13 +218,24 @@ const predictColleges = async (req, res) => {
             const regionArray = Array.isArray(regions) ? regions : regions.split(',');
             const citiesToInclude = [];
             regionArray.forEach(reg => {
-                if (REGION_CITY_MAP[reg]) citiesToInclude.push(...REGION_CITY_MAP[reg]);
-                citiesToInclude.push(reg);
+                const trimmed = reg.trim();
+                if (REGION_CITY_MAP[trimmed]) {
+                    citiesToInclude.push(...REGION_CITY_MAP[trimmed]);
+                }
+
+                // Add the tag itself
+                citiesToInclude.push(trimmed);
+
+                // If tag is something like "Pune Region", also add "Pune" as a potential city match
+                if (trimmed.toLowerCase().endsWith(' region')) {
+                    citiesToInclude.push(trimmed.replace(/ region$/i, '').trim());
+                }
             });
-            const uniqueCities = [...new Set(citiesToInclude)];
+            const uniqueCities = [...new Set(citiesToInclude)].filter(c => c.length > 1);
+
             instQuery.$or = [
-                { 'location.region': { $in: uniqueCities.map(c => new RegExp(c, 'i')) } },
-                { 'location.city': { $in: uniqueCities.map(c => new RegExp(c, 'i')) } },
+                { 'location.region': { $in: uniqueCities.map(c => new RegExp(`^${c}$|${c}`, 'i')) } },
+                { 'location.city': { $in: uniqueCities.map(c => new RegExp(`^${c}$|${c}`, 'i')) } },
                 { name: { $in: uniqueCities.map(c => new RegExp(c, 'i')) } }
             ];
             needsInstFilter = true;

@@ -178,14 +178,19 @@ const toggleSaveCollege = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (user) {
-        const isSaved = user.savedColleges.includes(collegeId);
+        if (!user.savedColleges) user.savedColleges = [];
+
+        const isSaved = user.savedColleges.some(id => id.toString() === collegeId);
         if (isSaved) {
             user.savedColleges = user.savedColleges.filter(id => id.toString() !== collegeId);
         } else {
             user.savedColleges.push(collegeId);
         }
         await user.save();
-        res.json({ success: true, savedColleges: user.savedColleges });
+
+        // Return populated saved colleges to sync frontend state
+        const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university');
+        res.json({ success: true, savedColleges: updatedUser.savedColleges });
     } else {
         res.status(404).json({ message: 'User not found' });
     }

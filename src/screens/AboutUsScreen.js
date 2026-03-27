@@ -48,7 +48,7 @@ const AboutUsScreen = ({ navigation }) => {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.foundersScroll}>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={require('../../assets/founders/shivam.png')}
+                                source={{ uri: 'https://raw.githubusercontent.com/shivam222343/AlloteMe_Android/main/assets/founders/shivam.png' }}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Shivam Dombe</Text>
@@ -56,7 +56,7 @@ const AboutUsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={require('../../assets/founders/rohan.png')}
+                                source={{ uri: 'https://raw.githubusercontent.com/shivam222343/AlloteMe_Android/main/assets/founders/rohan.png' }}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Rohan Mane</Text>
@@ -64,7 +64,7 @@ const AboutUsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={require('../../assets/founders/tejas.png')}
+                                source={{ uri: 'https://raw.githubusercontent.com/shivam222343/AlloteMe_Android/main/assets/founders/tejas.png' }}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Tejas Choudhari</Text>

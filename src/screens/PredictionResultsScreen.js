@@ -2,7 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView, Image } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
-import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck } from 'lucide-react-native';
+import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck, Star } from 'lucide-react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { authAPI } from '../services/api';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -21,11 +23,28 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         }
     }, [resultsParam]);
 
+    const { user, refreshUser } = useAuth();
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [sortBy, setSortBy] = useState('none');
+    const [savingId, setSavingId] = useState(null);
+
+    const handleToggleSave = async (id) => {
+        if (!id || savingId) return;
+        setSavingId(id);
+        try {
+            const res = await authAPI.toggleSave(id);
+            if (res.data.success) {
+                await refreshUser();
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setSavingId(null);
+        }
+    };
 
     const userPerc = useMemo(() => parseFloat(percentile) || 0, [percentile]);
 
@@ -182,6 +201,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const renderItem = ({ item, drag, isActive, getIndex }) => {
         const index = getIndex();
+        const isSaved = user?.savedColleges?.some(c => (c._id === item.collegeId?._id || c === item.collegeId?._id));
 
         return (
             <TouchableOpacity
@@ -210,7 +230,24 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                         <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: item.chanceColor + '10' }]}>
                             <Text style={[styles.matchPercent, { color: item.chanceColor }]}>{item.chanceLabel}</Text>
                         </View>
-                        <TouchableOpacity onPress={() => handleDelete(item.key)} style={styles.deleteBtn}>
+
+                        {user?.role === 'student' && (
+                            <TouchableOpacity
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleSave(item.collegeId?._id);
+                                }}
+                                style={{ padding: 6, marginRight: 4 }}
+                            >
+                                <Star
+                                    size={20}
+                                    color={isSaved ? "#F59E0B" : "#CBD5E1"}
+                                    fill={isSaved ? "#F59E0B" : "transparent"}
+                                />
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDelete(item.key); }} style={styles.deleteBtn}>
                             <X size={16} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>

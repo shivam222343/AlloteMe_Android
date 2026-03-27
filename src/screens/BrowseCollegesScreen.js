@@ -2,19 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, ScrollView } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
-import { institutionAPI } from '../services/api';
+import { institutionAPI, authAPI } from '../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { Search, MapPin, Star, Pencil } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 
 const BrowseCollegesScreen = ({ navigation }) => {
-    const { user, socket } = useAuth();
+    const { user, socket, refreshUser } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [institutions, setInstitutions] = useState([]);
     const [filtered, setFiltered] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('All');
+    const [savingId, setSavingId] = useState(null);
 
     const tabs = ['All', 'Autonomous', 'Government', 'Private', 'Deemed'];
 
@@ -63,64 +64,100 @@ const BrowseCollegesScreen = ({ navigation }) => {
         setFiltered(filteredData);
     };
 
-    const InstitutionCard = ({ item }) => (
-        <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('CollegeDetail', { id: item._id })}
-            style={styles.listItem}
-        >
-            <View style={styles.itemHeader}>
-                {item.galleryImages && item.galleryImages[0] ? (
-                    <Image source={{ uri: item.galleryImages[0] }} style={styles.itemThumbnail} />
-                ) : (
-                    <Image source={require('../assets/images/college_default.jpg')} style={styles.itemThumbnail} />
-                )}
-                <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <View style={styles.subInfoRow}>
-                        <Text style={styles.itemUniversity}>{item.university || 'Affiliated'}</Text>
-                        {item.dteCode && (
-                            <View style={styles.dteMiniBadge}>
-                                <Text style={styles.dteMiniText}>DTE: {item.dteCode}</Text>
-                            </View>
+    const handleToggleSave = async (id) => {
+        if (savingId) return;
+        setSavingId(id);
+        try {
+            const res = await authAPI.toggleSave(id);
+            if (res.data.success) {
+                await refreshUser();
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setSavingId(null);
+        }
+    };
+
+    const InstitutionCard = ({ item }) => {
+        const isSaved = user?.savedColleges?.some(c => (c._id === item._id || c === item._id));
+
+        return (
+            <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('CollegeDetail', { id: item._id })}
+                style={styles.listItem}
+            >
+                <View style={styles.itemHeader}>
+                    {item.galleryImages && item.galleryImages[0] ? (
+                        <Image source={{ uri: item.galleryImages[0] }} style={styles.itemThumbnail} />
+                    ) : (
+                        <Image source={require('../assets/images/college_default.jpg')} style={styles.itemThumbnail} />
+                    )}
+                    <View style={styles.itemInfo}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Text style={[styles.itemName, { flex: 1 }]}>{item.name}</Text>
+                            {user?.role === 'student' && (
+                                <TouchableOpacity
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleSave(item._id);
+                                    }}
+                                    style={{ padding: 4 }}
+                                >
+                                    <Star
+                                        size={22}
+                                        color={isSaved ? "#F59E0B" : "#CBD5E1"}
+                                        fill={isSaved ? "#F59E0B" : "transparent"}
+                                    />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <View style={styles.subInfoRow}>
+                            <Text style={styles.itemUniversity}>{item.university || 'Affiliated'}</Text>
+                            {item.dteCode && (
+                                <View style={styles.dteMiniBadge}>
+                                    <Text style={styles.dteMiniText}>DTE: {item.dteCode}</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+
+                <View style={styles.badgeRow}>
+                    <View style={styles.professionTag}><Text style={styles.professionTagText}>{item.type}</Text></View>
+                    {item.rating?.value && (
+                        <View style={styles.nirfBadgeMini}>
+                            <Star size={12} color="#B8860B" fill="#B8860B" />
+                            <Text style={styles.nirfTextMini}>{item.rating.value} {item.rating.platform}</Text>
+                        </View>
+                    )}
+                </View>
+
+                <View style={styles.itemFooter}>
+                    <View style={styles.itemLoc}>
+                        <MapPin size={14} color={Colors.text.tertiary} />
+                        <Text style={styles.itemLocText}>{item.location.city}, {item.location.region}</Text>
+                    </View>
+                    <View style={styles.itemFooterRight}>
+                        <Text style={styles.itemFees}>₹{item.feesPerYear?.toLocaleString()}/yr</Text>
+                        {isAdmin && (
+                            <TouchableOpacity
+                                style={styles.editBtn}
+                                onPress={(e) => {
+                                    e.stopPropagation();
+                                    navigation.navigate('EditInstitution', { id: item._id });
+                                }}
+                            >
+                                <Pencil size={14} color={Colors.primary} />
+                                <Text style={styles.editBtnText}>Edit</Text>
+                            </TouchableOpacity>
                         )}
                     </View>
                 </View>
-            </View>
-
-            <View style={styles.badgeRow}>
-                <View style={styles.professionTag}><Text style={styles.professionTagText}>{item.type}</Text></View>
-                {item.rating?.value && (
-                    <View style={styles.nirfBadgeMini}>
-                        <Star size={12} color="#B8860B" fill="#B8860B" />
-                        <Text style={styles.nirfTextMini}>{item.rating.value} {item.rating.platform}</Text>
-                    </View>
-                )}
-            </View>
-
-            <View style={styles.itemFooter}>
-                <View style={styles.itemLoc}>
-                    <MapPin size={14} color={Colors.text.tertiary} />
-                    <Text style={styles.itemLocText}>{item.location.city}, {item.location.region}</Text>
-                </View>
-                <View style={styles.itemFooterRight}>
-                    <Text style={styles.itemFees}>₹{item.feesPerYear?.toLocaleString()}/yr</Text>
-                    {isAdmin && (
-                        <TouchableOpacity
-                            style={styles.editBtn}
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                navigation.navigate('EditInstitution', { id: item._id });
-                            }}
-                        >
-                            <Pencil size={14} color={Colors.primary} />
-                            <Text style={styles.editBtnText}>Edit</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </View>
-        </TouchableOpacity>
-    );
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <MainLayout scrollable={false} noPadding>

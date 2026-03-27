@@ -19,7 +19,37 @@ const CITY_COORDS = {
     'Mumbai': { latitude: 19.0760, longitude: 72.8777 },
     'Nagpur': { latitude: 21.1458, longitude: 79.0882 },
     'Nashik': { latitude: 19.9975, longitude: 73.7898 },
-    'Aurangabad': { latitude: 19.8762, longitude: 75.3433 }
+    'Aurangabad': { latitude: 19.8762, longitude: 75.3433 },
+    'Chhatrapati Sambhajinagar': { latitude: 19.8762, longitude: 75.3433 },
+    'Kolhapur': { latitude: 16.7050, longitude: 74.2433 },
+    'Sangli': { latitude: 16.8524, longitude: 74.5815 },
+    'Solapur': { latitude: 17.6599, longitude: 75.9064 },
+    'Amravati': { latitude: 20.9320, longitude: 77.7523 },
+    'Latur': { latitude: 18.4088, longitude: 76.5604 },
+    'Ahmednagar': { latitude: 19.0948, longitude: 74.7480 },
+    'Jalgaon': { latitude: 21.0077, longitude: 75.5626 },
+    'Dhule': { latitude: 20.9042, longitude: 74.7749 },
+    'Satara': { latitude: 17.6805, longitude: 73.9918 },
+    'Nanded': { latitude: 19.1383, longitude: 77.3210 },
+    'Thane': { latitude: 19.2183, longitude: 72.9781 },
+    'Navi Mumbai': { latitude: 19.0330, longitude: 73.0297 },
+    'Ratnagiri': { latitude: 16.9902, longitude: 73.3120 },
+    'Raigad': { latitude: 18.5158, longitude: 73.1822 },
+    'Sindhudurg': { latitude: 16.1158, longitude: 73.6917 },
+    'Wardha': { latitude: 20.7453, longitude: 78.6022 },
+    'Akola': { latitude: 20.7002, longitude: 77.0082 },
+    'Parbhani': { latitude: 19.2644, longitude: 76.7721 },
+    'Yavatmal': { latitude: 20.3899, longitude: 78.1311 },
+    'Beed': { latitude: 18.9891, longitude: 75.7601 },
+    'Jalna': { latitude: 19.8297, longitude: 75.8800 },
+    'Osmanabad': { latitude: 18.1861, longitude: 76.0419 },
+    'Gondia': { latitude: 21.4624, longitude: 80.1983 },
+    'Chandrapur': { latitude: 19.9615, longitude: 79.2961 },
+    'Buldhana': { latitude: 20.5290, longitude: 76.1842 },
+    'Washim': { latitude: 20.1005, longitude: 77.1306 },
+    'Bhandara': { latitude: 21.1702, longitude: 79.6521 },
+    'Gadchiroli': { latitude: 20.1845, longitude: 79.9935 },
+    'Nandurbar': { latitude: 21.3670, longitude: 74.2433 }
 };
 
 const NearbyCollegesScreen = ({ navigation }) => {
@@ -64,33 +94,57 @@ const NearbyCollegesScreen = ({ navigation }) => {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') { handleLocationFallback('Permission denied'); return; }
-            const freshLoc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced, timeout: 8000 });
+
+            // Speed up fetching on Android/iOS by trying last known position first
+            const lastLoc = await Location.getLastKnownPositionAsync();
+            if (lastLoc) {
+                setLocation(lastLoc.coords);
+                await fetchNearbyColleges(lastLoc.coords);
+                setLoading(false);
+                // Also trigger a background higher-accuracy fetch to update the map if it differs significantly
+                Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(fresh => {
+                    if (fresh) {
+                        setLocation(fresh.coords);
+                        fetchNearbyColleges(fresh.coords);
+                    }
+                }).catch(() => { });
+                return;
+            }
+
+            const freshLoc = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+                timeout: 5000 // Shorter timeout for user responsiveness
+            });
             if (freshLoc) {
                 setLocation(freshLoc.coords);
                 await fetchNearbyColleges(freshLoc.coords);
             }
-        } catch (err) { handleLocationFallback('GPS failed.'); }
+        } catch (err) { handleLocationFallback('GPS failed (Timeout).'); }
     };
 
     const handleLocationFallback = (error) => {
-        if (user?.location && CITY_COORDS[user.location]) {
-            const coords = CITY_COORDS[user.location];
+        const userCity = user?.location;
+        if (userCity && CITY_COORDS[userCity]) {
+            const coords = CITY_COORDS[userCity];
             setLocation(coords);
             fetchNearbyColleges(coords);
-            setErrorMsg(`Using ${user.location} coordinates (GPS failed)`);
+            setErrorMsg(`Using ${userCity} from profile (GPS slow/off)`);
         } else { setErrorMsg(error || 'Location unavailable'); }
         setLoading(false);
     };
 
     useEffect(() => {
         if (!location) {
-            if (user?.location && CITY_COORDS[user.location]) {
-                const coords = CITY_COORDS[user.location];
+            const userCity = user?.location;
+            if (userCity && CITY_COORDS[userCity]) {
+                const coords = CITY_COORDS[userCity];
                 setLocation(coords);
                 fetchNearbyColleges(coords);
-            } else { fetchCurrentLocation(); }
+            } else {
+                fetchCurrentLocation();
+            }
         }
-    }, []);
+    }, [user?.location]);
 
     const fetchNearbyColleges = async (coords) => {
         try {
@@ -248,6 +302,45 @@ const NearbyCollegesScreen = ({ navigation }) => {
         }
     }, [colleges]);
 
+    const [locationSearch, setLocationSearch] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+
+    const handleSearchLocation = async (cityName) => {
+        const city = cityName || locationSearch;
+        if (!city) return;
+
+        setIsSearching(true);
+        try {
+            // Try CITY_COORDS first
+            const matchedKey = Object.keys(CITY_COORDS).find(k => k.toLowerCase() === city.toLowerCase());
+            if (matchedKey) {
+                const coords = CITY_COORDS[matchedKey];
+                setLocation(coords);
+                await fetchNearbyColleges(coords);
+                setLocationSearch('');
+                return;
+            }
+
+            // Simple Geocoding fallback using Nominatim
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city + ', Maharashtra')}&limit=1`;
+            const response = await fetch(url, { headers: { 'User-Agent': 'AlloteMe App' } });
+            const data = await response.json();
+
+            if (data && data.length > 0) {
+                const coords = { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) };
+                setLocation(coords);
+                await fetchNearbyColleges(coords);
+                setLocationSearch('');
+            } else {
+                Alert.alert("Location Not Found", "Couldn't find that city. Try Pune, Mumbai, etc.");
+            }
+        } catch (err) {
+            Alert.alert("Error", "Failed to search location.");
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     if (loading) return <MainLayout title="Nearby Colleges"><View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View></MainLayout>;
 
     if (errorMsg && !location) {
@@ -259,11 +352,13 @@ const NearbyCollegesScreen = ({ navigation }) => {
                     <TouchableOpacity style={styles.primaryBtn} onPress={fetchCurrentLocation}><Text style={styles.primaryBtnText}>Retry GPS Fetch</Text></TouchableOpacity>
                     <Text style={styles.orText}>- OR -</Text>
                     <View style={styles.manualForm}>
-                        <View style={styles.inputRow}>
-                            <View style={styles.inputWrap}><Text style={styles.label}>Lat</Text><TextInput style={styles.input} value={manualLat} onChangeText={setManualLat} keyboardType="numeric" /></View>
-                            <View style={styles.inputWrap}><Text style={styles.label}>Lng</Text><TextInput style={styles.input} value={manualLng} onChangeText={setManualLng} keyboardType="numeric" /></View>
-                        </View>
-                        <TouchableOpacity style={styles.setBtn} onPress={handleManualSet}><Text style={styles.setBtnText}>Use Coordinates</Text></TouchableOpacity>
+                        <TextInput
+                            style={[styles.input, { marginBottom: 12 }]}
+                            placeholder="Enter City Name (e.g. Pune)"
+                            value={locationSearch}
+                            onChangeText={setLocationSearch}
+                        />
+                        <TouchableOpacity style={styles.setBtn} onPress={() => handleSearchLocation()}><Text style={styles.setBtnText}>Find City</Text></TouchableOpacity>
                     </View>
                 </View>
             </MainLayout>
@@ -291,7 +386,7 @@ const NearbyCollegesScreen = ({ navigation }) => {
                     {!isFullscreen && (
                         <View style={styles.mapActions}>
                             <TouchableOpacity style={styles.mapActionBtn} onPress={fetchCurrentLocation}>
-                                <RefreshCcw size={20} color="white" />
+                                <Navigation size={20} color="white" />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.mapActionBtn} onPress={() => setIsFullscreen(true)}>
                                 <Maximize2 size={20} color="white" />
@@ -302,6 +397,37 @@ const NearbyCollegesScreen = ({ navigation }) => {
 
                 {!isFullscreen && (
                     <ScrollView style={styles.listArea} showsVerticalScrollIndicator={false}>
+                        <View style={styles.searchSection}>
+                            <View style={styles.searchBar}>
+                                <MapPin size={20} color={Colors.primary} />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search location/city..."
+                                    value={locationSearch}
+                                    onChangeText={setLocationSearch}
+                                    onSubmitEditing={() => handleSearchLocation()}
+                                />
+                                {isSearching ? (
+                                    <ActivityIndicator size="small" color={Colors.primary} />
+                                ) : (
+                                    <TouchableOpacity onPress={() => handleSearchLocation()}>
+                                        <RefreshCcw size={20} color={Colors.primary} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickSearch}>
+                                {['Pune', 'Mumbai', 'Nagpur', 'Nashik', 'Aurangabad'].map(city => (
+                                    <TouchableOpacity
+                                        key={city}
+                                        style={styles.quickCity}
+                                        onPress={() => handleSearchLocation(city)}
+                                    >
+                                        <Text style={styles.quickCityText}>{city}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+
                         {showRadius ? (
                             <View style={styles.rangeBox}>
                                 <View style={styles.rangeLabels}>
@@ -380,6 +506,33 @@ const styles = StyleSheet.create({
     mapActions: { position: 'absolute', bottom: 15, right: 15, gap: 10 },
     mapActionBtn: { backgroundColor: 'rgba(0,0,0,0.7)', padding: 10, borderRadius: 12 },
     listArea: { flex: 1, padding: 16 },
+
+    // Search Section
+    searchSection: { marginBottom: 20 },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f1f5f9',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 50,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#e2e8f0'
+    },
+    searchInput: { flex: 1, fontSize: 14, color: '#1e293b' },
+    quickSearch: { marginTop: 10 },
+    quickCity: {
+        backgroundColor: Colors.primary + '10',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: Colors.primary + '20'
+    },
+    quickCityText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
+
     rangeBox: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
     rangeLabels: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
     rangeTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
