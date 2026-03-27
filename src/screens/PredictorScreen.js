@@ -196,8 +196,9 @@ const PredictorScreen = ({ navigation }) => {
             });
 
         } catch (error) {
+            const errorMsg = error.response?.data?.message || 'Failed to fetch prediction data. Please try again.';
             console.error('Prediction error:', error);
-            Alert.alert('Error', 'Failed to fetch prediction data.');
+            Alert.alert('Prediction Error', errorMsg);
         } finally {
             setLoading(false);
         }

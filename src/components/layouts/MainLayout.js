@@ -15,7 +15,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPadding = false, style, botSafe = false, scrollable = false }) => {
     const navigation = useNavigation();
-    const { user, unreadCount, setUnreadCount, showAvatarPopup, setShowAvatarPopup } = useAuth();
+    const {
+        user,
+        unreadCount,
+        setUnreadCount,
+        notifications,
+        markLocalNotifAsRead,
+        markAllLocalNotifsAsRead,
+        clearAllLocalNotifs,
+        showAvatarPopup,
+        setShowAvatarPopup
+    } = useAuth();
     const insets = useSafeAreaInsets();
 
     // Fallback for devices/web where insets might be 0
@@ -23,53 +33,22 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
     const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 0 : 20);
 
     const [showNotifs, setShowNotifs] = useState(false);
-    const [notifications, setNotifications] = useState([]);
-    const [notifLoading, setNotifLoading] = useState(false);
 
-    const fetchNotifications = async () => {
-        setNotifLoading(true);
-        try {
-            const res = await notificationsAPI.getAll();
-            setNotifications(res.data || []);
-            // After viewing, we can reset local count or wait for mark read
-        } catch (error) {
-            console.error('Failed to fetch notifications', error);
-        } finally {
-            setNotifLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (showNotifs) fetchNotifications();
-    }, [showNotifs]);
-
-    const handleMarkAllRead = async () => {
-        try {
-            await notificationsAPI.markAllRead();
-            setUnreadCount(0);
-            fetchNotifications();
-        } catch (error) {
-            Alert.alert('Error', 'Failed to mark notifications as read');
-        }
+    const handleMarkAllRead = () => {
+        markAllLocalNotifsAsRead();
     };
 
     const handleDeleteAll = () => {
         Alert.alert(
             'Clear All',
-            'Are you sure you want to delete all notifications?',
+            'Are you sure you want to delete all local notifications?',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await notificationsAPI.deleteAll();
-                            setUnreadCount(0);
-                            fetchNotifications();
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to delete notifications');
-                        }
+                    onPress: () => {
+                        clearAllLocalNotifs();
                     }
                 }
             ]
@@ -200,59 +179,48 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 </TouchableOpacity>
                             </View>
 
-                            {notifLoading ? (
-                                <View style={styles.loaderBox}>
-                                    <ActivityIndicator size="large" color={Colors.primary} />
-                                </View>
-                            ) : (
-                                <FlatList
-                                    data={notifications}
-                                    keyExtractor={item => item._id}
-                                    renderItem={({ item }) => {
-                                        let Icon = Info;
-                                        let iconColor = Colors.primary;
-                                        if (item.type === 'success') { Icon = CheckCircle; iconColor = Colors.success; }
-                                        if (item.type === 'warning') { Icon = AlertTriangle; iconColor = '#F59E0B'; }
-                                        if (item.type === 'error') { Icon = AlertCircle; iconColor = Colors.error; }
+                            <FlatList
+                                data={notifications}
+                                keyExtractor={item => item._id}
+                                renderItem={({ item }) => {
+                                    let Icon = Info;
+                                    let iconColor = Colors.primary;
+                                    if (item.type === 'success') { Icon = CheckCircle; iconColor = '#22C55E'; }
+                                    if (item.type === 'warning') { Icon = AlertTriangle; iconColor = '#F59E0B'; }
+                                    if (item.type === 'error') { Icon = AlertCircle; iconColor = '#EF4444'; }
+                                    if (item.type === 'info') { Icon = Info; iconColor = '#0A66C2'; }
 
-                                        const handleItemPress = async () => {
-                                            if (!item.isRead) {
-                                                try {
-                                                    await notificationsAPI.markAsRead(item._id);
-                                                    setUnreadCount(prev => Math.max(0, prev - 1));
-                                                    fetchNotifications();
-                                                } catch (error) {
-                                                    console.error(error);
-                                                }
-                                            }
-                                        };
+                                    const handleItemPress = () => {
+                                        if (!item.read) {
+                                            markLocalNotifAsRead(item._id);
+                                        }
+                                    };
 
-                                        return (
-                                            <TouchableOpacity
-                                                style={[styles.notifItem, !item.isRead && styles.unreadNotif]}
-                                                onPress={handleItemPress}
-                                            >
-                                                <View style={[styles.notifIcon, { backgroundColor: iconColor + '10' }]}>
-                                                    <Icon size={18} color={iconColor} />
-                                                </View>
-                                                <View style={styles.notifBody}>
-                                                    <Text style={[styles.notifTitle, !item.isRead && styles.boldText]}>{item.title}</Text>
-                                                    <Text style={styles.notifMsg} numberOfLines={2}>{item.message}</Text>
-                                                    <Text style={styles.notifTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-                                                </View>
-                                                {!item.isRead && <View style={styles.unreadDot} />}
-                                            </TouchableOpacity>
-                                        );
-                                    }}
-                                    ListEmptyComponent={
-                                        <View style={styles.emptyBox}>
-                                            <Bell size={40} color={Colors.divider} />
-                                            <Text style={styles.emptyText}>No notifications yet</Text>
-                                        </View>
-                                    }
-                                    contentContainerStyle={{ paddingBottom: 40 + bottomPadding }}
-                                />
-                            )}
+                                    return (
+                                        <TouchableOpacity
+                                            style={[styles.notifItem, !item.read && styles.unreadNotif]}
+                                            onPress={handleItemPress}
+                                        >
+                                            <View style={[styles.notifIcon, { backgroundColor: iconColor + '10' }]}>
+                                                <Icon size={18} color={iconColor} />
+                                            </View>
+                                            <View style={styles.notifBody}>
+                                                <Text style={[styles.notifTitle, !item.read && styles.boldText]}>{item.title}</Text>
+                                                <Text style={styles.notifMsg} numberOfLines={2}>{item.message}</Text>
+                                                <Text style={styles.notifTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                                            </View>
+                                            {!item.read && <View style={styles.unreadDot} />}
+                                        </TouchableOpacity>
+                                    );
+                                }}
+                                ListEmptyComponent={
+                                    <View style={styles.emptyBox}>
+                                        <Bell size={40} color={Colors.divider} />
+                                        <Text style={styles.emptyText}>No notifications yet</Text>
+                                    </View>
+                                }
+                                contentContainerStyle={{ paddingBottom: 40 + bottomPadding }}
+                            />
                         </Pressable>
                     </View>
                 </Pressable>

@@ -23,6 +23,16 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const NotificationsModal = ({ visible, onClose, navigation }) => {
     const panY = React.useRef(new Animated.Value(0)).current;
 
+    const {
+        notifications,
+        markLocalNotifAsRead,
+        markAllLocalNotifsAsRead,
+        deleteLocalNotif,
+        clearAllLocalNotifs
+    } = useAuth();
+
+    const [loading, setLoading] = useState(false);
+
     const panResponder = React.useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
@@ -51,68 +61,12 @@ const NotificationsModal = ({ visible, onClose, navigation }) => {
         }
     }, [visible]);
 
-    const { refreshUnreadCount } = useAuth();
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(false);
-
-    useEffect(() => {
-        if (visible) {
-            fetchNotifications();
-        }
-    }, [visible]);
-
-    const fetchNotifications = async (pageNum = 1, append = false) => {
-        if (pageNum === 1) setLoading(true);
-        else setLoadingMore(true);
-
-        try {
-            const res = await notificationsAPI.getAll({ page: pageNum, limit: 20 });
-            if (res.success) {
-                if (append) {
-                    setNotifications(prev => [...prev, ...res.data]);
-                } else {
-                    setNotifications(res.data);
-                }
-                setHasMore(res.pagination.hasMore);
-                setPage(res.pagination.page);
-            }
-        } catch (error) {
-            console.error('Fetch notifications error:', error);
-        } finally {
-            setLoading(false);
-            setLoadingMore(false);
-        }
-    };
-
-    const handleLoadMore = () => {
-        if (hasMore && !loadingMore) {
-            fetchNotifications(page + 1, true);
-        }
-    };
-
     const markAsRead = async (id) => {
-        try {
-            await notificationsAPI.markAsRead(id);
-            setNotifications(prev => prev.map(n => n._id === id ? { ...n, read: true } : n));
-            refreshUnreadCount();
-        } catch (error) {
-            console.error('Mark as read error:', error);
-        }
+        markLocalNotifAsRead(id);
     };
 
     const deleteNotification = async (id) => {
-        try {
-            // Optimistic update
-            setNotifications(prev => prev.filter(n => n._id !== id));
-            await notificationsAPI.delete(id);
-            refreshUnreadCount();
-        } catch (error) {
-            console.error('Delete notification error:', error);
-            fetchNotifications(); // Revert on error
-        }
+        deleteLocalNotif(id);
     };
 
     const handleNotificationPress = async (item) => {
@@ -121,51 +75,32 @@ const NotificationsModal = ({ visible, onClose, navigation }) => {
         }
         onClose();
 
-        if (item.type === 'game_hosted' && item.data?.roomId) {
-            navigation.navigate('SketchHeads', { roomId: item.data.roomId });
-        } else if (item.data?.screen) {
+        if (item.data?.screen) {
             try {
                 const params = typeof item.data.params === 'string' ? JSON.parse(item.data.params) : item.data.params;
                 navigation.navigate(item.data.screen, params || {});
             } catch (e) {
                 navigation.navigate(item.data.screen);
             }
-        } else if (item.type.includes('meeting') || item.relatedModel === 'Meeting') {
-            navigation.navigate('Calendar', { selectedMeetingId: item.relatedId, clubId: item.clubId });
-        } else if (item.type.includes('task') || item.relatedModel === 'Task') {
-            navigation.navigate('Tasks', { focusTaskId: item.relatedId });
-        } else if (item.type === 'new_message' && item.relatedId) {
-            navigation.navigate('Chat', { otherUser: { _id: item.relatedId } });
         }
+        // Additional routing logic can go here
     };
 
-    const markAllAsRead = async () => {
-        try {
-            await notificationsAPI.markAllAsRead();
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-            refreshUnreadCount();
-        } catch (error) {
-            console.error('Mark all as read error:', error);
-        }
+    const markAllAsRead = () => {
+        markAllLocalNotifsAsRead();
     };
 
-    const clearAll = async () => {
+    const clearAll = () => {
         Alert.alert(
             'Clear All Notifications',
-            'Are you sure you want to delete all notifications? This action cannot be undone.',
+            'Are you sure you want to delete all local notifications?',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Clear All',
                     style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await notificationsAPI.clearAll();
-                            setNotifications([]);
-                            refreshUnreadCount();
-                        } catch (error) {
-                            console.error('Clear all error:', error);
-                        }
+                    onPress: () => {
+                        clearAllLocalNotifs();
                     }
                 }
             ]
@@ -175,27 +110,27 @@ const NotificationsModal = ({ visible, onClose, navigation }) => {
     const getIcon = (type) => {
         if (type.startsWith('meeting')) return 'calendar';
         if (type.startsWith('task')) return 'list';
-        if (type.startsWith('absence')) return 'hand-left';
-        if (type.startsWith('attendance')) return 'checkmark-done-circle';
-        if (type.startsWith('member')) return 'people';
-        if (type.startsWith('role')) return 'shield-checkmark';
+        if (type.startsWith('info')) return 'information-circle';
+        if (type.startsWith('success')) return 'checkmark-circle';
+        if (type.startsWith('warning')) return 'alert-circle';
+        if (type.startsWith('error')) return 'close-circle';
+
         switch (type) {
             case 'new_message': return 'chatbubble';
             case 'club_announcement': return 'megaphone';
             case 'game_hosted': return 'game-controller';
-            case 'gallery_upload': return 'camera';
-            case 'gallery_approved': return 'image';
             default: return 'notifications';
         }
     };
 
     const getIconColor = (type) => {
-        if (type === 'game_hosted') return '#8B5CF6'; // Purple for games
-        if (type.includes('created') || type.includes('assigned')) return '#0A66C2';
-        if (type.includes('marked') || type.includes('approved') || type.includes('completed')) return '#22C55E';
-        if (type.includes('cancelled') || type.includes('rejected') || type.includes('removed')) return '#EF4444';
-        if (type.includes('reminder') || type.includes('warning')) return '#F59E0B';
-        return '#6B7280';
+        if (type === 'success') return '#22C55E'; // Green
+        if (type === 'info') return '#0A66C2';    // Blue
+        if (type === 'warning') return '#F59E0B'; // Amber
+        if (type === 'error') return '#EF4444';   // Red
+        if (type === 'game_hosted') return '#8B5CF6'; // Purple
+        if (type.includes('reminder')) return '#F97316'; // Orange
+        return '#64748B'; // Slate
     };
 
     const renderRightActions = (progress, dragX, item) => {
@@ -302,23 +237,6 @@ const NotificationsModal = ({ visible, onClose, navigation }) => {
                                 renderItem={renderItem}
                                 contentContainerStyle={{ paddingBottom: 40 }}
                                 showsVerticalScrollIndicator={false}
-                                ListFooterComponent={() => (
-                                    hasMore && (
-                                        <View style={styles.loadMoreContainer}>
-                                            <TouchableOpacity
-                                                style={styles.loadMoreBtn}
-                                                onPress={handleLoadMore}
-                                                disabled={loadingMore}
-                                            >
-                                                {loadingMore ? (
-                                                    <ActivityIndicator size="small" color="#0A66C2" />
-                                                ) : (
-                                                    <Text style={styles.loadMoreText}>Load More</Text>
-                                                )}
-                                            </TouchableOpacity>
-                                        </View>
-                                    )
-                                )}
                             />
                         </GestureHandlerRootView>
                     ) : (

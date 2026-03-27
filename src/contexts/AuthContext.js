@@ -4,9 +4,10 @@ import { authAPI } from '../services/api';
 import { io } from 'socket.io-client';
 import { Platform } from 'react-native';
 
-const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://localhost:5100';
+const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
-const API_BASE_URL = RENDER_URL;
+// ⚠️ Keep in sync with src/services/api.js — switch together
+const API_BASE_URL = LOCAL_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -14,11 +15,21 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [hasSkippedProfile, setHasSkippedProfile] = useState(false);
     const [socket, setSocket] = useState(null);
+    const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [showAvatarPopup, setShowAvatarPopupState] = useState(false);
 
     useEffect(() => {
+        if (socket && user?._id) {
+            console.log(`[Socket] Joining room: ${user._id}`);
+            socket.emit('join', user._id);
+        }
+    }, [socket, user?._id]);
+
+    // Initial load including local notifications
+    useEffect(() => {
         loadUser();
+        loadLocalNotifications();
 
         // Initialize socket
         const newSocket = io(API_BASE_URL, {
@@ -28,13 +39,27 @@ export const AuthProvider = ({ children }) => {
 
         newSocket.on('connect', () => {
             console.log('[Socket] Connected to backend:', newSocket.id);
-            if (user?._id) {
-                newSocket.emit('join', user._id);
-            }
+            // Moved join logic to the dedicated useEffect above for reactive updates
         });
 
-        newSocket.on('notification:received', (data) => {
+        newSocket.on('notification:received', async (data) => {
             console.log('[Socket] New notification:', data);
+
+            // Generate valid object if needed
+            const newNotif = {
+                _id: data._id || Date.now().toString(),
+                title: data.title,
+                message: data.message,
+                type: data.type || 'info',
+                read: false,
+                createdAt: data.createdAt || new Date().toISOString()
+            };
+
+            setNotifications(prev => {
+                const updated = [newNotif, ...prev].slice(0, 50); // Keep last 50
+                saveLocalNotifications(updated);
+                return updated;
+            });
             setUnreadCount(prev => prev + 1);
         });
 
@@ -44,6 +69,55 @@ export const AuthProvider = ({ children }) => {
             newSocket.disconnect();
         };
     }, []);
+
+    // Notification Helpers
+    const loadLocalNotifications = async () => {
+        try {
+            const stored = await AsyncStorage.getItem('local_notifications');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                setNotifications(parsed);
+                setUnreadCount(parsed.filter(n => !n.read).length);
+            }
+        } catch (e) {
+            console.error('Failed to load local notifications', e);
+        }
+    };
+
+    const saveLocalNotifications = async (list) => {
+        try {
+            await AsyncStorage.setItem('local_notifications', JSON.stringify(list));
+        } catch (e) {
+            console.error('Failed to save local notifications', e);
+        }
+    };
+
+    const markLocalNotifAsRead = async (id) => {
+        const updated = notifications.map(n => n._id === id ? { ...n, read: true } : n);
+        setNotifications(updated);
+        setUnreadCount(updated.filter(n => !n.read).length);
+        saveLocalNotifications(updated);
+    };
+
+    const markAllLocalNotifsAsRead = async () => {
+        const updated = notifications.map(n => ({ ...n, read: true }));
+        setNotifications(updated);
+        setUnreadCount(0);
+        saveLocalNotifications(updated);
+    };
+
+    const deleteLocalNotif = async (id) => {
+        const updated = notifications.filter(n => n._id !== id);
+        setNotifications(updated);
+        setUnreadCount(updated.filter(n => !n.read).length);
+        saveLocalNotifications(updated);
+    };
+
+    const clearAllLocalNotifs = async () => {
+        setNotifications([]);
+        setUnreadCount(0);
+        await AsyncStorage.removeItem('local_notifications');
+    };
 
     const refreshUser = async () => {
         try {
@@ -60,11 +134,6 @@ export const AuthProvider = ({ children }) => {
             if (token) {
                 const response = await authAPI.getProfile();
                 setUser(response.data);
-
-                // Fetch initial unread count
-                const { notificationsAPI } = require('../services/api');
-                const nRes = await notificationsAPI.getUnreadCount();
-                setUnreadCount(nRes.data.count || 0);
             }
         } catch (error) {
             console.error('Failed to load user', error);
@@ -147,15 +216,19 @@ export const AuthProvider = ({ children }) => {
             hasSkippedProfile,
             setHasSkippedProfile,
             socket,
+            notifications,
             unreadCount,
             setUnreadCount,
+            markLocalNotifAsRead,
+            markAllLocalNotifsAsRead,
+            deleteLocalNotif,
+            clearAllLocalNotifs,
             showAvatarPopup,
             setShowAvatarPopup: setShowAvatarPopupState,
             unreadMessageCount: 0,
             refreshUnreadCount: async () => {
-                const { notificationsAPI } = require('../services/api');
-                const nRes = await notificationsAPI.getUnreadCount();
-                setUnreadCount(nRes.data.count || 0);
+                // Now handled locally from notifications array
+                setUnreadCount(notifications.filter(n => !n.read).length);
             }
         }}>
             {children}

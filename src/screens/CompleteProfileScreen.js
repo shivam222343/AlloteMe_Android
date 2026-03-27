@@ -1,33 +1,54 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
-import { authAPI } from '../services/api';
+import { authAPI, cutoffAPI } from '../services/api';
 import { MapPin, Target, Award, Hash, Bot } from 'lucide-react-native';
 
 const CompleteProfileScreen = ({ navigation }) => {
     const { user, refreshUser, setHasSkippedProfile } = useAuth();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        percentile: '',
-        rank: '',
-        location: '',
-        expectedRegion: '',
-        examType: 'MHTCET',// Default
-        groqApiKey: '',
+        percentile: user?.percentile?.toString() || '',
+        rank: user?.rank?.toString() || '',
+        location: user?.location || '',
+        expectedRegion: user?.expectedRegion || '',
+        examType: user?.examType || 'MHTCET',
+        groqApiKey: user?.groqApiKey || '',
         phoneNumber: user?.phoneNumber || ''
     });
 
-    const handleSubmit = async () => {
-        if (!formData.percentile || !formData.rank || !formData.location) {
-            Alert.alert('Required', 'Please fill in all mandatory fields.');
+    // Auto-calculate Rank based on Percentile (similar to Predictor)
+    const [rankLoading, setRankLoading] = useState(false);
+
+    React.useEffect(() => {
+        if (!formData.percentile || isNaN(parseFloat(formData.percentile)) || formData.percentile === user?.percentile?.toString()) {
             return;
         }
 
+        const timeout = setTimeout(async () => {
+            setRankLoading(true);
+            try {
+                const res = await cutoffAPI.estimateRank(formData.percentile);
+                if (res.data?.rank) {
+                    setFormData(prev => ({ ...prev, rank: res.data.rank.toString() }));
+                }
+            } catch (error) {
+                console.log('Rank estimation failed', error);
+            } finally {
+                setRankLoading(false);
+            }
+        }, 800); // 800ms debounce
+
+        return () => clearTimeout(timeout);
+    }, [formData.percentile]);
+
+    const handleSubmit = async () => {
+        // No fields are mandatory anymore per user request
         setLoading(true);
         try {
             const updateData = {
@@ -48,13 +69,14 @@ const CompleteProfileScreen = ({ navigation }) => {
             if (res.status === 200 || res.data) {
                 await refreshUser();
                 setHasSkippedProfile(false);
-                Alert.alert('Success', 'Profile completed! Welcome to AlloteMe.');
+                Alert.alert('Success', 'Profile updated! Welcome to AlloteMe.');
                 navigation.navigate('Dashboard');
             } else {
                 Alert.alert('Error', 'Failed to update profile');
             }
         } catch (error) {
-            Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+            const errorMsg = error.response?.data?.message || 'An unexpected error occurred. Please try again.';
+            Alert.alert('Submission Error', errorMsg);
         } finally {
             setLoading(false);
         }
@@ -90,14 +112,23 @@ const CompleteProfileScreen = ({ navigation }) => {
                             leftIcon={<Hash size={18} color={Colors.text.tertiary} />}
                         />
 
-                        <Input
-                            label="All India / State Rank"
-                            value={formData.rank}
-                            onChangeText={(t) => setFormData({ ...formData, rank: t })}
-                            placeholder="e.g. 1240"
-                            keyboardType="number-pad"
-                            leftIcon={<Target size={18} color={Colors.text.tertiary} />}
-                        />
+                        <View style={{ position: 'relative' }}>
+                            <Input
+                                label="All India / State Rank"
+                                value={formData.rank}
+                                onChangeText={(t) => setFormData({ ...formData, rank: t })}
+                                placeholder={rankLoading ? "Calculating..." : "e.g. 1240"}
+                                keyboardType="number-pad"
+                                leftIcon={<Target size={18} color={Colors.text.tertiary} />}
+                            />
+                            {rankLoading && (
+                                <ActivityIndicator
+                                    size="small"
+                                    color={Colors.primary}
+                                    style={{ position: 'absolute', right: 12, top: 40 }}
+                                />
+                            )}
+                        </View>
 
                         <Input
                             label="Your Current City"

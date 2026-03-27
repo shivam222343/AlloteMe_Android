@@ -1,27 +1,15 @@
-const Notification = require('../models/Notification');
-
-// @desc    Get all notifications for a user
+// @desc    Get all notifications for a user (Local Storage Migration)
 // @route   GET /api/notifications
 // @access  Private
 const getNotifications = async (req, res) => {
-    try {
-        const notifications = await Notification.find({ user: req.user._id }).sort({ createdAt: -1 });
-        res.json(notifications);
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
-    }
+    res.json([]); // Notifications now handled in frontend AsyncStorage
 };
 
 // @desc    Get unread count
 // @route   GET /api/notifications/unread-count
 // @access  Private
 const getUnreadCount = async (req, res) => {
-    try {
-        const count = await Notification.countDocuments({ user: req.user._id, isRead: false });
-        res.json({ count });
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
-    }
+    res.json({ count: 0 }); // Unread handling moved to frontend
 };
 
 // @desc    Mark all notifications as read

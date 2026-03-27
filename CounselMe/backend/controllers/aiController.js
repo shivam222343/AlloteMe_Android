@@ -39,6 +39,10 @@ const getAICounsel = async (req, res) => {
     };
 
     const apiKey = req.user?.groqApiKey || process.env.GROQ_API_KEY;
+    if (!apiKey) {
+        console.error('GROQ_API_KEY is not defined in environment or user profile');
+        return res.status(400).json({ message: 'No Groq API Key found. Please add your personal key in profile to continue.' });
+    }
     const groqClient = new Groq({ apiKey });
 
     try {
@@ -205,8 +209,12 @@ const getAICounsel = async (req, res) => {
         const reply = chatCompletion.choices[0].message.content;
         res.json({ reply, contextUsed: !!(relevantColleges.length || relevantCutoffs.length) });
     } catch (error) {
-        console.error('AI Counsel Error:', error);
-        res.status(500).json({ message: 'Error from Eta Counselor' });
+        console.error('AI Counsel Error:', error.message);
+        const isApiKeyError = error.message?.toLowerCase().includes('api key') || error.status === 401;
+        res.status(isApiKeyError ? 401 : 500).json({
+            message: isApiKeyError ? 'Invalid or missing API Key. Please update it in your profile.' : 'Error from Eta Counselor',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 

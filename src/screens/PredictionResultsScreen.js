@@ -123,81 +123,132 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         setExportingPDF(true);
         try {
             const html = `
+                <!DOCTYPE html>
                 <html>
                 <head>
+                    <meta charset="utf-8">
+                    <title>AlloteMe Prediction Report</title>
                     <style>
-                        body { font-family: 'Helvetica'; padding: 40px; color: #333; }
-                        .header { border-bottom: 2px solid #0A66C2; padding-bottom: 10px; margin-bottom: 20px; }
-                        h1 { color: #0A66C2; margin: 0; }
-                        .meta { color: #64748b; font-size: 12px; margin-top: 5px; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th { background-color: #f8fafc; text-align: left; padding: 10px; border-bottom: 2px solid #e2e8f0; font-size: 11px; color: #475569; }
-                        td { padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 10px; }
-                        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
-                        .contact { font-weight: bold; color: #0A66C2; font-size: 14px; margin-top: 8px; }
+                        body { font-family: 'Helvetica', Arial, sans-serif; padding: 30px; color: #1e293b; background: #fff; }
+                        .container { max-width: 900px; margin: auto; }
+                        .header { border-bottom: 3px solid #0A66C2; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+                        .brand h1 { color: #0A66C2; margin: 0; font-size: 28px; letter-spacing: -0.5px; }
+                        .brand p { margin: 5px 0 0 0; color: #64748b; font-size: 14px; }
+                        .report-meta { text-align: right; }
+                        .meta-tag { display: inline-block; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-size: 12px; margin-left: 8px; font-weight: 600; color: #475569; }
+                        
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+                        th { background-color: #0A66C2; text-align: left; padding: 12px; font-size: 11px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
+                        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 11px; line-height: 1.4; }
+                        tr:nth-child(even) { background-color: #f8fafc; }
+                        
+                        .dte { color: #0A66C2; font-weight: 700; font-size: 12px; }
+                        .college-name { font-weight: 700; font-size: 12px; color: #1e293b; }
+                        .branch { color: #475569; font-weight: 500; }
+                        .chance { font-weight: 700; border-radius: 4px; padding: 2px 6px; display: inline-block; }
+                        
+                        .footer { margin-top: 50px; padding: 25px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; }
+                        .footer p { margin: 0; font-size: 12px; color: #64748b; line-height: 1.6; }
+                        .contact { font-weight: 800; color: #0A66C2; font-size: 16px; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; }
                     </style>
                 </head>
                 <body>
-                    <div class="header">
-                        <h1>AlloteMe Prediction Report</h1>
-                        <div class="meta">Exam: ${examType} | Category: ${category} | Percentile: ${percentile}%</div>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>DTE Code</th>
-                                <th>College Name</th>
-                                <th>Branch</th>
-                                <th>Cutoff %</th>
-                                <th>Rank</th>
-                                <th>Chance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${processedResults.map((item, index) => `
+                    <div class="container">
+                        <div class="header">
+                            <div class="brand">
+                                <h1>AlloteMe Prediction Report</h1>
+                                <p>Personalized College Allotment Strategy</p>
+                            </div>
+                            <div class="report-meta">
+                                <span class="meta-tag">${examType}</span>
+                                <span class="meta-tag">${category}</span>
+                                <span class="meta-tag">${percentile}%ile</span>
+                                <p style="font-size: 10px; color: #94a3b8; margin: 8px 0 0 0;">Generated on ${new Date().toLocaleDateString()}</p>
+                            </div>
+                        </div>
+
+                        <table>
+                            <thead>
                                 <tr>
-                                    <td>${index + 1}</td>
-                                    <td style="color:#0A66C2; font-weight:bold;">${item.collegeId?.dteCode || '—'}</td>
-                                    <td><b>${item.collegeId?.name || 'Unknown'}</b></td>
-                                    <td>${item.branch}</td>
-                                    <td>${Number(item.percentile).toFixed(2)}%</td>
-                                    <td>${item.rank || '—'}</td>
-                                    <td>${item.chanceLabel}</td>
+                                    <th>#</th>
+                                    <th>DTE Code</th>
+                                    <th>Institution</th>
+                                    <th>Course / Branch</th>
+                                    <th>Cutoff %</th>
+                                    <th>Rank</th>
+                                    <th>Chance</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                    <div class="footer">
-                        <p><b>Instructions:</b> This report is based on previous year cutoff trends. Actual allotments depend on current year merit lists and seat availability.</p>
-                        <p>For counseling assistance and queries, contact AlloteMe Support:</p>
-                        <div class="contact">📞 8010961216</div>
+                            </thead>
+                            <tbody>
+                                ${processedResults.map((item, index) => `
+                                    <tr>
+                                        <td style="color:#94a3b8; font-weight:bold;">${index + 1}</td>
+                                        <td class="dte">${item.collegeId?.dteCode || '—'}</td>
+                                        <td class="college-name">${item.collegeId?.name || 'Unknown'}</td>
+                                        <td class="branch">${item.branch}</td>
+                                        <td style="font-weight:700;">${Number(item.percentile).toFixed(2)}%</td>
+                                        <td style="color:#64748b;">${item.rank || '—'}</td>
+                                        <td style="color:${item.chanceColor}">${item.chanceLabel}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+
+                        <div class="footer">
+                            <p><b>Disclaimer:</b> These predictions are generated via AI models based on historical cutoff data. Actual allotment depends on seat availability, merit ranks, and official CAP round processing.</p>
+                            <p style="margin-top: 10px;">For Expert Counseling & Admission Guidance:</p>
+                            <div class="contact"><span>📞</span> 8010961216</div>
+                        </div>
                     </div>
                 </body>
                 </html>
             `;
-            const { uri } = await Print.printToFileAsync({ html });
-            await Sharing.shareAsync(uri);
+
+            if (Platform.OS === 'web') {
+                await Print.printAsync({ html });
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
         } catch (error) {
-            console.error(error);
+            console.error('PDF Export Error:', error);
             Alert.alert('PDF Export Failed');
+        } finally {
+            setExportingPDF(false);
         }
-        finally { setExportingPDF(false); }
     };
 
     const exportToCSV = async () => {
         if (processedResults.length === 0) return;
         setExportingCSV(true);
         try {
-            let csv = 'No,DTE Code,College,Branch,Cutoff%,Rank,Chance\n';
+            let csv = '\uFEFFNo,DTE Code,College,Branch,Cutoff%,Rank,Chance\n';
             processedResults.forEach((item, idx) => {
-                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${item.collegeId?.name || 'Unknown'}","${item.branch}",${item.percentile},${item.rank || ''},${item.chanceLabel}\n`;
+                const name = item.collegeId?.name?.replace(/"/g, '""') || 'Unknown';
+                const branch = item.branch?.replace(/"/g, '""') || '';
+                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${name}","${branch}",${item.percentile},${item.rank || ''},${item.chanceLabel}\n`;
             });
-            const fileUri = `${FileSystem.cacheDirectory}AlloteMe_Predictions.csv`;
-            await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
-            await Sharing.shareAsync(fileUri);
-        } catch (error) { Alert.alert('CSV Export Failed'); }
-        finally { setExportingCSV(false); }
+
+            if (Platform.OS === 'web') {
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'AlloteMe_Predictions.csv');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                const fileUri = `${FileSystem.cacheDirectory}AlloteMe_Predictions.csv`;
+                await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
+                await Sharing.shareAsync(fileUri);
+            }
+        } catch (error) {
+            console.error('CSV Export Error:', error);
+            Alert.alert('CSV Export Failed');
+        } finally {
+            setExportingCSV(false);
+        }
     };
 
     const renderItem = ({ item, drag, isActive, getIndex }) => {

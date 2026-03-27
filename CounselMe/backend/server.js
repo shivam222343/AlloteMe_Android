@@ -34,8 +34,10 @@ app.use(cors({
         'http://10.0.2.2:8081',
         'http://localhost:19006', // Expo web
         'http://localhost:8082',
+        'http://127.0.0.1:5100',
         'http://127.0.0.1:8081',
-        'http://127.0.0.1:8080'
+        'http://127.0.0.1:8080',
+        'http://127.0.0.1:19006'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -74,11 +76,11 @@ const startServer = async () => {
         server.listen(PORT, () => {
             console.log(`Server (with Sockets) running on port ${PORT}`);
 
-            // Random greetings logic: Check every 4 hours
+            // Periodic Greetings logic: Check every 12 hours
             setInterval(() => {
                 const { sendRandomGreeting } = require('./services/notificationService');
                 sendRandomGreeting();
-            }, 4 * 60 * 60 * 1000);
+            }, 12 * 60 * 60 * 1000);
         });
     } catch (error) {
         console.error('Fatal: Server failed to start:', error.message);

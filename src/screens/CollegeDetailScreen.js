@@ -217,7 +217,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                                 <TouchableOpacity
                                     style={styles.deleteBranchBtn}
                                     onPress={() => {
-                                        Alert.alert("Delete Branch", `Are you sure you want to remove ${b.name}? This will not delete the cutoff data from database but will remove the branch from this college list.`, [
+                                        Alert.alert("Delete Branch", `Are you sure you want to remove ${b.name}? This will permanently delete the branch AND all associated cutoff data for this institution.`, [
                                             { text: "Cancel" },
                                             {
                                                 text: "Delete",

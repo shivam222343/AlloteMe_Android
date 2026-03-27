@@ -47,21 +47,23 @@ const registerUser = async (req, res) => {
     });
 
     if (user) {
+        // Send welcome notification (with slight delay so user joins room on frontend)
+        setTimeout(() => {
+            const { sendNotification } = require('../services/notificationService');
+            sendNotification(
+                user._id,
+                `Welcome to AlloteMe, ${user.displayName}! 🎉`,
+                "We're excited to have you here! Start exploring colleges and predicting your dream branches. 🚀",
+                "success"
+            );
+        }, 2000);
+
         res.status(201).json({
+            token: generateToken(user._id),
             _id: user._id,
             displayName: user.displayName,
             email: user.email,
             role: user.role,
-            examType: user.examType,
-            percentile: user.percentile,
-            rank: user.rank,
-            location: user.location,
-            expectedRegion: user.expectedRegion,
-            bannerUrl: user.bannerUrl,
-            preferences: user.preferences,
-            savedColleges: [],
-            token: generateToken(user._id),
-            groqApiKey: user.groqApiKey,
             showAvatarPopup: true
         });
     } else {
@@ -273,15 +275,17 @@ const toggleSaveCollege = async (req, res) => {
         // Invalidate cache
         await redis.del(`user_profile_${req.user._id}`);
 
-        if (!isSaved) {
-            const { sendNotification } = require('../services/notificationService');
-            sendNotification(
-                req.user._id,
-                "College Saved ⭐",
-                "Great choice! Saving colleges helps our prediction engine learn your interests. ❤️",
-                "success"
-            );
-        }
+        /*
+                if (!isSaved) {
+                    const { sendNotification } = require('../services/notificationService');
+                    sendNotification(
+                        req.user._id,
+                        "College Saved ⭐",
+                        "Great choice! Saving colleges helps our prediction engine learn your interests. ❤️",
+                        "success"
+                    );
+                }
+                */
 
         // Return populated saved colleges to sync frontend state
         const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university');

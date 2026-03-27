@@ -111,7 +111,8 @@ const ProfileScreen = ({ navigation }) => {
             setShowKeyModal(false);
             Alert.alert('Success', 'Groq API Key updated! Personal key will now be prioritized.');
         } catch (error) {
-            Alert.alert('Error', 'Failed to update API key');
+            const errorMsg = error.response?.data?.message || 'Failed to update API key. Please try again.';
+            Alert.alert('Update Error', errorMsg);
         } finally {
             setKeyUpdating(false);
         }

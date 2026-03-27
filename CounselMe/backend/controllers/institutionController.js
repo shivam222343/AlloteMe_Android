@@ -202,16 +202,20 @@ const deleteInstitution = async (req, res) => {
 // @access  Private/Admin
 const deleteBranch = async (req, res) => {
     try {
+        const { branch } = req.query;
+        if (!branch) return res.status(400).json({ message: 'Branch name is required' });
+
+        const decodedBranch = decodeURIComponent(branch);
         const institution = await Institution.findById(req.params.id);
         if (!institution) return res.status(404).json({ message: 'Institution not found' });
 
         // Remove from branches array
-        institution.branches = institution.branches.filter(b => b.name !== req.params.branchName);
+        institution.branches = institution.branches.filter(b => b.name !== decodedBranch);
         await institution.save();
 
         // Delete associated cutoffs
         const Cutoff = require('../models/Cutoff');
-        await Cutoff.deleteMany({ collegeId: req.params.id, branch: req.params.branchName });
+        await Cutoff.deleteMany({ collegeId: req.params.id, branch: decodedBranch });
 
         res.json({ message: 'Branch and associated cutoffs removed', branches: institution.branches });
     } catch (error) {

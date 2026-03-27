@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
+const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://127.0.0.1:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 // Switch to LOCAL_URL for development, RENDER_URL for production
 const API_BASE_URL = LOCAL_URL;
@@ -25,7 +25,8 @@ api.interceptors.request.use(
 
 export const authAPI = {
     login: (credentials) => api.post('auth/login', credentials),
-    signup: (userData) => api.post('auth/signup', userData),
+    signup: (userData) => api.post('auth/register', userData),
+    register: (userData) => api.post('auth/register', userData), // Alias used by AuthContext
     verifyOtp: (data) => api.post('auth/verify-otp', data),
     getProfile: () => api.get('auth/profile'),
     updateProfile: (data) => api.put('auth/profile', data),
@@ -56,8 +57,11 @@ export const institutionAPI = {
     create: (data) => api.post('institutions', data), // Alias for consistency
     update: (id, data) => api.put(`institutions/${id}`, data),
     delete: (id) => api.delete(`institutions/${id}`),
+    deleteBranch: (id, branchName) => api.delete(`institutions/${id}/branch`, { params: { branch: branchName } }),
     toggleFeature: (id) => api.put(`institutions/${id}/feature`),
-    uploadImage: (formData) => api.post('upload/image', formData),
+    uploadImage: (formData) => api.post('upload/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
     parse: (text) => api.post('institutions/parse', { text }),
 };
 

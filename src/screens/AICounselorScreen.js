@@ -1,16 +1,18 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, Modal, ScrollView, ActivityIndicator, Animated, Easing, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, Modal, ScrollView, ActivityIndicator, Animated, Easing, Keyboard, TouchableWithoutFeedback, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MainLayout from '../components/layouts/MainLayout';
-import { aiAPI } from '../services/api';
+import { aiAPI, authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
-import { Send, User, Bot, Mic, MicOff, X, Sparkles, Key } from 'lucide-react-native';
+import { Send, User, Bot, Mic, MicOff, X, Sparkles, Key, Image as ImageIcon } from 'lucide-react-native';
 import Voice from '@react-native-voice/voice';
 import Markdown from 'react-native-markdown-display';
 import GradientBorder from '../components/ui/GradientBorder';
 import { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { History, Trash2, Clock, Calendar } from 'lucide-react-native';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 
 const markdownStyles = {
     body: {
@@ -308,7 +310,7 @@ const ChatInput = React.memo(({ loading, isListening, startListening, stopListen
 ));
 
 const AICounselorScreen = ({ navigation }) => {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
 
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -325,6 +327,10 @@ const AICounselorScreen = ({ navigation }) => {
     const [pastChats, setPastChats] = useState([]);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [loadingStatus, setLoadingStatus] = useState('Eta is thinking...');
+    const [popupType, setPopupType] = useState('reminder'); // 'reminder' or 'error'
+    const [showKeyInputModal, setShowKeyInputModal] = useState(false);
+    const [tempKey, setTempKey] = useState('');
+    const [submittingKey, setSubmittingKey] = useState(false);
 
     const DEEP_QUERY_REGEX = /predict|chance|cutoff|can i get|get into|admission|percentile|rank|college|suggest|branch|coep|vjti|vit|ict/i;
 
@@ -354,6 +360,13 @@ const AICounselorScreen = ({ navigation }) => {
         loadHistory();
         startNewChat();
     }, []);
+
+    // Sync tempKey with user on modal open
+    React.useEffect(() => {
+        if (showKeyInputModal && user?.groqApiKey) {
+            setTempKey(user.groqApiKey);
+        }
+    }, [showKeyInputModal, user?.groqApiKey]);
 
     // Auto-scroll to bottom on message updates
     React.useEffect(() => {
@@ -489,6 +502,7 @@ const AICounselorScreen = ({ navigation }) => {
         setUserMessageCount(prev => {
             const newCount = prev + 1;
             if (newCount === 5 && !user?.groqApiKey) {
+                setPopupType('reminder');
                 setShowKeyPopup(true);
             }
             return newCount;
@@ -543,14 +557,19 @@ const AICounselorScreen = ({ navigation }) => {
             };
             setMessages(prev => [...prev, botMsg]);
         } catch (error) {
+            const errorMessage = error.response?.data?.message || "Sorry, I'm having trouble connecting to Eta right now. This usually happens when the API key is invalid or has expired.";
             const errorMsg = {
-                id: (Date.now() + 1).toString(),
-                text: "Sorry, I'm having trouble connecting to Eta right now.",
+                id: 'bot-error',
+                text: errorMessage,
                 sender: 'bot',
                 timestamp: new Date().toISOString(),
                 isNew: true
             };
-            setMessages(prev => [...prev, errorMsg]);
+            setMessages(prev => [...prev.filter(m => m.id !== 'bot-error'), errorMsg]);
+
+            // Show the key update popup on error
+            setPopupType('error');
+            setShowKeyPopup(true);
         } finally {
             if (statusInterval) clearInterval(statusInterval);
             setLoading(false);
@@ -595,6 +614,44 @@ const AICounselorScreen = ({ navigation }) => {
             }
         } catch (e) {
             Alert.alert('Error', 'Could not load chat');
+        }
+    };
+
+    const handleUpdateApiKey = async () => {
+        if (!tempKey.trim()) {
+            Alert.alert('Error', 'Please enter a valid API key');
+            return;
+        }
+        setSubmittingKey(true);
+        try {
+            await authAPI.updateProfile({ groqApiKey: tempKey });
+            await refreshUser();
+            setShowKeyInputModal(false);
+            setShowKeyPopup(false);
+
+            // AUTO-RETRY LOGIC: Clear error and resend last user message
+            setMessages(prev => {
+                const filtered = prev.filter(m => m.id !== 'bot-error');
+                const lastUserMsg = [...filtered].reverse().find(m => m.sender === 'user');
+
+                // If we found a user message, we can re-trigger handleSend(lastUserMsg.text)
+                // but handleSend is a useCallback dependent on 'user'.
+                // We'll give it a tiny delay to ensure the refreshed 'user' is propagation.
+                if (lastUserMsg) {
+                    setTimeout(() => {
+                        handleSend(lastUserMsg.text);
+                    }, 500);
+                }
+
+                return filtered;
+            });
+
+            Alert.alert('Success', 'Groq API Key updated! Re-trying your message...');
+        } catch (error) {
+            const errorMsg = error.response?.data?.message || 'Failed to update API key. Please try again.';
+            Alert.alert('Update Error', errorMsg);
+        } finally {
+            setSubmittingKey(false);
         }
     };
 
@@ -734,9 +791,14 @@ const AICounselorScreen = ({ navigation }) => {
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.popupTitle}>Boost Your AI Experience!</Text>
+                            <Text style={styles.popupTitle}>
+                                {popupType === 'error' ? 'AI Connection Trouble' : 'Boost Your AI Experience!'}
+                            </Text>
                             <Text style={styles.popupSub}>
-                                You've sent {userMessageCount} messages! To ensure uninterrupted, lighting-fast counseling, consider adding your own Groq API key.
+                                {popupType === 'error'
+                                    ? messages.find(m => m.id === 'bot-error')?.text || "I'm having trouble connecting. Please check or update your Groq API key to continue using the counselor AI."
+                                    : `You've sent ${userMessageCount} messages! To ensure uninterrupted, lighting-fast counseling, consider adding your own Groq API key.`
+                                }
                             </Text>
 
                             <View style={styles.benefitRow}>
@@ -752,7 +814,7 @@ const AICounselorScreen = ({ navigation }) => {
                                 style={styles.primaryAction}
                                 onPress={() => {
                                     setShowKeyPopup(false);
-                                    navigation.navigate('Profile');
+                                    setShowKeyInputModal(true);
                                 }}
                             >
                                 <Text style={styles.primaryActionText}>Add My Personal Key</Text>
@@ -763,6 +825,85 @@ const AICounselorScreen = ({ navigation }) => {
                                 onPress={() => setShowKeyPopup(false)}
                             >
                                 <Text style={styles.secondaryActionText}>Skip for now</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Groq Key Input Modal (Matching Profile Screen) */}
+                <Modal
+                    visible={showKeyInputModal}
+                    animationType="fade"
+                    transparent={true}
+                    onRequestClose={() => setShowKeyInputModal(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.centeredModal}>
+                            <View style={styles.modalHeader}>
+                                <View>
+                                    <Text style={styles.modalTitle}>Update Groq API Key</Text>
+                                    <Text style={styles.modalSub}>Your profile credentials</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setShowKeyInputModal(false)}>
+                                    <X size={20} color={Colors.text.tertiary} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.keyInfoText}>
+                                Your personal key avoids service interruptions. Keys are stored securely and never shared.
+                            </Text>
+
+                            <View style={styles.guideBox}>
+                                <Text style={styles.guideTitle}>How to get your key:</Text>
+                                <Text style={styles.guideStep}>1. Visit Groq Console</Text>
+                                <Text style={styles.guideStep}>2. Click "API Keys" in sidebar</Text>
+                                <Text style={styles.guideStep}>3. Create and Copy a new key</Text>
+
+                                <TouchableOpacity
+                                    style={styles.webLink}
+                                    onPress={() => Linking.openURL('https://console.groq.com/keys')}
+                                >
+                                    <Text style={styles.webLinkText}>Go to Groq Console</Text>
+                                    <ImageIcon size={14} color={Colors.primary} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.inputWrapper}>
+                                <Bot size={18} color={Colors.primary} style={styles.inputIcon} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.miniLabel}>Groq API Key</Text>
+                                    <Input
+                                        value={tempKey}
+                                        onChangeText={setTempKey}
+                                        placeholder="gsk_..."
+                                        secureTextEntry={true}
+                                        containerStyle={{ marginBottom: 0 }}
+                                    />
+                                </View>
+                            </View>
+
+                            <Button
+                                title="Save API Key"
+                                onPress={handleUpdateApiKey}
+                                loading={submittingKey}
+                                style={styles.saveKeyBtn}
+                            />
+
+                            <TouchableOpacity
+                                style={styles.removeBtn}
+                                onPress={async () => {
+                                    setTempKey('');
+                                    try {
+                                        await authAPI.updateProfile({ groqApiKey: null });
+                                        await refreshUser();
+                                        setShowKeyInputModal(false);
+                                        Alert.alert('Success', 'Personal API key removed.');
+                                    } catch (e) {
+                                        Alert.alert('Error', 'Failed to remove key');
+                                    }
+                                }}
+                            >
+                                <Text style={styles.removeText}>Remove Key (Use System Default)</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -779,7 +920,6 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: Colors.divider,
-        backgroundColor: Colors.white,
         flexDirection: 'row',
         alignItems: 'center'
     },
@@ -971,8 +1111,72 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
-
-    // History and Meta Styles
+    centeredModal: {
+        backgroundColor: Colors.white,
+        margin: 20,
+        borderRadius: 24,
+        padding: 24,
+        width: '90%',
+        alignSelf: 'center',
+        marginBottom: 'auto',
+        marginTop: 'auto'
+    },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text.primary },
+    modalSub: { fontSize: 13, color: Colors.text.tertiary, marginTop: 2 },
+    keyInfoText: { fontSize: 13, color: Colors.text.tertiary, marginBottom: 20, lineHeight: 18 },
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.background,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginBottom: 20
+    },
+    inputIcon: { marginRight: 12 },
+    miniLabel: { fontSize: 10, fontWeight: 'bold', color: Colors.primary, marginBottom: 2, textTransform: 'uppercase' },
+    saveKeyBtn: { marginTop: 8 },
+    removeBtn: { marginTop: 16, alignItems: 'center' },
+    removeText: { color: Colors.error, fontSize: 12, fontWeight: '600' },
+    guideBox: {
+        backgroundColor: Colors.background,
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: Colors.divider
+    },
+    guideTitle: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 10 },
+    guideStep: { fontSize: 12, color: Colors.text.secondary, marginBottom: 4 },
+    webLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 12,
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: Colors.divider
+    },
+    webLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+    inputCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.background,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        width: '100%',
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: Colors.divider
+    },
+    keyInput: {
+        flex: 1,
+        fontSize: 14,
+        color: Colors.text.primary,
+        height: 40
+    },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',

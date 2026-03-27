@@ -316,13 +316,15 @@ const predictColleges = async (req, res) => {
                 const jwt = require('jsonwebtoken');
                 const token = req.headers.authorization.split(' ')[1];
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                /*
                 const { sendNotification } = require('../services/notificationService');
                 sendNotification(
-                    decoded.id,
-                    "Analysis Complete 📊",
-                    `Found ${cleaned.length} colleges matching your profile. Compare them to find your best fit! ✨`,
-                    "info"
+                    req.user._id,
+                    "Prediction Complete! 🎓",
+                    `We found ${results.length} colleges matching your profile. Check the 'My Predictions' tab!`,
+                    "success"
                 );
+                */
             } catch (e) { /* ignore invalid auth for public routes */ }
         }
     } catch (error) {

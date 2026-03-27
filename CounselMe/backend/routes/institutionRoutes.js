@@ -20,7 +20,7 @@ router.route('/')
 router.get('/featured', getFeaturedInstitutions);
 router.post('/parse', protect, authorize('admin'), parseInstitutionText);
 
-router.delete('/:id/branches/:branchName', protect, authorize('admin'), deleteBranch);
+router.delete('/:id/branch', protect, authorize('admin'), deleteBranch);
 
 router.put('/:id/feature', protect, authorize('admin'), toggleFeatureInstitution);
 

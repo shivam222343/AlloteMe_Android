@@ -1,38 +1,27 @@
-const Notification = require('../models/Notification');
-const User = require('../models/User');
 const { getIO } = require('../utils/socket');
 
 const sendNotification = async (userId, title, message, type = 'info') => {
     try {
         const io = getIO();
+        const notificationData = {
+            _id: Date.now().toString(), // Mock ID for local storage
+            title,
+            message,
+            type,
+            createdAt: new Date().toISOString(),
+            read: false
+        };
 
         if (userId === 'all') {
-            // Global Notification
-            const users = await User.find({}, '_id');
-            const notifications = users.map(u => ({
-                user: u._id,
-                title,
-                message,
-                type
-            }));
-
-            await Notification.insertMany(notifications);
-            io.emit('notification:received', { title, message, type, isGlobal: true });
-            console.log(`[Notification] Global broadcast sent: ${title}`);
-            return { success: true, count: users.length };
+            // Global Notification - Emission Only
+            io.emit('notification:received', { ...notificationData, isGlobal: true });
+            console.log(`[Notification] Global broadcast emitted: ${title}`);
+            return { success: true };
         } else {
-            // Target User Notification
-            const notification = await Notification.create({
-                user: userId,
-                title,
-                message,
-                type
-            });
-
-            // Emit to specific user room
-            io.to(userId).emit('notification:received', notification);
-            console.log(`[Notification] Sent to ${userId}: ${title}`);
-            return { success: true, notification };
+            // Target User Notification - Emission Only
+            io.to(userId).emit('notification:received', notificationData);
+            console.log(`[Notification] Emitted to ${userId}: ${title}`);
+            return { success: true, notification: notificationData };
         }
     } catch (error) {
         console.error('[NotificationService] Error:', error);
@@ -42,19 +31,19 @@ const sendNotification = async (userId, title, message, type = 'info') => {
 
 const GREETINGS = {
     morning: [
-        "Good Morning! Start your college search with a positive vibe. ☀️",
-        "Rise and shine! New prediction cutoffs are waiting for you. 🚀",
-        "Morning! Have you checked the latest featured institutions? 🏫"
+        { title: "☀️ Morning Motivation", message: "Morning! Your dream college is just a preference away. Start your search now! 🚀", type: 'success' },
+        { title: "☕ Early Bird Cutoffs", message: "Rise and shine! New prediction algorithms are live for today's searches. 🏫", type: 'info' },
+        { title: "🌅 Fresh Start", message: "A new day to find your perfect fit. Have you checked COEP cutoffs today? 🎓", type: 'info' }
     ],
     afternoon: [
-        "Good Afternoon! Taking a break? Browse some top-rated colleges. 🥤",
-        "Hello! Stay focused on your goals. We're here to help. 🎯",
-        "Afternoon! Need help with your prediction results? 📊"
+        { title: "🌤️ Afternoon Update", message: "Taking a break? Browse through our top-rated featured institutions. 🏫", type: 'info' },
+        { title: "💡 Pro Tip", message: "Lower percentile? Don't worry! Try exploring regional branch options. 🎯", type: 'success' },
+        { title: "📊 Result Analysis", message: "Check out the latest branch-wise cutoffs for the 2024-25 cycle. 📈", type: 'info' }
     ],
     evening: [
-        "Good Evening! Reflect on your career choices today. 🌙",
-        "Evening! Don't forget to save the colleges you liked. ⭐",
-        "Relaxing? Why not chat with our AI counselor for advice? 💬"
+        { title: "🌙 Evening Insight", message: "Reflection time. Which colleges did you save today? View your favorites! ⭐", type: 'success' },
+        { title: "💬 AI Counselor Online", message: "Eta is ready for a late-night chat. Need help with branch choices? 🤖", type: 'info' },
+        { title: "🛌 Rest & Plan", message: "Great progress today! We'll keep updating cutoffs while you sleep. 💤", type: 'info' }
     ]
 };
 
@@ -62,25 +51,22 @@ const sendRandomGreeting = async () => {
     // Convert to IST (UTC + 5:30)
     const now = new Date();
     const utcOffset = now.getTimezoneOffset(); // in minutes
-    const istOffset = 330; // 5 hours 30 mins
+    const istOffset = 330;
     const istTime = new Date(now.getTime() + (istOffset + utcOffset) * 60000);
     const hour = istTime.getHours();
 
     let timeSlot = '';
-
     if (hour >= 5 && hour < 12) timeSlot = 'morning';
     else if (hour >= 12 && hour < 17) timeSlot = 'afternoon';
     else if (hour >= 17 && hour < 22) timeSlot = 'evening';
 
-    if (!timeSlot) return; // Skip late night
+    if (!timeSlot) return;
 
     const messages = GREETINGS[timeSlot];
-    const message = messages[Math.floor(Math.random() * messages.length)];
-    const emojiMap = { morning: '☀️', afternoon: '🌤️', evening: '🌙' };
-    const title = `${emojiMap[timeSlot]} ${timeSlot.charAt(0).toUpperCase() + timeSlot.slice(1)} Greeting`;
+    const item = messages[Math.floor(Math.random() * messages.length)];
 
-    // To preserve resources, we only send to active users (mocked here as simple broadcast)
-    await sendNotification('all', title, message, 'info');
+    // Broadcast to all active users
+    await sendNotification('all', item.title, item.message, item.type);
 };
 
 module.exports = { sendNotification, sendRandomGreeting };
