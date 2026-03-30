@@ -30,6 +30,7 @@ app.use(cors({
         'https://alloteme.com',
         'https://alloteme.in',
         'https://alloteme.online',
+        'https://web.alloteme.app',
         'http://localhost:5100',
         'http://localhost:8081',
         'http://localhost:8080',
