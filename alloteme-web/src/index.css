@@ -52,7 +52,7 @@ ul {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   background: var(--glass);
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1.5px solid #0A66C2;
   position: sticky;
   top: 0;
   z-index: 1000;

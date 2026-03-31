@@ -246,18 +246,31 @@ const NearbyCollegesScreen = ({ navigation }) => {
                     }).addTo(map);
                     L.marker([${location.latitude}, ${location.longitude}], { icon: L.divIcon({ className:'u-mark', iconSize:[16,16]}) }).addTo(map);
                     var markers = ${JSON.stringify(collegeMarkers)};
-                    function safeSend(msg) { try { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg); else window.parent.postMessage({ nativeEvent: { data: msg } }, "*"); } catch(e){} }
+                    function safeSend(msg) { 
+                        try { 
+                            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                                window.ReactNativeWebView.postMessage(msg); 
+                            } else {
+                                window.parent.postMessage(msg, "*"); 
+                            }
+                        } catch(e){} 
+                    }
                     markers.forEach(function(m) {
                         var icon = L.divIcon({ className:'c-icon', html:'<div class="inst-m">🎓 '+m.name.substring(0,8)+'...</div>', iconSize:[80,24], iconAnchor:[40,24] });
-                        L.marker([m.lat, m.lng], { icon: icon }).addTo(map).bindPopup(
-                            '<div style="text-align:center"><b>'+m.name+'</b><div class="btns">' +
-                            '<div class="btn btn-i" onclick="safeSend(JSON.stringify({type:\\'NAV\\', id:\\''+m.id+'\\'}))">INFO</div>' +
-                            '<div class="btn btn-r" onclick="safeSend(JSON.stringify({type:\\'ROUTE\\', id:\\''+m.id+'\\'}))">ROUTE</div>' +
-                            '</div></div>'
-                        );
+                        var div = document.createElement('div');
+                        div.style.textAlign = 'center';
+                        var b = document.createElement('b'); b.innerText = m.name;
+                        var btnContainer = document.createElement('div'); btnContainer.className = 'btns';
+                        var bi = document.createElement('div'); bi.className = 'btn btn-i'; bi.innerText = 'INFO';
+                        bi.onclick = function() { safeSend(JSON.stringify({type:'NAV', id:m.id})); };
+                        var br = document.createElement('div'); br.className = 'btn btn-r'; br.innerText = 'ROUTE';
+                        br.onclick = function() { safeSend(JSON.stringify({type:'ROUTE', id:m.id})); };
+                        btnContainer.appendChild(bi); btnContainer.appendChild(br);
+                        div.appendChild(b); div.appendChild(btnContainer);
+                        L.marker([m.lat, m.lng], { icon: icon }).addTo(map).bindPopup(div);
                     });
                     var rLayer = null;
-                    function handleMsg(e) { try { var d = JSON.parse(e.data); if(d.type === 'DRAW') {
+                    function handleMsg(e) { try { var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; if(d.type === 'DRAW') {
                         if(rLayer) map.removeLayer(rLayer);
                         rLayer = L.polyline(d.pts, {color:'#2563eb', weight:6, opacity:0.8}).addTo(map);
                         map.fitBounds(rLayer.getBounds(), {padding:[40,40]});
@@ -279,7 +292,7 @@ const NearbyCollegesScreen = ({ navigation }) => {
                 const rt = data.routes[0];
                 const pts = rt.geometry.coordinates.map(c => [c[1], c[0]]);
                 const msg = JSON.stringify({ type: 'DRAW', pts });
-                if (Platform.OS === 'web') webViewRef.current?.contentWindow.postMessage(msg, "*");
+                if (Platform.OS === 'web') webViewRef.current?.contentWindow?.postMessage(msg, "*");
                 else webViewRef.current?.postMessage(msg);
                 setColleges(colleges.map(c => c._id === college._id ? { ...c, realDist: (rt.distance / 1000).toFixed(1), duration: Math.round(rt.duration / 60) } : c));
             }
@@ -288,7 +301,10 @@ const NearbyCollegesScreen = ({ navigation }) => {
 
     const onMessage = (event) => {
         try {
-            const data = JSON.parse(event.nativeEvent?.data || event.data);
+            const payload = event.nativeEvent?.data || event.data;
+            if (!payload) return;
+            const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+
             if (data.type === 'NAV') navigation.navigate('CollegeDetail', { id: data.id });
             else if (data.type === 'ROUTE') {
                 const college = colleges.find(c => c._id === data.id);
@@ -303,7 +319,7 @@ const NearbyCollegesScreen = ({ navigation }) => {
             window.addEventListener('message', listener);
             return () => window.removeEventListener('message', listener);
         }
-    }, [colleges]);
+    }, [colleges, location]);
 
     const [locationSearch, setLocationSearch] = useState('');
     const [isSearching, setIsSearching] = useState(false);

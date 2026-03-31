@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://alloteme.online/sitemap.xml

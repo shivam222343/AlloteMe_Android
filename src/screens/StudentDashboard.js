@@ -110,7 +110,7 @@ const StudentDashboard = ({ navigation }) => {
 
     const menuItems = [
         { label: 'Browse Colleges', icon: Search, sub: 'Explore 500+ institutes', route: 'BrowseColleges' },
-        { label: 'College Predictor', icon: LayoutGrid, sub: 'Check your chances', route: 'Predictor' },
+        { label: 'College Predictor', icon: LayoutGrid, sub: 'Check your chances', route: 'Predictor', highlight: true },
         { label: 'AI Counselor', icon: Cpu, sub: '24/7 AI Guidance', route: 'AICounselor' },
         { label: 'Nearby Colleges', icon: MapPin, sub: 'Find local institutes', route: 'NearbyColleges' },
         { label: 'Connect Counselor', icon: MessageSquare, sub: 'Chat with experts', route: 'Counselors' },
@@ -173,15 +173,16 @@ const StudentDashboard = ({ navigation }) => {
         const Icon = item.icon;
         return (
             <TouchableOpacity
-                style={styles.gridCard}
+                style={[styles.gridCard, item.highlight && styles.premiumGridCard]}
                 onPress={() => navigation.navigate(item.route)}
                 activeOpacity={0.7}
             >
-                <View style={styles.gridIconBox}>
-                    <Icon size={24} color={Colors.primary} />
+                {item.highlight && <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View>}
+                <View style={[styles.gridIconBox, item.highlight && styles.premiumIconBox]}>
+                    <Icon size={24} color={item.highlight ? Colors.white : Colors.primary} />
                 </View>
-                <Text style={styles.gridLabel}>{item.label}</Text>
-                <Text style={styles.gridSub}>{item.sub}</Text>
+                <Text style={[styles.gridLabel, item.highlight && styles.premiumGridLabel]}>{item.label}</Text>
+                <Text style={[styles.gridSub, item.highlight && styles.premiumGridSub]}>{item.sub}</Text>
             </TouchableOpacity>
         );
     };
@@ -344,6 +345,40 @@ const styles = StyleSheet.create({
     promoBtn: { backgroundColor: Colors.white, alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 30, marginTop: 16 },
     promoBtnText: { color: Colors.primary, fontSize: 12, fontWeight: 'bold' },
     promoIcon: { position: 'absolute', right: -10, bottom: -10, opacity: 0.2 },
+
+    // Premium Highlight Styles
+    premiumGridCard: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary,
+        shadowColor: Colors.primary,
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    premiumIconBox: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    premiumBadge: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    premiumBadgeText: {
+        color: Colors.white,
+        fontSize: 8,
+        fontWeight: 'bold',
+        letterSpacing: 0.5,
+    },
+    premiumGridLabel: {
+        color: Colors.white,
+    },
+    premiumGridSub: {
+        color: 'rgba(255,255,255,0.7)',
+    },
 });
 
 export default StudentDashboard;

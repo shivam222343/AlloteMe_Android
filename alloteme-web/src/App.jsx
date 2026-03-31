@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -8,6 +9,10 @@ import Legal from './pages/Legal';
 import './index.css';
 
 function App() {
+  useEffect(() => {
+    document.title = "AlloteMe";
+  }, []);
+
   return (
     <Router>
       <div className="app-container">

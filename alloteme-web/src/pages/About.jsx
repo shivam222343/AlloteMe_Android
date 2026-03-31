@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 
 const founders = [
     { name: "Shivam Dombe", role: "Founder & Lead Architect", img: "/founders/shivam.png" },
-    { name: "Rohan Mane", role: "Co-Founder & Tech Director", img: "/founders/rohan.png" },
-    { name: "Tejas Choudhari", role: "Co-Founder & Innovation Lead", img: "/founders/tejas.png" },
+    { name: "Rohan Mane", role: "Co-Founder & Production Lead", img: "/founders/rohan.png" },
+    { name: "Tejas Choudhari", role: "Co-Founder & Management Lead", img: "/founders/tejas.png" },
+    { name: "Omkar Kapare", role: "Co-Founder & Marketing Lead", img: "/founders/omkar.png" },
 ];
 
 const About = () => {

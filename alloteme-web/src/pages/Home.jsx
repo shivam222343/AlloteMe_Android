@@ -6,7 +6,7 @@ import {
     Layers, Filter, MousePointer2
 } from 'lucide-react';
 
-const APP_URL = "https://alloteme.netlify.app/";
+const APP_URL = "https://web.alloteme.online/";
 
 const Home = () => {
     return (
@@ -101,11 +101,11 @@ const Home = () => {
             </section>
 
             {/* SOLUTION SECTION */}
-            <section className="section-padding" style={{ background: 'var(--dark)', borderRadius: '60px 60px 0 0', marginTop: '40px', color: 'white' }}>
+            <section className="section-padding" style={{ background: 'white', borderTop: '1px solid #f1f5f9', marginTop: '40px', color: 'var(--text)' }}>
                 <div className="container">
                     <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-                        <h2 style={{ fontSize: '42px', color: 'white', marginBottom: '24px' }}>Meet AlloteMe — Your AI Counseling Assistant</h2>
-                        <p style={{ color: '#94a3b8', fontSize: '18px', maxWidth: '700px', margin: '0 auto' }}>
+                        <h2 style={{ fontSize: '42px', color: 'var(--dark)', marginBottom: '24px' }}>Meet AlloteMe — Your AI Counseling Assistant</h2>
+                        <p style={{ color: 'var(--text-soft)', fontSize: '18px', maxWidth: '700px', margin: '0 auto' }}>
                             AlloteMe simplifies the entire admission process by turning complex data into clear, personalized decisions.
                         </p>
                     </div>
@@ -115,10 +115,10 @@ const Home = () => {
                             { title: "Real DTE allotment data analysis", text: "Every prediction is backed by official Maharashtra CET Cell data." },
                             { title: "Personalized cutoff insights", text: "Insights tailored to your category, region, and branch preference." },
                         ].map((item, i) => (
-                            <div key={i} style={{ padding: '40px', background: '#1e293b', borderRadius: '32px', border: '1px solid #334155' }}>
-                                <CheckCircle2 color="var(--primary-light)" size={32} style={{ marginBottom: '20px' }} />
-                                <h3 style={{ color: 'white', marginBottom: '12px' }}>{item.title}</h3>
-                                <p style={{ color: '#94a3b8' }}>{item.text}</p>
+                            <div key={i} style={{ padding: '40px', background: 'white', borderRadius: '32px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+                                <CheckCircle2 color="var(--primary)" size={32} style={{ marginBottom: '20px' }} />
+                                <h3 style={{ color: 'var(--dark)', marginBottom: '12px' }}>{item.title}</h3>
+                                <p style={{ color: 'var(--text-soft)' }}>{item.text}</p>
                             </div>
                         ))}
                     </div>
@@ -165,7 +165,7 @@ const Home = () => {
                             <h3>⚡ Advanced Filters</h3>
                             <ul style={{ color: 'var(--text-soft)', marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 <li>• Branch Specific Search</li>
-                                <li>• Region (Pune, Mumbai, Nagpur, etc.)</li>
+                                <li>• Region (Kolhapur, Pune, Mumbai, Nagpur)</li>
                                 <li>• College Type (Govt / Private / Autonomous)</li>
                             </ul>
                         </div>
@@ -237,12 +237,12 @@ const Home = () => {
             {/* FINAL CTA */}
             <section className="section-padding" style={{ padding: '0 5% 80px' }}>
                 <div className="container" style={{
-                    background: 'linear-gradient(135deg, var(--dark) 0%, #1e293b 100%)',
-                    borderRadius: '48px', padding: '100px 40px', textAlign: 'center', color: 'white', overflow: 'hidden', position: 'relative'
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)',
+                    borderRadius: '48px', padding: '100px 40px', textAlign: 'center', color: 'var(--dark)', overflow: 'hidden', position: 'relative', border: '1px solid #dbeafe'
                 }}>
                     <div style={{ position: 'relative', zIndex: 10 }}>
-                        <h2 style={{ fontSize: '48px', color: 'white', marginBottom: '24px', fontWeight: 900 }}>Your Rank Deserves the Right College</h2>
-                        <p style={{ color: '#94a3b8', fontSize: '20px', marginBottom: '48px', maxWidth: '600px', margin: '0 auto 48px' }}>
+                        <h2 style={{ fontSize: '48px', color: 'var(--dark)', marginBottom: '24px', fontWeight: 900 }}>Your Rank Deserves the Right College</h2>
+                        <p style={{ color: 'var(--text-soft)', fontSize: '20px', marginBottom: '48px', maxWidth: '600px', margin: '0 auto 48px' }}>
                             Don’t leave your future to guesswork. Make smarter decisions with AlloteMe.
                         </p>
                         <a href={APP_URL} className="btn-primary" style={{ padding: '1.2rem 4rem', fontSize: '20px', borderRadius: '100px' }}>

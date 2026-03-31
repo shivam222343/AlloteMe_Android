@@ -28,9 +28,15 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
     } = useAuth();
     const insets = useSafeAreaInsets();
 
+    useEffect(() => {
+        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+            document.title = title ? `${title} | AlloteMe` : 'AlloteMe';
+        }
+    }, [title]);
+
     // Fallback for devices/web where insets might be 0
     const topPadding = Math.max(insets.top, Platform.OS === 'ios' ? 0 : 20);
-    const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 0 : 20);
+    const bottomPadding = Math.max(insets.bottom, 0);
 
     const [showNotifs, setShowNotifs] = useState(false);
 
@@ -236,8 +242,8 @@ const styles = StyleSheet.create({
     },
     header: {
         backgroundColor: Colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.divider,
+        borderBottomWidth: 1.5,
+        borderBottomColor: Colors.primary,
         ...Shadows.xs,
         zIndex: 10,
     },

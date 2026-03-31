@@ -48,7 +48,7 @@ const AboutUsScreen = ({ navigation }) => {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.foundersScroll}>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={{ uri: 'https://raw.githubusercontent.com/shivam222343/AlloteMe_Android/main/assets/founders/shivam.png' }}
+                                source={require('../../assets/founders/shivam.png')}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Shivam Dombe</Text>
@@ -56,19 +56,27 @@ const AboutUsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={{ uri: 'https://raw.githubusercontent.com/shivam222343/AlloteMe_Android/main/assets/founders/rohan.png' }}
+                                source={require('../../assets/founders/rohan.png')}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Rohan Mane</Text>
-                            <Text style={styles.founderRole}>Technical Director</Text>
+                            <Text style={styles.founderRole}>Production Lead</Text>
                         </View>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={{ uri: 'https://raw.githubusercontent.com/shivam222343/AlloteMe_Android/main/assets/founders/tejas.png' }}
+                                source={require('../../assets/founders/tejas.png')}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Tejas Choudhari</Text>
-                            <Text style={styles.founderRole}>Innovation Lead</Text>
+                            <Text style={styles.founderRole}>Management Lead</Text>
+                        </View>
+                        <View style={styles.founderCardContainer}>
+                            <Image
+                                source={require('../../assets/founders/omkar.png')}
+                                style={styles.founderAvatar}
+                            />
+                            <Text style={styles.founderName}>Omkar Kapare</Text>
+                            <Text style={styles.founderRole}>Marketing Lead</Text>
                         </View>
                     </ScrollView>
 
