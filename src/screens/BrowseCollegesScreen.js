@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, Image, TextInput, ScrollView } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
 import { institutionAPI, authAPI } from '../services/api';
@@ -155,43 +155,46 @@ const BrowseCollegesScreen = ({ navigation }) => {
     return (
         <MainLayout scrollable={false} noPadding>
             <View style={styles.container}>
-                <View style={styles.topSection}>
-                    <Text style={styles.title}>Explore Colleges</Text>
-                    <View style={styles.searchBar}>
-                        <Search size={20} color={Colors.text.tertiary} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search colleges..."
-                            value={search}
-                            onChangeText={(t) => handleFilter(t, activeTab)}
-                        />
-                    </View>
-                </View>
-
-                <View style={styles.tabBar}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-                        {tabs.map((tab) => {
-                            const isActive = activeTab === tab;
-                            return (
-                                <TouchableOpacity
-                                    key={tab}
-                                    style={[styles.tabItem, isActive && styles.activeTabItem]}
-                                    onPress={() => handleFilter(search, tab)}
-                                >
-                                    <Text style={[styles.tabItemText, isActive && styles.activeTabItemText]}>{tab}</Text>
-                                    {isActive && <View style={styles.activeLine} />}
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-
-                <FlatList
-                    data={filtered}
+                <SectionList
+                    sections={[{ title: 'Colleges', data: filtered }]}
                     keyExtractor={(item) => item._id}
                     renderItem={({ item }) => <InstitutionCard item={item} />}
+                    renderSectionHeader={() => (
+                        <View style={styles.tabBar}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+                                {tabs.map((tab) => {
+                                    const isActive = activeTab === tab;
+                                    return (
+                                        <TouchableOpacity
+                                            key={tab}
+                                            style={[styles.tabItem, isActive && styles.activeTabItem]}
+                                            onPress={() => handleFilter(search, tab)}
+                                        >
+                                            <Text style={[styles.tabItemText, isActive && styles.activeTabItemText]}>{tab}</Text>
+                                            {isActive && <View style={styles.activeLine} />}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    )}
+                    ListHeaderComponent={() => (
+                        <View style={styles.topSection}>
+                            <Text style={styles.title}>Explore Colleges</Text>
+                            <View style={styles.searchBar}>
+                                <Search size={20} color={Colors.text.tertiary} />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search colleges..."
+                                    value={search}
+                                    onChangeText={(t) => handleFilter(t, activeTab)}
+                                />
+                            </View>
+                        </View>
+                    )}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
+                    stickySectionHeadersEnabled={true}
                     ListEmptyComponent={
                         <Text style={styles.emptyText}>{loading ? 'Loading...' : 'No colleges found'}</Text>
                     }

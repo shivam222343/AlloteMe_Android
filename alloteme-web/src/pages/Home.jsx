@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import {
     Target, Sparkles, Zap, BarChart, GraduationCap,
     ChevronRight, AlertCircle, CheckCircle2, Search,
-    Layers, Filter, MousePointer2
+    Search, Layers, Filter, MousePointer2
 } from 'lucide-react';
+import TestimonialSlider from '../components/TestimonialSlider';
 
 const APP_URL = "https://web.alloteme.online/";
 
@@ -251,6 +252,7 @@ const Home = () => {
                     </div>
                 </div>
             </section>
+            <TestimonialSlider />
         </div>
     );
 };

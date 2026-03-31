@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    getAICounsel, 
-    saveChat, 
-    getMyChats, 
-    trainAI, 
-    getFrequentQuestions, 
-    setFrequentQuestion 
+const {
+    getAICounsel,
+    saveChat,
+    getMyChats,
+    trainAI,
+    getFrequentQuestions,
+    setFrequentQuestion,
+    generateReview
 } = require('../controllers/aiController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -14,7 +15,8 @@ const { protect } = require('../middleware/authMiddleware');
 router.post('/counsel', protect, getAICounsel);
 router.get('/chats', protect, getMyChats);
 router.post('/chats', protect, saveChat);
-router.get('/frequent-questions', getFrequentQuestions); // Public so students can see tags
+router.get('/frequent-questions', getFrequentQuestions);
+router.post('/generate-review', protect, generateReview);
 
 // Admin routes
 router.post('/train', protect, trainAI);

@@ -14,6 +14,8 @@ import {
 import { institutionAPI } from '../services/api';
 import VerificationBanner from '../components/ui/VerificationBanner';
 import VerificationModal from '../components/ui/VerificationModal';
+import RatingSection from '../components/ui/RatingSection';
+import TestimonialSlider from '../components/ui/TestimonialSlider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDER_WIDTH = SCREEN_WIDTH - 32;
@@ -179,10 +181,10 @@ const StudentDashboard = ({ navigation }) => {
             >
                 {item.highlight && <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View>}
                 <View style={[styles.gridIconBox, item.highlight && styles.premiumIconBox]}>
-                    <Icon size={24} color={item.highlight ? Colors.white : Colors.primary} />
+                    <Icon size={24} color={Colors.primary} />
                 </View>
-                <Text style={[styles.gridLabel, item.highlight && styles.premiumGridLabel]}>{item.label}</Text>
-                <Text style={[styles.gridSub, item.highlight && styles.premiumGridSub]}>{item.sub}</Text>
+                <Text style={styles.gridLabel}>{item.label}</Text>
+                <Text style={styles.gridSub}>{item.sub}</Text>
             </TouchableOpacity>
         );
     };
@@ -256,7 +258,13 @@ const StudentDashboard = ({ navigation }) => {
                     <GraduationCap size={60} color={Colors.white} style={styles.promoIcon} />
                 </View>
 
-                <View style={{ height: 100 }} />
+                <View style={{ marginTop: 32 }}>
+                    <RatingSection />
+                </View>
+
+                <TestimonialSlider />
+
+                <View style={{ height: 120 }} />
             </ScrollView>
 
             <VerificationModal
@@ -316,7 +324,8 @@ const styles = StyleSheet.create({
     statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
     statCard: {
         width: CARD_WIDTH, backgroundColor: Colors.white, padding: 12, borderRadius: 16,
-        flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.sm, borderWidth: 1, borderColor: Colors.divider
+        flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.sm,
+        borderWidth: 1.5, borderColor: Colors.primary
     },
     statIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     statVal: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary },
@@ -330,7 +339,7 @@ const styles = StyleSheet.create({
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     gridCard: {
         width: CARD_WIDTH, backgroundColor: Colors.white, padding: 12, borderRadius: 20,
-        borderWidth: 1, borderColor: Colors.divider, ...Shadows.xs
+        borderWidth: 1.5, borderColor: Colors.primary, ...Shadows.xs
     },
     gridIconBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
     gridLabel: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary },
@@ -348,21 +357,20 @@ const styles = StyleSheet.create({
 
     // Premium Highlight Styles
     premiumGridCard: {
-        backgroundColor: Colors.primary,
-        borderColor: Colors.primary,
+        backgroundColor: Colors.white,
         shadowColor: Colors.primary,
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
         elevation: 6,
     },
     premiumIconBox: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: Colors.primary + '15',
     },
     premiumBadge: {
         position: 'absolute',
         top: 10,
         right: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: Colors.primary,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 8,
@@ -372,12 +380,6 @@ const styles = StyleSheet.create({
         fontSize: 8,
         fontWeight: 'bold',
         letterSpacing: 0.5,
-    },
-    premiumGridLabel: {
-        color: Colors.white,
-    },
-    premiumGridSub: {
-        color: 'rgba(255,255,255,0.7)',
     },
 });
 

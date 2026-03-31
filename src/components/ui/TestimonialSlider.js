@@ -1,0 +1,123 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated, Dimensions, Image } from 'react-native';
+import { Colors, Shadows } from '../../constants/theme';
+import { Quote, Star } from 'lucide-react-native';
+import { reviewAPI } from '../../services/api';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const TestimonialSlider = () => {
+    const [reviews, setReviews] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const scrollViewRef = useRef(null);
+
+    useEffect(() => {
+        fetchReviews();
+    }, []);
+
+    const fetchReviews = async () => {
+        try {
+            const res = await reviewAPI.getPublished();
+            if (res.data && res.data.length > 0) {
+                // Triple the data to create a seamless loop effect
+                setReviews([...res.data, ...res.data, ...res.data]);
+            }
+        } catch (error) {
+            console.error('Fetch reviews error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (reviews.length > 0) {
+            let index = Math.floor(reviews.length / 3);
+            const timer = setInterval(() => {
+                index++;
+                if (index >= reviews.length - 1) {
+                    index = Math.floor(reviews.length / 3);
+                    scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: false });
+                } else {
+                    scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
+                }
+            }, 5000);
+            return () => clearInterval(timer);
+        }
+    }, [reviews]);
+
+    if (loading || reviews.length === 0) return null;
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <Quote size={24} color={Colors.primary} fill={Colors.primary + '20'} />
+                <Text style={styles.title}>What Students Say</Text>
+            </View>
+
+            <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                    { useNativeDriver: false }
+                )}
+                scrollEventThrottle={16}
+            >
+                {reviews.map((item, index) => (
+                    <View key={index} style={styles.slide}>
+                        <View style={styles.card}>
+                            <View style={styles.stars}>
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                    <Star
+                                        key={s}
+                                        size={14}
+                                        color={s <= item.rating ? '#F59E0B' : '#CBD5E1'}
+                                        fill={s <= item.rating ? '#F59E0B' : 'transparent'}
+                                    />
+                                ))}
+                            </View>
+                            <Text style={styles.comment} numberOfLines={4}>"{item.comment}"</Text>
+                            <View style={styles.userRow}>
+                                <Image
+                                    source={{ uri: item.userAvatar || `https://ui-avatars.com/api/?name=${item.userName}&background=random` }}
+                                    style={styles.avatar}
+                                />
+                                <View>
+                                    <Text style={styles.userName}>{item.userName}</Text>
+                                    <Text style={styles.userSub}>Verified Student</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                ))}
+            </ScrollView>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: { marginTop: 40, marginBottom: 20 },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, marginBottom: 15 },
+    title: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary },
+    slide: { width: SCREEN_WIDTH },
+    card: {
+        backgroundColor: Colors.white,
+        borderRadius: 0,
+        padding: 24,
+        borderTopWidth: 1.5,
+        borderBottomWidth: 1.5,
+        borderColor: Colors.primary + '10',
+        ...Shadows.sm
+    },
+    stars: { flexDirection: 'row', gap: 4, marginBottom: 12 },
+    comment: { fontSize: 14, color: Colors.text.secondary, fontStyle: 'italic', lineHeight: 22, marginBottom: 20 },
+    userRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.divider },
+    userName: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary },
+    userSub: { fontSize: 11, color: Colors.text.tertiary, marginTop: 2 }
+});
+
+export default TestimonialSlider;

@@ -105,6 +105,13 @@ const AdminDashboard = ({ navigation }) => {
             route: 'SystemAnalytics',
             color: '#8B5CF6'
         },
+        {
+            title: 'Review Management',
+            desc: 'Approve or remove student testimonials',
+            icon: MessageSquare,
+            route: 'AdminReviews',
+            color: '#10B981'
+        },
     ];
 
     const ActionCard = ({ item }) => {

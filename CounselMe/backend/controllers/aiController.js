@@ -300,11 +300,46 @@ const setFrequentQuestion = async (req, res) => {
     res.status(201).json(newQ);
 };
 
+// @desc    Generate a cool review based on stars
+// @route   POST /api/ai/generate-review
+// @access  Private
+const generateReview = async (req, res) => {
+    const { rating } = req.body;
+    const apiKey = req.user?.groqApiKey || process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+        return res.status(400).json({ message: 'No AI key found' });
+    }
+
+    try {
+        const groqClient = new Groq({ apiKey });
+        const systemPrompt = `You are an AI that generates short, cool, and catchy student reviews for an admission counseling app called "AlloteMe".
+        The user has selected a ${rating} star rating.
+        Generate a one-sentence review that is appropriate for this rating.
+        Use cool lingo (e.g., "spot on", "game changer", "lit", "smooth") and include 1-2 relevant emojis.
+        Keep it under 15 words. DO NOT use quotes or prefixes like "Review:". Just the text.`;
+
+        const chatCompletion = await groqClient.chat.completions.create({
+            messages: [{ role: 'system', content: systemPrompt }],
+            model: 'llama-3.1-8b-instant',
+            temperature: 0.9,
+            max_tokens: 50
+        });
+
+        const reply = chatCompletion.choices[0].message.content.trim();
+        res.json({ reply });
+    } catch (error) {
+        console.error('Review Gen Error:', error);
+        res.status(500).json({ message: 'AI generation failed' });
+    }
+};
+
 module.exports = {
     getAICounsel,
     saveChat,
     getMyChats,
     trainAI,
     getFrequentQuestions,
-    setFrequentQuestion
+    setFrequentQuestion,
+    generateReview
 };

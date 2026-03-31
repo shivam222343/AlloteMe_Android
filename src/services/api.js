@@ -100,6 +100,15 @@ export const aiAPI = {
     getFrequentQuestions: () => api.get('ai/frequent-questions'),
     trainAI: (data) => api.post('ai/train', data),
     setFrequentQuestion: (data) => api.post('ai/frequent-questions', data),
+    generateReview: (rating) => api.post('ai/generate-review', { rating }),
+};
+
+export const reviewAPI = {
+    submit: (data) => api.post('reviews', data),
+    getAllAdmin: () => api.get('reviews/admin'),
+    getPublished: () => api.get('reviews'),
+    togglePublish: (id) => api.patch(`reviews/publish/${id}`),
+    delete: (id) => api.delete(`reviews/${id}`),
 };
 
 export default {
@@ -109,5 +118,6 @@ export default {
     notificationsAPI,
     aiAPI,
     counselorAPI,
-    uploadAPI
+    uploadAPI,
+    reviewAPI
 };

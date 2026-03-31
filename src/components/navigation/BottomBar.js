@@ -28,7 +28,7 @@ const BottomBar = ({ state, navigation }) => {
     ] : [
         { name: 'Dashboard', icon: Home, label: 'Home' },
         { name: 'BrowseColleges', icon: Search, label: 'Browse' },
-        { name: 'AICounselor', icon: Bot, label: 'AS AI' },
+        { name: 'AICounselor', icon: Bot, label: 'ETA AI' },
         { name: 'Counselors', icon: User, label: 'Experts' },
     ];
 

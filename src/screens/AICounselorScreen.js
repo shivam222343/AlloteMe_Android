@@ -598,19 +598,26 @@ const AICounselorScreen = ({ navigation }) => {
         try {
             const chat = pastChats.find(c => (c.id || c._id) === id);
             if (chat) {
+                let formatted;
                 if (chat.isLocal) {
-                    setMessages(chat.messages);
+                    formatted = chat.messages.map(m => ({ ...m, isNew: false }));
                 } else {
-                    const formatted = chat.messages.map((m, i) => ({
+                    formatted = chat.messages.map((m, i) => ({
                         id: `old-${i}`,
                         text: m.content,
                         sender: m.role === 'user' ? 'user' : 'bot',
-                        timestamp: chat.updatedAt
+                        timestamp: chat.updatedAt,
+                        isNew: false
                     }));
-                    setMessages(formatted);
                 }
+                setMessages(formatted);
                 setChatId(id);
                 setShowHistoryModal(false);
+
+                // Ensure we scroll to bottom after loading history
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 300);
             }
         } catch (e) {
             Alert.alert('Error', 'Could not load chat');
