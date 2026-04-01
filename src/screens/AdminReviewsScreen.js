@@ -13,7 +13,9 @@ const AdminReviewsScreen = () => {
     const fetchReviews = async () => {
         try {
             const res = await reviewAPI.getAllAdmin();
-            setReviews(res.data);
+            if (res.data && res.data.success) {
+                setReviews(res.data.data);
+            }
         } catch (error) {
             console.error('Fetch reviews error:', error);
             Alert.alert('Error', 'Failed to load reviews');
@@ -79,9 +81,9 @@ const AdminReviewsScreen = () => {
                     style={[styles.actionBtn, item.isPublished ? styles.publishedBtn : styles.draftBtn]}
                     onPress={() => handleTogglePublish(item._id)}
                 >
-                    {item.isPublished ? <CheckCircle size={16} color={Colors.white} /> : <XCircle size={16} color={Colors.text.secondary} />}
-                    <Text style={[styles.actionText, { color: item.isPublished ? Colors.white : Colors.text.secondary }]}>
-                        {item.isPublished ? 'Published' : 'Draft'}
+                    <CheckCircle size={16} color={item.isPublished ? Colors.white : '#10B981'} />
+                    <Text style={[styles.actionText, { color: item.isPublished ? Colors.white : '#10B981' }]}>
+                        {item.isPublished ? 'Approved' : 'Approve'}
                     </Text>
                 </TouchableOpacity>
 
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
         borderWidth: 1
     },
     publishedBtn: { backgroundColor: '#10B981', borderColor: '#10B981' },
-    draftBtn: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' },
+    draftBtn: { backgroundColor: '#F0FDF4', borderColor: '#10B98130' },
     deleteBtn: { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2' },
     actionText: { fontSize: 12, fontWeight: 'bold' },
     empty: { alignItems: 'center', marginTop: 100, gap: 10 },

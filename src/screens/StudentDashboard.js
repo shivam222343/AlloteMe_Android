@@ -9,7 +9,7 @@ import { Colors, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Search, LayoutGrid, Cpu, MapPin,
-    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings
+    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings, Bot
 } from 'lucide-react-native';
 import { institutionAPI } from '../services/api';
 import VerificationBanner from '../components/ui/VerificationBanner';
@@ -113,7 +113,7 @@ const StudentDashboard = ({ navigation }) => {
     const menuItems = [
         { label: 'Browse Colleges', icon: Search, sub: 'Explore 500+ institutes', route: 'BrowseColleges' },
         { label: 'College Predictor', icon: LayoutGrid, sub: 'Check your chances', route: 'Predictor', highlight: true },
-        { label: 'AI Counselor', icon: Cpu, sub: '24/7 AI Guidance', route: 'AICounselor' },
+        { label: 'Eta AI Counselor', icon: Bot, sub: '24/7 AI Guidance', route: 'AICounselor' },
         { label: 'Nearby Colleges', icon: MapPin, sub: 'Find local institutes', route: 'NearbyColleges' },
         { label: 'Connect Counselor', icon: MessageSquare, sub: 'Chat with experts', route: 'Counselors' },
         { label: 'App Settings', icon: Settings, sub: 'Profile & Preferences', route: 'Settings' },

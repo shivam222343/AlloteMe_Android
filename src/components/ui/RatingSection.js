@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, Animated, Easing } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Shadows } from '../../constants/theme';
-import { Star, Send, Sparkles } from 'lucide-react-native';
+import { Star, Send, Sparkles, RotateCcw } from 'lucide-react-native';
 import { reviewAPI, aiAPI } from '../../services/api';
 
 const RatingSection = () => {
@@ -11,6 +12,14 @@ const RatingSection = () => {
     const [generating, setGenerating] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [activeStar, setActiveStar] = useState(0);
+
+    useEffect(() => {
+        const loadStatus = async () => {
+            const hasReviewed = await AsyncStorage.getItem('ALLOTEME_HAS_REVIEWED');
+            if (hasReviewed === 'true') setSubmitted(true);
+        };
+        loadStatus();
+    }, []);
 
     // Star sweep animation for encouragement
     useEffect(() => {
@@ -90,6 +99,7 @@ const RatingSection = () => {
         setSubmitting(true);
         try {
             await reviewAPI.submit({ rating, comment: comment.trim() });
+            await AsyncStorage.setItem('ALLOTEME_HAS_REVIEWED', 'true');
             setSubmitted(true);
             Alert.alert('Success', 'Your review has been submitted for approval!');
         } catch (error) {
@@ -100,6 +110,13 @@ const RatingSection = () => {
         }
     };
 
+    const handleReset = async () => {
+        await AsyncStorage.removeItem('ALLOTEME_HAS_REVIEWED');
+        setSubmitted(false);
+        setRating(0);
+        setComment('');
+    };
+
     if (submitted) {
         return (
             <View style={styles.card}>
@@ -108,6 +125,10 @@ const RatingSection = () => {
                 </View>
                 <Text style={styles.statusTitle}>Review Submitted!</Text>
                 <Text style={styles.statusSub}>Thank you for your feedback. It will be visible once approved by admin.</Text>
+                <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
+                    <RotateCcw size={14} color={Colors.primary} />
+                    <Text style={styles.resetText}>Submit Another</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -237,7 +258,9 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
         borderRadius: 8
     },
-    aiBtnText: { fontSize: 11, fontWeight: 'bold', color: Colors.primary }
+    aiBtnText: { fontSize: 11, fontWeight: 'bold', color: Colors.primary },
+    resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 15, padding: 8 },
+    resetText: { fontSize: 13, color: Colors.primary, fontWeight: '600' }
 });
 
 export default RatingSection;
