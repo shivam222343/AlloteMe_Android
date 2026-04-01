@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
     registerUser, loginUser, getUserProfile, updateUserProfile,
-    changePassword, toggleSaveCollege, getAllUsers, updateUserRole,
+    changePassword, toggleSaveCollege, getAllUsers, getUserById, updateUserRole,
     sendOTP, verifyOTP, getDashboardStats, deleteAccount, deleteUser, setVerifiedPhone,
     updateAvatarPreference
 } = require('../controllers/authController');
@@ -21,6 +21,7 @@ router.post('/update-avatar', protect, updateAvatarPreference);
 
 router.get('/users', protect, authorize('admin'), getAllUsers);
 router.route('/users/:id')
+    .get(protect, authorize('admin'), getUserById)
     .put(protect, authorize('admin'), updateUserRole)
     .delete(protect, authorize('admin'), deleteUser);
 

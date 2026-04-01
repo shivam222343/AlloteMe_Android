@@ -310,22 +310,30 @@ const predictColleges = async (req, res) => {
 
         res.json(cleaned);
 
-        // Optional: Send background notification if user logged in
-        if (req.headers.authorization) {
-            try {
-                const jwt = require('jsonwebtoken');
-                const token = req.headers.authorization.split(' ')[1];
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                /*
-                const { sendNotification } = require('../services/notificationService');
-                sendNotification(
-                    req.user._id,
-                    "Prediction Complete! 🎓",
-                    `We found ${results.length} colleges matching your profile. Check the 'My Predictions' tab!`,
-                    "success"
-                );
-                */
-            } catch (e) { /* ignore invalid auth for public routes */ }
+        // Save preferences to user for admin tracking
+        if (req.user) {
+            const User = require('../models/User');
+            const { client: redis } = require('../config/redis');
+
+            await User.findByIdAndUpdate(req.user._id, {
+                lastPredictorPreferences: {
+                    percentile,
+                    rank,
+                    category,
+                    examType,
+                    round,
+                    year,
+                    branches,
+                    regions,
+                    institutionTypes,
+                    seatTypes,
+                    isFemale,
+                    timestamp: new Date()
+                }
+            });
+
+            // Invalidate user profile cache so admins see fresh data
+            await redis.del(`user_profile_${req.user._id}`);
         }
     } catch (error) {
         console.error('Prediction Engine Failure:', error);

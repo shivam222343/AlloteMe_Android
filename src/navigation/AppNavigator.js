@@ -42,6 +42,7 @@ import AdminCounselorLogsScreen from '../screens/AdminCounselorLogsScreen';
 import AdminNotificationsScreen from '../screens/AdminNotificationsScreen';
 import SystemAnalyticsScreen from '../screens/SystemAnalyticsScreen';
 import AdminReviewsScreen from '../screens/AdminReviewsScreen';
+import PricingScreen from '../screens/PricingScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -99,6 +100,7 @@ const TabNavigator = () => {
             <Tab.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
             <Tab.Screen name="SystemAnalytics" component={SystemAnalyticsScreen} />
             <Tab.Screen name="AdminReviews" component={AdminReviewsScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="Pricing" component={PricingScreen} options={{ tabBarButton: () => null }} />
         </Tab.Navigator>
     );
 };
@@ -118,7 +120,21 @@ const DrawerNavigator = () => (
 );
 
 const AppNavigator = () => {
-    const { isAuthenticated, user, loading } = useAuth();
+    const { isAuthenticated, user, loading, setLoading } = useAuth();
+
+    // Safety timeout to ensure loading screen clears even if backend is waking up slowly
+    React.useEffect(() => {
+        let timer;
+        if (loading) {
+            timer = setTimeout(() => {
+                if (typeof setLoading === 'function') {
+                    console.log('[AppNavigator] Loading timeout reached. Forcing state update.');
+                    setLoading(false);
+                }
+            }, 8000);
+        }
+        return () => clearTimeout(timer);
+    }, [loading]);
 
     if (loading) {
         return (

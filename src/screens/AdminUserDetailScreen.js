@@ -22,17 +22,14 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
 
     const fetchUser = async () => {
         try {
-            const res = await authAPI.getAllUsers();
-            const found = res.data.find(u => u._id === userId);
-            if (found) {
-                setUser(found);
-            } else {
-                Alert.alert('Error', 'User not found');
-                navigation.goBack();
+            const res = await authAPI.getUserById(userId);
+            if (res.data) {
+                setUser(res.data);
             }
         } catch (error) {
             console.error('Failed to fetch user', error);
             Alert.alert('Error', 'Failed to load user info');
+            navigation.goBack();
         } finally {
             setLoading(false);
         }
@@ -229,9 +226,15 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
 
                 {user.lastPredictorPreferences && Object.keys(user.lastPredictorPreferences).length > 0 && (
                     <View style={styles.section}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                            <Search size={14} color={Colors.text.tertiary} />
-                            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Latest Predictor Search</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Search size={14} color={Colors.text.tertiary} />
+                                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Latest Predictor Search</Text>
+                            </View>
+                            <TouchableOpacity onPress={fetchUser} style={styles.miniRefreshBtn}>
+                                <Activity size={14} color={Colors.primary} />
+                                <Text style={styles.miniRefreshText}>Refresh</Text>
+                            </TouchableOpacity>
                         </View>
                         <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: Colors.primary }]}>
                             <View style={styles.academicGrid}>
@@ -379,7 +382,9 @@ const styles = StyleSheet.create({
     statLine: { flexDirection: 'row', gap: 24 },
     statItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     statText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },
-    timeText: { fontSize: 11, color: Colors.text.tertiary }
+    timeText: { fontSize: 11, color: Colors.text.tertiary },
+    miniRefreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.primary + '10' },
+    miniRefreshText: { fontSize: 11, fontWeight: '700', color: Colors.primary }
 });
 
 export default AdminUserDetailScreen;

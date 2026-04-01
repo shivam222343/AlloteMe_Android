@@ -19,9 +19,14 @@ const TestimonialSlider = () => {
     const fetchReviews = async () => {
         try {
             const res = await reviewAPI.getPublished();
-            if (res.data && res.data.length > 0) {
-                // Triple the data to create a seamless loop effect
-                setReviews([...res.data, ...res.data, ...res.data]);
+            if (res.data?.success && res.data.data.length > 0) {
+                const data = res.data.data;
+                // Only triple if there's more than 1 review to avoid showing duplicates of the same review in a row
+                if (data.length > 1) {
+                    setReviews([...data, ...data, ...data]);
+                } else {
+                    setReviews(data);
+                }
             }
         } catch (error) {
             console.error('Fetch reviews error:', error);
@@ -31,20 +36,27 @@ const TestimonialSlider = () => {
     };
 
     useEffect(() => {
-        if (reviews.length > 0) {
-            let index = Math.floor(reviews.length / 3);
+        if (reviews.length > 1) {
+            const realCount = reviews.length / 3;
+            let index = realCount;
+
             const timer = setInterval(() => {
                 index++;
-                if (index >= reviews.length - 1) {
-                    index = Math.floor(reviews.length / 3);
-                    scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: false });
+                if (index >= realCount * 2) {
+                    // Seamless jump back to middle set without animation
+                    scrollViewRef.current?.scrollTo({ x: realCount * SCREEN_WIDTH, animated: false });
+                    index = realCount + 1;
+                    // Then continue with animation
+                    setTimeout(() => {
+                        scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
+                    }, 50);
                 } else {
                     scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
                 }
-            }, 5000);
+            }, 1000); // 1-second auto-scroll as requested
             return () => clearInterval(timer);
         }
-    }, [reviews]);
+    }, [reviews.length]);
 
     if (loading || reviews.length === 0) return null;
 
@@ -59,12 +71,14 @@ const TestimonialSlider = () => {
                 ref={scrollViewRef}
                 horizontal
                 pagingEnabled
+                decelerationRate="fast"
                 showsHorizontalScrollIndicator={false}
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
                     { useNativeDriver: false }
                 )}
                 scrollEventThrottle={16}
+                contentOffset={reviews.length > 1 ? { x: (reviews.length / 3) * SCREEN_WIDTH, y: 0 } : { x: 0, y: 0 }}
             >
                 {reviews.map((item, index) => (
                     <View key={index} style={styles.slide}>

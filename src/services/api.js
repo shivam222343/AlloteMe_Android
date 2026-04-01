@@ -33,6 +33,7 @@ export const authAPI = {
     toggleSave: (collegeId) => api.post('auth/toggle-save', { collegeId }),
     getStats: () => api.get('auth/stats'),
     getAllUsers: () => api.get('auth/users'),
+    getUserById: (id) => api.get(`auth/users/${id}`),
     updateUserRole: (id, data) => api.put(`auth/users/${id}`, data),
     deleteUser: (id) => api.delete(`auth/users/${id}`),
     updateAvatarPreference: (data) => api.post('auth/update-avatar', data),

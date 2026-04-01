@@ -5,7 +5,7 @@ import GradientBorder from '../ui/GradientBorder';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     Home, Search, LayoutGrid, Users, History, Bookmark,
-    Settings, LogOut, X, ChevronRight, User, Star, PlusCircle, FileUp, Bot
+    Settings, LogOut, X, ChevronRight, User, Star, PlusCircle, FileUp, Bot, Gem
 } from 'lucide-react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,11 +32,11 @@ const Sidebar = ({ navigation, state }) => {
     ];
 
     const AdminItems = [
-        { label: 'Institution Manager', icon: PlusCircle, route: 'CreateInstitution' },
-        { label: 'Featured Colleges', icon: Star, route: 'FeaturedColleges' },
-        { label: 'Cutoff Uploader', icon: FileUp, route: 'UploadCutoff' },
-        { label: 'User Management', icon: Users, route: 'AdminUsers' },
         { label: 'System Analytics', icon: LayoutGrid, route: 'SystemAnalytics' },
+    ];
+
+    const StudentItems = [
+        { label: 'Premium Plans', icon: Gem, route: 'Pricing', premium: true },
     ];
 
     // Filter out duplicate settings from main menu if admin
@@ -61,6 +61,11 @@ const Sidebar = ({ navigation, state }) => {
             >
                 <Icon size={20} color={isActive ? Colors.primary : Colors.text.tertiary} />
                 <Text style={[styles.navText, isActive && styles.navTextActive]}>{item.label}</Text>
+                {item.premium && (
+                    <View style={styles.premiumTag}>
+                        <Text style={styles.premiumText}>PREMIUM</Text>
+                    </View>
+                )}
                 {isActive && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
         );
@@ -110,6 +115,14 @@ const Sidebar = ({ navigation, state }) => {
             <ScrollView style={styles.menuList} showsVerticalScrollIndicator={false}>
                 <Text style={styles.sectionLabel}>MAIN MENU</Text>
                 {filteredMenuItems.map((item, idx) => <NavItem key={idx} item={item} />)}
+
+                {user?.role === 'student' && (
+                    <>
+                        <View style={styles.divider} />
+                        <Text style={styles.sectionLabel}>PREMIUM SERVICES</Text>
+                        {StudentItems.map((item, idx) => <NavItem key={idx} item={item} />)}
+                    </>
+                )}
 
                 {user?.role === 'admin' && (
                     <>
@@ -166,11 +179,13 @@ const styles = StyleSheet.create({
     navText: { fontSize: 14, fontWeight: '500', color: Colors.text.secondary },
     navTextActive: { color: Colors.primary, fontWeight: 'bold' },
     activeIndicator: { width: 4, height: 16, backgroundColor: Colors.primary, borderRadius: 2, position: 'absolute', right: 0 },
-    divider: { height: 1, backgroundColor: Colors.divider, marginVertical: 20 },
+    divider: { height: 1, backgroundColor: Colors.divider, marginVertical: 12 },
     footer: { padding: 24, paddingBottom: 32, borderTopWidth: 1, borderTopColor: Colors.divider },
     logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
     logoutText: { fontSize: 14, fontWeight: 'bold', color: Colors.error },
-    versionText: { fontSize: 10, color: Colors.text.tertiary, textAlign: 'center', marginTop: 16 }
+    versionText: { fontSize: 10, color: Colors.text.tertiary, textAlign: 'center', marginTop: 16 },
+    premiumTag: { backgroundColor: '#F59E0B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 'auto', marginRight: 15 },
+    premiumText: { color: Colors.white, fontSize: 8, fontWeight: '900' }
 });
 
 export default Sidebar;

@@ -123,8 +123,8 @@ const RatingSection = () => {
                 <View style={[styles.statusIcon, { backgroundColor: '#10B98115' }]}>
                     <Star size={24} color="#10B981" fill="#10B981" />
                 </View>
-                <Text style={styles.statusTitle}>Review Submitted!</Text>
-                <Text style={styles.statusSub}>Thank you for your feedback. It will be visible once approved by admin.</Text>
+                <Text style={styles.statusTitle}>Review Published!</Text>
+                <Text style={styles.statusSub}>Thank you! Your feedback is now Live and helping other students. ✨</Text>
                 <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
                     <RotateCcw size={14} color={Colors.primary} />
                     <Text style={styles.resetText}>Submit Another</Text>
@@ -209,10 +209,10 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: Colors.white,
         padding: 24,
-        borderRadius: 0,
-        borderTopWidth: 1.5,
-        borderBottomWidth: 1.5,
-        borderColor: Colors.primary + '15',
+        borderWidth: 1.5,
+        borderColor: Colors.primary,
+        borderRadius: 24,
+        marginHorizontal: 16,
         ...Shadows.sm,
         alignItems: 'center'
     },

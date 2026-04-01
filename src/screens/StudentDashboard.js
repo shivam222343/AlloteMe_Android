@@ -258,13 +258,15 @@ const StudentDashboard = ({ navigation }) => {
                     <GraduationCap size={60} color={Colors.white} style={styles.promoIcon} />
                 </View>
 
-                <View style={{ marginTop: 32 }}>
+                <View style={{ marginTop: 24 }}>
+                    <TestimonialSlider />
+                </View>
+
+                <View style={{ marginTop: 8 }}>
                     <RatingSection />
                 </View>
 
-                <TestimonialSlider />
-
-                <View style={{ height: 120 }} />
+                <View style={{ height: 100 }} />
             </ScrollView>
 
             <VerificationModal
