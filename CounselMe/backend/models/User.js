@@ -69,6 +69,14 @@ const userSchema = new mongoose.Schema({
     lastPredictorPreferences: {
         type: Object,
         default: {}
+    },
+    isOnline: {
+        type: Boolean,
+        default: false
+    },
+    lastActive: {
+        type: Date,
+        default: Date.now
     }
 }, {
     timestamps: true,

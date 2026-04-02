@@ -118,7 +118,7 @@ const TestimonialSlider = () => {
     return (
         <View style={styles.container}>
             <View style={styles.headerRow}>
-                <Text style={styles.title}>Success Stories</Text>
+                <Text style={styles.title}>What student Says</Text>
                 <View style={styles.pagination}>
                     {reviews.slice(0, reviews.length / 2 || 1).map((_, i) => (
                         <View

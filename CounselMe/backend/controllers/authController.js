@@ -299,7 +299,7 @@ const toggleSaveCollege = async (req, res) => {
 // @route   GET /api/auth/users
 // @access  Private/Admin
 const getAllUsers = async (req, res) => {
-    const users = await User.find({}).select('-password');
+    const users = await User.find({}).select('-password').sort({ isOnline: -1, lastActive: -1 });
     res.json(users);
 };
 

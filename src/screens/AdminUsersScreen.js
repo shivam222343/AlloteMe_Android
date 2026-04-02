@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, TextInput, Alert, Animated } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI } from '../services/api';
-import { Search, ChevronRight, User as UserIcon, Users, ShieldCheck, Mail, Trash2 } from 'lucide-react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { Search, ChevronRight, User as UserIcon, Users, ShieldCheck, Mail, Trash2, Clock } from 'lucide-react-native';
 import GradientBorder from '../components/ui/GradientBorder';
 
 const AdminUsersScreen = ({ navigation }) => {
+    const { socket } = useAuth();
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [search, setSearch] = useState('');
@@ -15,6 +17,36 @@ const AdminUsersScreen = ({ navigation }) => {
     useEffect(() => {
         fetchUsers();
     }, []);
+
+    useEffect(() => {
+        if (socket) {
+            const handleStatusUpdate = (data) => {
+                console.log('[Socket] user_status update:', data);
+                setUsers(prevUsers => {
+                    const updated = prevUsers.map(u =>
+                        u._id === data.userId
+                            ? { ...u, isOnline: data.isOnline, lastActive: data.lastActive || u.lastActive }
+                            : u
+                    );
+                    // Re-sort: Online first, then by lastActive
+                    return updated.sort((a, b) => {
+                        if (a.isOnline === b.isOnline) {
+                            return new Date(b.lastActive || 0) - new Date(a.lastActive || 0);
+                        }
+                        return a.isOnline ? -1 : 1;
+                    });
+                });
+            };
+
+            socket.on('user_status', handleStatusUpdate);
+            return () => socket.off('user_status', handleStatusUpdate);
+        }
+    }, [socket]);
+
+    useEffect(() => {
+        // Sync filteredUsers when users changes
+        handleSearch(search);
+    }, [users]);
 
     const fetchUsers = async () => {
         try {
@@ -41,6 +73,19 @@ const AdminUsersScreen = ({ navigation }) => {
         }
     };
 
+    const formatLastActive = (date) => {
+        if (!date) return 'Never';
+        const now = new Date();
+        const active = new Date(date);
+        const diffMs = now - active;
+        const diffMin = Math.floor(diffMs / 60000);
+
+        if (diffMin < 1) return 'Just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;
+        return active.toLocaleDateString();
+    };
+
     const renderUserItem = ({ item }) => (
         <TouchableOpacity
             style={styles.userCard}
@@ -48,17 +93,24 @@ const AdminUsersScreen = ({ navigation }) => {
             activeOpacity={0.7}
         >
             <View style={styles.avatarContainer}>
-                <GradientBorder size={50} borderWidth={2}>
+                <GradientBorder size={54} borderWidth={item.isOnline ? 3 : 1} borderColor={item.isOnline ? Colors.success : Colors.divider}>
                     <Image
                         source={{ uri: item.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${item.displayName}&background=6366f1&color=fff&size=100` }}
                         style={styles.avatar}
                     />
                 </GradientBorder>
+                <View style={[styles.statusDot, { backgroundColor: item.isOnline ? Colors.success : '#F59E0B' }]} />
             </View>
             <View style={styles.userInfo}>
                 <View style={styles.nameRow}>
                     <Text style={styles.userName} numberOfLines={1}>{item.displayName}</Text>
-                    <Text style={styles.userTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                    <View style={styles.timeRow}>
+                        {item.isOnline ? (
+                            <Text style={styles.onlineText}>ONLINE</Text>
+                        ) : (
+                            <Text style={styles.userTime}>{formatLastActive(item.lastActive)}</Text>
+                        )}
+                    </View>
                 </View>
                 <View style={styles.detailRow}>
                     <View style={styles.roleBadge}>
@@ -156,12 +208,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
         padding: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9'
     },
-    avatarContainer: { marginRight: 12 },
+    avatarContainer: { marginRight: 12, position: 'relative' },
     avatar: { width: '100%', height: '100%' },
+    statusDot: {
+        position: 'absolute', bottom: 2, right: 2,
+        width: 14, height: 14, borderRadius: 7,
+        borderWidth: 2, borderColor: Colors.white,
+        backgroundColor: Colors.success,
+        ...Shadows.sm
+    },
     userInfo: { flex: 1, marginRight: 8 },
     nameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
     userName: { fontSize: 16, fontWeight: 'bold', color: Colors.text.primary, flex: 1 },
-    userTime: { fontSize: 11, color: Colors.text.tertiary },
+    timeRow: { alignItems: 'flex-end' },
+    userTime: { fontSize: 10, color: Colors.text.tertiary, fontWeight: '500' },
+    onlineText: { fontSize: 10, color: Colors.success, fontWeight: '900', letterSpacing: 0.5 },
     detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     roleBadge: {
         flexDirection: 'row', alignItems: 'center', gap: 4,

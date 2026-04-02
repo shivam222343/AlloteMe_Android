@@ -21,6 +21,8 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
     }, [userId]);
 
     const fetchUser = async () => {
+        setLoading(true);
+        setUser(null);
         try {
             const res = await authAPI.getUserById(userId);
             if (res.data) {
@@ -116,19 +118,28 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <View style={styles.avatarRow}>
-                        <GradientBorder size={80} borderWidth={3}>
+                        <GradientBorder size={80} borderWidth={user.isOnline ? 4 : 2} borderColor={user.isOnline ? Colors.success : Colors.divider}>
                             <Image
                                 source={{ uri: user.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user.displayName}&background=4f46e5&color=fff&size=256` }}
                                 style={styles.avatar}
                             />
+                            <View style={[styles.detailStatusDot, { backgroundColor: user.isOnline ? Colors.success : '#F59E0B' }]} />
                         </GradientBorder>
                         <View style={styles.nameHeader}>
                             <Text style={styles.userName}>{user.displayName}</Text>
-                            <View style={styles.roleBadgeMajor}>
-                                <ShieldCheck size={14} color={user.role === 'admin' ? Colors.primary : Colors.text.tertiary} />
-                                <Text style={[styles.roleTextMajor, user.role === 'admin' && styles.adminRoleTextMajor]}>
-                                    {user.role.toUpperCase()}
-                                </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                <View style={styles.roleBadgeMajor}>
+                                    <ShieldCheck size={14} color={user.role === 'admin' ? Colors.primary : Colors.text.tertiary} />
+                                    <Text style={[styles.roleTextMajor, user.role === 'admin' && styles.adminRoleTextMajor]}>
+                                        {user.role.toUpperCase()}
+                                    </Text>
+                                </View>
+                                <View style={[styles.statusTag, { backgroundColor: user.isOnline ? Colors.success + '15' : '#F59E0B15' }]}>
+                                    <View style={[styles.tagDot, { backgroundColor: user.isOnline ? Colors.success : '#F59E0B' }]} />
+                                    <Text style={[styles.tagText, { color: user.isOnline ? Colors.success : '#D97706' }]}>
+                                        {user.isOnline ? 'ONLINE' : 'OFFLINE'}
+                                    </Text>
+                                </View>
                             </View>
                         </View>
                     </View>
@@ -167,7 +178,8 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                         <InfoRow icon={Mail} label="Email Address" value={user.email} />
                         <InfoRow icon={Phone} label="Mobile Number" value={user.phoneNumber ? `+91 ${user.phoneNumber}` : null} />
                         <InfoRow icon={MapPin} label="Location" value={user.location} />
-                        <InfoRow icon={Calendar} label="Joined on" value={new Date(user.createdAt).toLocaleDateString()} />
+                        <InfoRow icon={Calendar} label="Last Active" value={user.isOnline ? 'Active now' : new Date(user.lastActive).toLocaleString()} />
+                        <InfoRow icon={Clock} label="Account Created" value={new Date(user.createdAt).toLocaleDateString()} />
                         <View style={styles.statusRow}>
                             <View style={[styles.statusBadge, user.isVerified ? styles.verifiedBadge : styles.unverifiedBadge]}>
                                 {user.isVerified ? <CheckCircle2 size={12} color={Colors.success} /> : <AlertCircle size={12} color={Colors.error} />}
@@ -444,7 +456,29 @@ const styles = StyleSheet.create({
     resultColl: { fontSize: 13, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 2 },
     resultSub: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     resultBranch: { fontSize: 11, color: Colors.text.secondary, fontWeight: '600' },
-    resultDets: { fontSize: 10, color: Colors.text.tertiary }
+    resultDets: { fontSize: 10, color: Colors.text.tertiary },
+    detailStatusDot: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 3,
+        borderColor: Colors.white,
+        backgroundColor: Colors.success,
+        ...Shadows.sm
+    },
+    statusTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20
+    },
+    tagDot: { width: 6, height: 6, borderRadius: 3 },
+    tagText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 }
 });
 
 export default AdminUserDetailScreen;
