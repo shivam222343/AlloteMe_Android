@@ -325,10 +325,21 @@ const predictColleges = async (req, res) => {
                     year,
                     branches,
                     regions,
+                    pTolerance,
+                    rTolerance,
                     institutionTypes,
                     seatTypes,
                     isFemale,
-                    timestamp: new Date()
+                    timestamp: new Date(),
+                    topResults: cleaned.slice(0, 10).map(r => ({
+                        collegeName: r.collegeId.name,
+                        branch: r.branch,
+                        percentile: r.percentile,
+                        rank: r.rank,
+                        category: r.category,
+                        round: r.round,
+                        year: r.year
+                    }))
                 }
             });
 

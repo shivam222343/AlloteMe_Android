@@ -205,6 +205,24 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                                 <Text style={styles.emptySmall}>No branches selected</Text>
                             )}
                         </View>
+
+                        <Text style={[styles.innerLabel, { marginTop: 12 }]}>Preferred Regions</Text>
+                        <View style={styles.prefGrid}>
+                            {user.preferences?.preferredRegions?.length > 0 ? (
+                                user.preferences.preferredRegions.map((r, i) => <PreferenceBadge key={i} text={r} color={Colors.success} />)
+                            ) : (
+                                <Text style={styles.emptySmall}>No regions selected</Text>
+                            )}
+                        </View>
+
+                        <Text style={[styles.innerLabel, { marginTop: 12 }]}>College Type Preferences</Text>
+                        <View style={styles.prefGrid}>
+                            {user.preferences?.collegeStatusPreference?.length > 0 ? (
+                                user.preferences.collegeStatusPreference.map((s, i) => <PreferenceBadge key={i} text={s} color={Colors.accent} />)
+                            ) : (
+                                <Text style={styles.emptySmall}>No status preferences</Text>
+                            )}
+                        </View>
                     </View>
                 </View>
 
@@ -267,6 +285,24 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                                 </View>
                             </View>
 
+                            <View style={[styles.academicGrid, { marginBottom: 12 }]}>
+                                <View style={styles.academicBox}>
+                                    <Text style={styles.academicLabel}>pTolerance</Text>
+                                    <Text style={styles.academicVal}>{user.lastPredictorPreferences.pTolerance || '5'}</Text>
+                                </View>
+                                <View style={styles.academicBox}>
+                                    <Text style={styles.academicLabel}>rTolerance</Text>
+                                    <Text style={styles.academicVal}>{user.lastPredictorPreferences.rTolerance || '500'}</Text>
+                                </View>
+                                <View style={styles.academicBox}>
+                                    <Text style={styles.academicLabel}>Female Seat</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: user.lastPredictorPreferences.isFemale ? Colors.error : Colors.divider }} />
+                                        <Text style={styles.academicVal}>{user.lastPredictorPreferences.isFemale ? 'YES' : 'NO'}</Text>
+                                    </View>
+                                </View>
+                            </View>
+
                             {user.lastPredictorPreferences.institutionTypes && (
                                 <>
                                     <Text style={styles.innerLabel}>Institution Filter</Text>
@@ -319,8 +355,25 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                                 </>
                             )}
 
+                            {user.lastPredictorPreferences.topResults && user.lastPredictorPreferences.topResults.length > 0 && (
+                                <>
+                                    <Text style={[styles.innerLabel, { color: Colors.primary, marginTop: 24, marginBottom: 12 }]}>Top Results from this Search</Text>
+                                    <View style={styles.resultsBox}>
+                                        {user.lastPredictorPreferences.topResults.map((r, i) => (
+                                            <View key={i} style={styles.resultRow}>
+                                                <Text style={styles.resultColl} numberOfLines={1}>{r.collegeName}</Text>
+                                                <View style={styles.resultSub}>
+                                                    <Text style={styles.resultBranch}>{r.branch}</Text>
+                                                    <Text style={styles.resultDets}>{r.category} | {r.percentile}%ile | R{r.round}</Text>
+                                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </>
+                            )}
+
                             <Text style={[styles.timeText, { marginTop: 16, textAlign: 'right', fontSize: 10 }]}>
-                                Preferences updated on latest search
+                                Predicted on: {user.lastPredictorPreferences.timestamp ? new Date(user.lastPredictorPreferences.timestamp).toLocaleString() : 'N/A'}
                             </Text>
                         </View>
                     </View>
@@ -384,7 +437,14 @@ const styles = StyleSheet.create({
     statText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },
     timeText: { fontSize: 11, color: Colors.text.tertiary },
     miniRefreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: Colors.primary + '10' },
-    miniRefreshText: { fontSize: 11, fontWeight: '700', color: Colors.primary }
+    miniRefreshText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+
+    resultsBox: { backgroundColor: '#F1F5F9', borderRadius: 12, overflow: 'hidden' },
+    resultRow: { borderBottomWidth: 1, borderBottomColor: Colors.white, padding: 10 },
+    resultColl: { fontSize: 13, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 2 },
+    resultSub: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    resultBranch: { fontSize: 11, color: Colors.text.secondary, fontWeight: '600' },
+    resultDets: { fontSize: 10, color: Colors.text.tertiary }
 });
 
 export default AdminUserDetailScreen;

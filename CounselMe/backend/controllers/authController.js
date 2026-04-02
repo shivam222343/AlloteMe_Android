@@ -487,6 +487,7 @@ module.exports = {
     changePassword,
     toggleSaveCollege,
     getAllUsers,
+    getUserById,
     updateUserRole,
     sendOTP,
     verifyOTP,
