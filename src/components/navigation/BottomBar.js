@@ -28,9 +28,8 @@ const BottomBar = ({ state, navigation }) => {
         { name: 'Counselors', icon: User, label: 'Experts' },
     ];
 
-    // On Android, avoid using insets (often 0 even with gesture nav)
-    // Use a safe fixed height — icons sit in the icon area, system nav bar is below the View
-    const safeBottom = Platform.OS === 'ios' ? insets.bottom : 0;
+    // On Android, ensuring icons sit further upward and don't merge with system nav bar
+    const safeBottom = Platform.OS === 'ios' ? insets.bottom : Math.max(insets.bottom, 15);
 
     return (
         <View style={[styles.wrapper, { paddingBottom: safeBottom }]}>
