@@ -6,7 +6,7 @@ import { authAPI } from '../services/api';
 import {
     User as UserIcon, Mail, Phone, Calendar,
     ShieldCheck, GraduationCap, MapPin, Search,
-    Activity, CheckCircle2, AlertCircle, Star, Trash2
+    Activity, CheckCircle2, AlertCircle, Star, Trash2, Clock
 } from 'lucide-react-native';
 import GradientBorder from '../components/ui/GradientBorder';
 

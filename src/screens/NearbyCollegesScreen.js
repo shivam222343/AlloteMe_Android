@@ -54,7 +54,7 @@ const CITY_COORDS = {
 };
 
 const NearbyCollegesScreen = ({ navigation }) => {
-    const { user } = useAuth();
+    const { user, admissionPath } = useAuth();
     const [location, setLocation] = useState(null);
     const [loading, setLoading] = useState(true);
     const [colleges, setColleges] = useState([]);
@@ -145,11 +145,11 @@ const NearbyCollegesScreen = ({ navigation }) => {
                 fetchCurrentLocation();
             }
         }
-    }, [user?.location]);
+    }, [user?.location, admissionPath]);
 
     const fetchNearbyColleges = async (coords) => {
         try {
-            const res = await institutionAPI.getAll();
+            const res = await institutionAPI.getAll(admissionPath);
             if (!res.data || res.data.length === 0) { setColleges([]); setLoading(false); return; }
             const allColleges = res.data.filter(c => c.location?.coordinates?.lat && c.location?.coordinates?.lng);
 
@@ -479,7 +479,11 @@ const NearbyCollegesScreen = ({ navigation }) => {
                         </View>
 
                         {filteredColleges.length === 0 ? (
-                            <View style={styles.emptyState}><Text style={styles.emptyText}>No results within {maxDistance}km.</Text></View>
+                            <View style={styles.emptyState}>
+                                <AlertCircle size={40} color="#CBD5E1" />
+                                <Text style={styles.emptyText}>No colleges found within {maxDistance}km.</Text>
+                                <Text style={styles.emptySubText}>Try increasing the radius or searching for a different city.</Text>
+                            </View>
                         ) : (
                             filteredColleges.map((item) => (
                                 <TouchableOpacity key={item._id} style={styles.collegeCard} onPress={() => navigation.navigate('CollegeDetail', { id: item._id })}>
@@ -595,8 +599,9 @@ const styles = StyleSheet.create({
     input: { backgroundColor: 'white', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
     setBtn: { backgroundColor: '#10b981', padding: 14, borderRadius: 12, alignItems: 'center' },
     setBtnText: { color: 'white', fontWeight: 'bold' },
-    emptyState: { alignItems: 'center', marginTop: 40 },
-    emptyText: { color: '#64748b' }
+    emptyState: { alignItems: 'center', marginTop: 40, paddingHorizontal: 30 },
+    emptyText: { color: Colors.text.primary, fontWeight: 'bold', fontSize: 16, marginTop: 12 },
+    emptySubText: { color: Colors.text.tertiary, textAlign: 'center', marginTop: 8, fontSize: 13 }
 });
 
 export default NearbyCollegesScreen;

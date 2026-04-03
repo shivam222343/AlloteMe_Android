@@ -3,6 +3,7 @@ const Institution = require('../models/Institution');
 const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
 const { client: redis } = require('../config/redis');
+const { triggerDailyNotifications } = require('../services/notificationService');
 
 const getRandomAvatar = (name) => {
     const seeds = ['Felix', 'Max', 'Luna', 'Jack', 'Daisy', 'Zoe', 'Milo', 'Coco', 'Oliver', 'Toby'];
@@ -158,6 +159,11 @@ const getUserProfile = async (req, res) => {
         const user = await User.findById(req.user._id);
 
         if (user) {
+            // Trigger Daily Notifications check (Max 2, 6h cooldown, only when online)
+            if (user.role === 'student' && !cachedData) {
+                triggerDailyNotifications(user).catch(e => console.error(e));
+            }
+
             const profileData = {
                 _id: user._id,
                 displayName: user.displayName,
@@ -199,8 +205,36 @@ const updateUserProfile = async (req, res) => {
             user.password = req.body.password;
         }
 
+        // Handle multiple scores
+        if (req.body.scores) {
+            if (!user.scores) user.scores = new Map();
+            Object.keys(req.body.scores).forEach(key => {
+                const scoreData = req.body.scores[key];
+                // Handle deletion if scoreData is null
+                if (scoreData === null) {
+                    user.scores.delete(key);
+                } else {
+                    user.scores.set(key, scoreData);
+
+                    // Synchronize primary fields if updating the currently selected examType
+                    if (key === (req.body.examType || user.examType)) {
+                        if (scoreData.percentile !== undefined) user.percentile = scoreData.percentile;
+                        if (scoreData.rank !== undefined) user.rank = scoreData.rank;
+                    }
+                }
+            });
+        }
+
         // Update new academic & key fields
-        if (req.body.examType) user.examType = req.body.examType;
+        if (req.body.examType) {
+            user.examType = req.body.examType;
+            // Sync primary fields from scores map if they exist for this new type
+            if (user.scores && user.scores.has(user.examType)) {
+                const s = user.scores.get(user.examType);
+                user.percentile = s.percentile;
+                user.rank = s.rank;
+            }
+        }
         if (req.body.percentile !== undefined) user.percentile = req.body.percentile;
         if (req.body.rank !== undefined) user.rank = req.body.rank;
         if (req.body.location !== undefined) user.location = req.body.location;
@@ -228,6 +262,7 @@ const updateUserProfile = async (req, res) => {
             email: updatedUser.email,
             role: updatedUser.role,
             examType: updatedUser.examType,
+            scores: updatedUser.scores,
             percentile: updatedUser.percentile,
             rank: updatedUser.rank,
             location: updatedUser.location,
@@ -389,8 +424,39 @@ const verifyOTP = async (req, res) => {
 // @access  Private/Admin
 const getDashboardStats = async (req, res) => {
     try {
+        const { category } = req.query;
+        let instFilter = {};
+
+        if (category) {
+            const upperCat = category.toUpperCase();
+            if (upperCat === 'ENGINEERING' || upperCat === 'MHTCET' || upperCat === 'MHTCET PCM') {
+                instFilter = {
+                    $or: [
+                        { category: /^Engineering$/i },
+                        { category: /^MHTCET$/i },
+                        { category: /^MHTCET PCM$/i },
+                        {
+                            $and: [
+                                { $or: [{ category: { $exists: false } }, { category: null }, { category: '' }] },
+                                { name: { $not: /Pharmacy|Pharma|Medical|Ayurvedic|B\.Pharm/i } }
+                            ]
+                        }
+                    ]
+                };
+            } else if (upperCat === 'PHARMACY' || upperCat === 'MHTCET PCB') {
+                instFilter = {
+                    $or: [
+                        { category: /Pharmacy/i },
+                        { category: /MHTCET PCB/i }
+                    ]
+                };
+            } else {
+                instFilter = { category: new RegExp(`^${category}$`, 'i') };
+            }
+        }
+
         const userCount = await User.countDocuments();
-        const institutionCount = await Institution.countDocuments();
+        const institutionCount = await Institution.countDocuments(instFilter);
 
         // Detailed Analytics for Graphs (Last 7 Days)
         const sevenDaysAgo = new Date();

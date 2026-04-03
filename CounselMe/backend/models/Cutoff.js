@@ -20,7 +20,8 @@ const cutoffSchema = new mongoose.Schema({
     },
     examType: {
         type: String,
-        enum: ['MHTCET', 'JEE', 'NEET'],
+        // Expanded to support all platform admission paths
+        enum: ['MHTCET PCM', 'MHTCET PCB', 'JEE', 'NEET', 'PHARMACY', 'BBA'],
         required: true
     },
     year: {

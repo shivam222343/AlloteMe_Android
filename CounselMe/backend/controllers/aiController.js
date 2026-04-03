@@ -86,21 +86,23 @@ const getAICounsel = async (req, res) => {
 
         if (searchRegex) {
             const isBranchSpecific = branchKeywordsFound.length > 0;
-            const resultLimit = isBranchSpecific ? 35 : 15; // More thorough for branch specific questions
+            const isBroadQuery = /cutoff|predict|chance|suggest|list|every|all/i.test(lowerMsg);
+            const resultLimit = (isBranchSpecific || isBroadQuery) ? 150 : 30; // Massive data pool for accurate counseling
 
             // Step A: Broad Search for Knowledge & Colleges
             const [knowledge, colleges] = await Promise.all([
                 Knowledge.find({
                     type: { $ne: 'frequent_question' },
                     $or: [{ question: searchRegex }, { content: searchRegex }]
-                }).limit(2).lean(),
+                }).limit(3).lean(),
                 Institution.find({
                     $or: [
                         { name: searchRegex },
                         { 'location.city': searchRegex },
-                        { 'location.region': searchRegex }
+                        { 'location.region': searchRegex },
+                        { branches: searchRegex }
                     ]
-                }).limit(5).select('name location type dteCode branches').lean()
+                }).limit(10).select('name location type dteCode branches').lean()
             ]);
 
             relevantKnowledge = knowledge;
@@ -110,31 +112,37 @@ const getAICounsel = async (req, res) => {
             const collegeIds = colleges.map(c => c._id);
             const cutoffTasks = [];
 
-            // 1. If colleges were found, get their cutoffs
-            if (collegeIds.length > 0) {
-                cutoffTasks.push(Cutoff.find({
-                    collegeId: { $in: collegeIds },
-                    examType: userProfile.examType,
-                    category: { $in: activeCategories }
-                }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(30).lean());
-            }
+            // 1. If colleges or branches were found, get a massive pool of cutoffs
+            if (collegeIds.length > 0 || isBranchSpecific || isPredictionQuery) {
+                // Task 1: Direct matches for found colleges
+                if (collegeIds.length > 0) {
+                    cutoffTasks.push(Cutoff.find({
+                        collegeId: { $in: collegeIds },
+                        examType: userProfile.examType,
+                        category: { $in: activeCategories }
+                    }).populate('collegeId', 'name location city').sort({ percentile: -1 }).limit(100).lean());
+                }
 
-            // 2. Prediction results within user's range
-            if (isPredictionQuery || isBranchSpecific) {
+                // Task 2: Prediction results within a wide percentile range to give accurate choices
                 const p = parseFloat(userProfile.percentile);
-                cutoffTasks.push(Cutoff.find({
-                    branch: searchRegex,
-                    category: { $in: activeCategories },
-                    examType: userProfile.examType,
-                    percentile: { $lte: p + 3, $gte: p - 10 }
-                }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(resultLimit).lean());
-            } else {
-                // Generic search
-                cutoffTasks.push(Cutoff.find({
-                    branch: searchRegex,
-                    category: { $in: activeCategories },
-                    examType: userProfile.examType
-                }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(10).lean());
+                if (!isNaN(p)) {
+                    cutoffTasks.push(Cutoff.find({
+                        $or: [
+                            { branch: searchRegex },
+                            { collegeId: { $in: collegeIds } }
+                        ],
+                        category: { $in: activeCategories },
+                        examType: userProfile.examType,
+                        percentile: { $lte: p + 5, $gte: p - 20 } // Wider range for more options
+                    }).populate('collegeId', 'name location city').sort({ percentile: -1 }).limit(resultLimit).lean());
+                } else {
+                    // Fallback for non-numeric percentile
+                    cutoffTasks.push(Cutoff.find({
+                        branch: searchRegex,
+                        category: { $in: activeCategories },
+                        examType: userProfile.examType
+                    }).populate('collegeId', 'name location city').sort({ percentile: -1 }).limit(50).lean());
+                }
             }
 
             const cutoffResults = await Promise.all(cutoffTasks);
@@ -143,11 +151,21 @@ const getAICounsel = async (req, res) => {
             const allCutoffs = [].concat(...cutoffResults);
             const seen = new Set();
             relevantCutoffs = allCutoffs.filter(c => {
-                const key = `${c.collegeId?._id}-${c.branch}-${c.percentile}`;
+                const key = `${c.collegeId?._id}-${c.branch}-${c.category}-${c.percentile}`;
                 if (seen.has(key)) return false;
                 seen.add(key);
                 return true;
             });
+
+            // If we still have too few, try a broader search on categories
+            if (relevantCutoffs.length < 5 && isPredictionQuery) {
+                const p = parseFloat(userProfile.percentile);
+                const broadCutoffs = await Cutoff.find({
+                    examType: userProfile.examType,
+                    percentile: { $lte: p + 1.5, $gte: p - 5 }
+                }).populate('collegeId', 'name location city').limit(50).lean();
+                relevantCutoffs = [...relevantCutoffs, ...broadCutoffs];
+            }
         }
 
         // 3. Format context for AI
@@ -155,7 +173,7 @@ const getAICounsel = async (req, res) => {
             user_profile: userProfile,
             found_colleges: relevantColleges.map(c => ({
                 name: c.name,
-                location: `${c.location?.city}, ${c.location?.region}`,
+                location: `${c.location?.city || c.location}`,
                 type: c.type,
                 dte_code: c.dteCode
             })),
@@ -165,30 +183,25 @@ const getAICounsel = async (req, res) => {
                 category: c.category,
                 cutoff_percentile: c.percentile,
                 cutoff_rank: c.rank,
-                location: c.collegeId?.location?.city
+                location: c.collegeId?.location?.city || c.collegeId?.city
             }))
         };
 
         const systemPrompt = `You are the "Eta powered by AlloteMe - AI Education Counselor".
         Expert context: You assist students in Maharashtra for MHTCET, JEE, and NEET admissions.
         
-        CRITICAL RULES:
-        1. USE REAL DATA: Only provide college names, cutoffs, and ranks that exist in the "Context from our Database" provided below.
-        2. NO HALLUCINATION: If the context is empty or doesn't match the user's question, do NOT invent numbers. Say "I don't have the exact cutoff data for that college in my database yet, but I can guide you based on general trends."
-        3. TAILOR TO STUDENT: The student matches these profile details:
-           - Percentile: ${userProfile.percentile}%ile
-           - Rank: ${userProfile.rank}
-           - Category: ${userProfile.category}
-           - Preferred Region: ${userProfile.expectedRegion || userProfile.location || 'Any'}
-        4. ANALYSIS: When suggesting colleges, compare their cutoff to the student's percentile.
-           - Safe: Cutoff is 2%+ lower than student.
-           - Fair: Cutoff is 0-2% lower.
-           - Reach: Cutoff is slightly higher.
+        CRITICAL DATA-DRIVEN RULES:
+        1. MASSIVE DATASET: You have been provided with a large list of up to 150 matching cutoff records. DO NOT ignore them. Analyze the the list to find the best matches for the student.
+        2. ACCURACY FIRST: When a user asks for cutoffs, lists, or predictions, ALWAYS generate a comprehensive TABLE using the "suggested_cutoffs" data.
+        3. REAL DATA ONLY: Only provide college names, cutoffs, and ranks that exist in the "Context from our Database" provided below.
+        4. CATEGORY HANDLING: Explicitly mention the Category (e.g., OBC, OPEN, TFWS) from the data to ensure the student knows which seat type is being discussed.
+        5. NO HALLUCINATION: If the context is empty or doesn't match the user's question, do NOT invent numbers. 
+        6. COMPARISON: Compare the student's percentile (${userProfile.percentile}) with the database cutoffs. 
+           - Label them: [HIGH CHANCE] (if cutoff < ${userProfile.percentile - 2}), [MODERATE] (if cutoff matches), or [REACH/AMBITIOUS] (if cutoff is slightly high).
         
         FORMATTING:
-        - Use **Bold** for emphasis.
-        - Use ## Headings.
-        - USE TABLES for any list of colleges/cutoffs: | Institute | Branch | Category | Cutoff | Chance |.
+        - Use ## Headings for different college tiers.
+        - ALWAYS USE TABLES for cutoff lists: | Institute | Branch | Category | Cutoff % | Your Chance |.
         
         Context from our Database: ${JSON.stringify(contextData)}
         Knowledge Base Info: ${JSON.stringify(relevantKnowledge.map(k => k.answer || k.content))}`;

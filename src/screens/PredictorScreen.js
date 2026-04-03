@@ -13,37 +13,35 @@ import * as Animatable from 'react-native-animatable';
 import Slider from '@react-native-community/slider';
 
 const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJ', 'NT1', 'NT2', 'NT3', 'SEBC', 'EWS', 'DEF', 'PWD', 'ORPHAN', 'TFWS'];
-const BRANCHES = [
-    'Bio Technology',
-    'Civil Engineering',
-    'Computer Science and Engineering',
-    'Computer Science and Business Systems',
-    'Computer Science and Engineering (Artificial Intelligence and Machine Learning)',
-    'Artificial Intelligence and Machine Learning',
-    'Artificial Intelligence (AI) and Data Science',
-    'Information Technology',
-    'Electrical Engineering',
-    'Electronics and Telecommunication Engineering',
-    'Electronics and Computer Engineering',
-    'Instrumentation and Control Engineering',
-    'Instrumentation Engineering',
-    'Mechanical Engineering',
-    'Manufacturing Science and Engineering',
-    'Metallurgy and Material Technology',
-    'Civil and Environmental Engineering',
-    'Food Technology',
-    'Petro Chemical Engineering',
-    'Oil and Paints Technology',
-    'Paper and Pulp Technology',
-    'Chemical Engineering',
-    'Textile Engineering',
-    'Production Engineering',
-    'Automobile Engineering',
-    'Aeronautical Engineering',
-    'Biomedical Engineering',
-    'Mining Engineering',
-    'Printing Technology'
-];
+const CATEGORICAL_BRANCHES = {
+    'MHTCET PCM': [
+        'Bio Technology', 'Civil Engineering', 'Computer Science and Engineering',
+        'Computer Science and Business Systems', 'Computer Science and Engineering (Artificial Intelligence and Machine Learning)',
+        'Artificial Intelligence and Machine Learning', 'Artificial Intelligence (AI) and Data Science',
+        'Information Technology', 'Electrical Engineering', 'Electronics and Telecommunication Engineering',
+        'Electronics and Computer Engineering', 'Instrumentation and Control Engineering', 'Instrumentation Engineering',
+        'Mechanical Engineering', 'Manufacturing Science and Engineering', 'Metallurgy and Material Technology',
+        'Civil and Environmental Engineering', 'Food Technology', 'Petro Chemical Engineering',
+        'Oil and Paints Technology', 'Paper and Pulp Technology', 'Chemical Engineering',
+        'Textile Engineering', 'Production Engineering', 'Automobile Engineering',
+        'Aeronautical Engineering', 'Biomedical Engineering', 'Mining Engineering', 'Printing Technology'
+    ],
+    'MHTCET PCB': [
+        'Pharmacy (B.Pharm)', 'Pharm.D (Doctor of Pharmacy)', 'B.Sc Biotechnology', 'B.Sc Microbiology',
+        'B.Sc Biochemistry', 'B.Sc Nursing', 'B.Sc Agriculture', 'B.Sc Horticulture',
+        'Physiotherapy (BPT)', 'Medical Lab Technology (MLT)', 'Allied Health Sciences'
+    ],
+    'BBA': [
+        'Business Administration', 'Marketing Management', 'Financial Management', 'Human Resource Management',
+        'International Business', 'Digital Marketing', 'Data Analytics for Business'
+    ],
+    'NEET': [
+        'MBBS', 'BDS', 'BAMS', 'BHMS', 'BUMS', 'BPTh', 'BOTh', 'BASLP', 'BP&O', 'B.Sc. Nursing'
+    ],
+    'JEE': [
+        'B.Tech', 'B.Arch', 'B.Planning'
+    ]
+};
 const REGIONS = [
     'Pune Region',
     'Mumbai Region',
@@ -83,7 +81,7 @@ const SEAT_TYPES = [
 const YEARS = [2025, 2024, 2023, 2022];
 
 const PredictorScreen = ({ navigation }) => {
-    const { user, socket } = useAuth();
+    const { user, socket, admissionPath } = useAuth();
     const [percentile, setPercentile] = useState(user?.percentile?.toString() || '');
     const [rank, setRank] = useState(user?.rank?.toString() || '');
     const [category, setCategory] = useState(user?.category || 'OPEN');
@@ -138,6 +136,10 @@ const PredictorScreen = ({ navigation }) => {
         }
     };
 
+    React.useEffect(() => {
+        setSelectedBranches([]);
+    }, [admissionPath]);
+
     const [loadingMessage, setLoadingMessage] = useState('Searching best options...');
     const loadingMessages = [
         'Searching best options...',
@@ -171,6 +173,7 @@ const PredictorScreen = ({ navigation }) => {
                 rank,
                 pTolerance,
                 rTolerance,
+                admissionPath,
                 examType: user?.examType || 'MHTCET',
                 category,
                 branches: selectedBranches.join(','),
@@ -334,7 +337,7 @@ const PredictorScreen = ({ navigation }) => {
 
                     {showAdvance && (
                         <View style={styles.advancePanel}>
-                            {renderMultiSelect(BRANCHES, selectedBranches, setSelectedBranches, GitBranch, "Preferred Branches")}
+                            {renderMultiSelect(CATEGORICAL_BRANCHES[admissionPath] || CATEGORICAL_BRANCHES['MHTCET'], selectedBranches, setSelectedBranches, GitBranch, "Preferred Branches")}
                             {renderMultiSelect(REGIONS, selectedRegions, setSelectedRegions, MapPin, "Target Regions")}
                             {renderMultiSelect(INSTITUTION_TYPES, selectedTypes, setSelectedTypes, ShieldCheck, "Institution Type & Autonomy")}
                             {renderMultiSelect(SEAT_TYPES, selectedSeatTypes, setSelectedSeatTypes, CheckCircle2, "Seat Type Preference")}

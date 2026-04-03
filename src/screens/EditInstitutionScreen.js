@@ -9,6 +9,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { institutionAPI, uploadAPI } from '../services/api';
 import { Colors, Shadows } from '../constants/theme';
+import { useAuth } from '../contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { X, Plus, Globe, MapPin, Bot, ShieldCheck, Award } from 'lucide-react-native';
 
@@ -18,6 +19,7 @@ const INST_TYPES = ['Government', 'Government Autonomous', 'Autonomous', 'Privat
 
 const EditInstitutionScreen = ({ route, navigation }) => {
     const { id } = route.params;
+    const { admissionPath } = useAuth();
     const [loading, setLoading] = useState(false);
     const [fetchLoading, setFetchLoading] = useState(true);
     const [formData, setFormData] = useState(null);
@@ -57,13 +59,19 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                     }
                 },
                 rating: { value: d.rating?.value?.toString() || '', platform: d.rating?.platform || 'NIRF' },
+                category: d.category || 'Engineering',
                 galleryImages: d.galleryImages || [],
                 facilities: d.facilities || [],
                 hostel: d.hostel || { available: false, boys: { available: false, fees: '', capacity: '' }, girls: { available: false, fees: '', capacity: '' }, notes: '' },
                 branches: d.branches || []
             });
         } catch (err) {
-            Alert.alert('Error', 'Failed to load institution data');
+            console.error('Load error:', err?.response?.status, id);
+            if (err?.response?.status === 404) {
+                Alert.alert('Not Found', 'This college no longer exists in our database.');
+            } else {
+                Alert.alert('Error', 'Failed to load institution data. Please try again.');
+            }
             navigation.goBack();
         } finally {
             setFetchLoading(false);
@@ -223,6 +231,7 @@ const EditInstitutionScreen = ({ route, navigation }) => {
 
             const payload = {
                 name: formData.name,
+                category: (formData.category === 'MHTCET' || formData.category === 'Engineering' || !formData.category) ? 'MHTCET' : formData.category,
                 university: formData.university || undefined,
                 dteCode: formData.dteCode || undefined,
                 type: formData.type,
@@ -328,6 +337,13 @@ const EditInstitutionScreen = ({ route, navigation }) => {
                 <Text style={styles.sectionTitle}>Basic Info</Text>
                 <Card style={styles.card}>
                     <Input label="Institution Name *" value={f.name} onChangeText={v => setF({ name: v })} placeholder="e.g. COEP Technological University" />
+                    <View style={styles.autoPathContainer}>
+                        <Text style={styles.autoPathLabel}>Admission Path:</Text>
+                        <View style={styles.autoPathChip}>
+                            <Text style={styles.autoPathText}>{(f.category === null || f.category === 'Engineering' || f.category === '') ? 'MHTCET' : f.category}</Text>
+                        </View>
+                    </View>
+
                     <View style={styles.row}>
                         <View style={{ flex: 1 }}>
                             <Input label="University" value={f.university} onChangeText={v => setF({ university: v })} placeholder="e.g. SPPU" />
@@ -547,7 +563,16 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 20, marginBottom: 10, color: Colors.primary, paddingHorizontal: 16 },
     card: { marginBottom: 12, marginHorizontal: 16, padding: 16 },
     row: { flexDirection: 'row', gap: 12 },
-    label: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary, marginBottom: 8, marginTop: 12 },
+    label: { fontSize: 11, fontWeight: '800', color: Colors.text.secondary, marginBottom: 10, marginTop: 15, textTransform: 'uppercase', letterSpacing: 0.8 },
+    autoPathContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 10, gap: 10, backgroundColor: '#F0F9FF', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BAE6FD' },
+    autoPathLabel: { fontSize: 12, fontWeight: 'bold', color: '#0369A1' },
+    autoPathChip: { backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
+    autoPathText: { color: Colors.white, fontSize: 12, fontWeight: 'bold' },
+    catScroll: { marginBottom: 20 },
+    catChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F1F5F9', marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+    catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    catChipText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },
+    catChipTextActive: { color: Colors.white },
     imageGallery: { flexDirection: 'row', gap: 12 },
     imageWrapper: { width: 80, height: 80, borderRadius: 12, overflow: 'hidden', marginRight: 12, position: 'relative', ...Shadows.sm },
     previewImage: { width: '100%', height: '100%' },

@@ -186,7 +186,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
         const branches = inst.branches || [];
         return (
             <View style={styles.tabContent}>
-                <Text style={styles.sectionTitle}>Engineering Branches & Cutoffs</Text>
+                <Text style={styles.sectionTitle}>{(inst.category || 'MHTCET')} Branches & Cutoffs</Text>
                 {branches.length === 0 ? (
                     <View style={styles.emptyCard}>
                         <Info size={40} color={Colors.text.tertiary} />

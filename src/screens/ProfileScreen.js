@@ -12,7 +12,7 @@ import { authAPI, uploadAPI } from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
-const ProfileScreen = ({ navigation }) => {
+const ProfileScreen = ({ navigation, route }) => {
     const { user, logout, refreshUser } = useAuth();
     const [uploading, setUploading] = useState(false);
     const [avatarLoading, setAvatarLoading] = useState(false);
@@ -23,6 +23,14 @@ const ProfileScreen = ({ navigation }) => {
     const [keyUpdating, setKeyUpdating] = useState(false);
     const [bannerPreview, setBannerPreview] = useState(null);
     const [profilePreview, setProfilePreview] = useState(null);
+
+    React.useEffect(() => {
+        if (route.params?.autoOpenEdit) {
+            const path = route.params?.admissionPath;
+            navigation.setParams({ autoOpenEdit: null, admissionPath: null }); // Clear it to avoid loop
+            navigation.navigate('CompleteProfile', { admissionPath: path });
+        }
+    }, [route.params]);
 
     const pickImage = async (type = 'profile') => {
         const result = await ImagePicker.launchImageLibraryAsync({

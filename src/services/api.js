@@ -31,7 +31,7 @@ export const authAPI = {
     getProfile: () => api.get('auth/profile'),
     updateProfile: (data) => api.put('auth/profile', data),
     toggleSave: (collegeId) => api.post('auth/toggle-save', { collegeId }),
-    getStats: () => api.get('auth/stats'),
+    getStats: (category) => api.get('auth/stats', { params: { category } }),
     getAllUsers: () => api.get('auth/users'),
     getUserById: (id) => api.get(`auth/users/${id}`),
     updateUserRole: (id, data) => api.put(`auth/users/${id}`, data),
@@ -51,8 +51,8 @@ export const counselorAPI = {
 };
 
 export const institutionAPI = {
-    getAll: () => api.get('institutions'),
-    getFeatured: () => api.get('institutions/featured'),
+    getAll: (category) => api.get('institutions', { params: { category } }),
+    getFeatured: (category) => api.get('institutions/featured', { params: { category } }),
     getById: (id) => api.get(`institutions/${id}`),
     add: (data) => api.post('institutions', data),
     create: (data) => api.post('institutions', data), // Alias for consistency

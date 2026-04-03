@@ -9,6 +9,11 @@ const institutionSchema = new mongoose.Schema({
         enum: ['Government', 'Government Autonomous', 'Autonomous', 'Private-Autonomous', 'Private', 'Deemed'],
         required: true
     },
+    category: {
+        type: String,
+        enum: ['Engineering', 'Pharmacy', 'BBA', 'NEET', 'JEE', 'MHTCET', 'MHTCET PCM', 'MHTCET PCB'],
+        default: 'Engineering'
+    },
     location: {
         region: String,
         address: String,

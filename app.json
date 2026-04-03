@@ -101,7 +101,8 @@
           "androidMode": "default",
           "androidCollapsedTitle": "#{unread_notifications} new notifications"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "notification": {
       "iosDisplayInForeground": true,

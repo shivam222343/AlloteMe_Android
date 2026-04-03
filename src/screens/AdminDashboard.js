@@ -10,7 +10,7 @@ import {
 } from 'lucide-react-native';
 
 const AdminDashboard = ({ navigation }) => {
-    const { user } = useAuth();
+    const { user, admissionPath, setAdmissionPath } = useAuth();
     const [stats, setStats] = useState([
         { label: 'Institutes', value: '-', icon: BarChart3, color: Colors.primary, key: 'institutions' },
         { label: 'Users', value: '-', icon: Users, color: '#8B5CF6', key: 'users' },
@@ -20,11 +20,12 @@ const AdminDashboard = ({ navigation }) => {
 
     useEffect(() => {
         fetchStats();
-    }, []);
+    }, [admissionPath]);
 
     const fetchStats = async () => {
+        setLoading(true);
         try {
-            const res = await authAPI.getStats();
+            const res = await authAPI.getStats(admissionPath);
             setStats(prev => prev.map(s => {
                 const val = s.key === 'activeSessions'
                     ? res.data.analytics?.activeSessions
@@ -146,6 +147,25 @@ const AdminDashboard = ({ navigation }) => {
                     <Text style={styles.nameText}>{user?.displayName}</Text>
                 </View>
 
+                {/* Path Selector for Admins */}
+                <View style={styles.pathSelectorContainer}>
+                    <Text style={styles.sectionTitle}>Current Platform Focus</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pathList}>
+                        {['MHTCET PCM', 'MHTCET PCB', 'BBA', 'NEET', 'JEE'].map((path) => (
+                            <TouchableOpacity
+                                key={path}
+                                style={[styles.pathChip, admissionPath === path && styles.activePathChip]}
+                                onPress={() => setAdmissionPath(path)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.pathText, admissionPath === path && styles.activePathText]}>
+                                    {path}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
                 <View style={styles.statsRow}>
                     {stats.map((s, i) => (
                         <View key={i} style={styles.statBox}>
@@ -183,6 +203,24 @@ const styles = StyleSheet.create({
     badgeText: { color: Colors.white, fontSize: 10, fontWeight: 'bold', letterSpacing: 0.5 },
     welcomeText: { fontSize: 14, color: Colors.text.tertiary },
     nameText: { fontSize: 28, fontWeight: 'bold', color: Colors.text.primary, marginTop: 4 },
+
+    pathSelectorContainer: { marginBottom: 32 },
+    pathList: { gap: 10, marginTop: 8 },
+    pathChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        backgroundColor: Colors.white,
+        borderWidth: 1.5,
+        borderColor: Colors.divider
+    },
+    activePathChip: {
+        backgroundColor: Colors.primary + '10',
+        borderColor: Colors.primary,
+    },
+    pathText: { fontSize: 13, fontWeight: '600', color: Colors.text.tertiary },
+    activePathText: { color: Colors.primary, fontWeight: 'bold' },
+
     statsRow: { flexDirection: 'row', gap: 16, marginBottom: 32 },
     statBox: {
         flex: 1, backgroundColor: Colors.white, padding: 20, borderRadius: 20,

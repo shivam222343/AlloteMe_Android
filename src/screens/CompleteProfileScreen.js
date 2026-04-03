@@ -9,18 +9,38 @@ import { useAuth } from '../contexts/AuthContext';
 import { authAPI, cutoffAPI } from '../services/api';
 import { MapPin, Target, Award, Hash, Bot } from 'lucide-react-native';
 
-const CompleteProfileScreen = ({ navigation }) => {
+import TouchableOpacity from 'react-native-gesture-handler/src/components/touchables/TouchableOpacity'; // Fallback if needed, but standard is fine
+import { TouchableOpacity as RNTouchable } from 'react-native';
+
+const EXAM_OPTIONS = ['MHTCET PCM', 'MHTCET PCB', 'BBA', 'NEET', 'JEE'];
+
+const CompleteProfileScreen = ({ navigation, route }) => {
     const { user, refreshUser, setHasSkippedProfile } = useAuth();
     const [loading, setLoading] = useState(false);
+
+    const initialExam = route.params?.admissionPath || user?.examType || 'MHTCET PCM';
+    const userScores = user?.scores || {};
+    const initialScore = userScores[initialExam] || {};
+
     const [formData, setFormData] = useState({
-        percentile: user?.percentile?.toString() || '',
-        rank: user?.rank?.toString() || '',
+        percentile: initialScore.percentile?.toString() || (initialExam === user?.examType ? user?.percentile?.toString() : '') || '',
+        rank: initialScore.rank?.toString() || (initialExam === user?.examType ? user?.rank?.toString() : '') || '',
         location: user?.location || '',
         expectedRegion: user?.expectedRegion || '',
-        examType: user?.examType || 'MHTCET',
+        examType: initialExam,
         groqApiKey: user?.groqApiKey || '',
         phoneNumber: user?.phoneNumber || ''
     });
+
+    const handleExamChange = (type) => {
+        const score = userScores[type] || {};
+        setFormData(prev => ({
+            ...prev,
+            examType: type,
+            percentile: score.percentile?.toString() || '',
+            rank: score.rank?.toString() || ''
+        }));
+    };
 
     // Auto-calculate Rank based on Percentile (similar to Predictor)
     const [rankLoading, setRankLoading] = useState(false);
@@ -53,6 +73,12 @@ const CompleteProfileScreen = ({ navigation }) => {
         try {
             const updateData = {
                 examType: formData.examType,
+                scores: {
+                    [formData.examType]: {
+                        percentile: parseFloat(formData.percentile) || 0,
+                        rank: parseInt(formData.rank) || 0
+                    }
+                },
                 percentile: formData.percentile,
                 rank: formData.rank,
                 location: formData.location,
@@ -98,8 +124,23 @@ const CompleteProfileScreen = ({ navigation }) => {
                         <View style={styles.iconCircle}>
                             <Award size={32} color={Colors.primary} />
                         </View>
-                        <Text style={styles.title}>Final Step!</Text>
-                        <Text style={styles.subtitle}>Help us personalize your college recommendations.</Text>
+                        <Text style={styles.title}>Update Your Scores</Text>
+                        <Text style={styles.subtitle}>Add or edit your results for different entrance exams.</Text>
+                    </View>
+
+                    {/* Exam Type Selector */}
+                    <View style={styles.examSelector}>
+                        {EXAM_OPTIONS.map(opt => (
+                            <RNTouchable
+                                key={opt}
+                                style={[styles.examPill, formData.examType === opt && styles.activeExamPill]}
+                                onPress={() => handleExamChange(opt)}
+                            >
+                                <Text style={[styles.examPillText, formData.examType === opt && styles.activeExamPillText]}>
+                                    {opt}
+                                </Text>
+                            </RNTouchable>
+                        ))}
                     </View>
 
                     <Card style={styles.formCard}>
@@ -196,7 +237,12 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: 14, color: Colors.text.tertiary, textAlign: 'center', marginTop: 8, paddingHorizontal: 20 },
     formCard: { padding: 16, marginBottom: 24, ...Shadows.sm },
     footerBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
-    disclaimer: { textAlign: 'center', marginTop: 24, color: Colors.text.tertiary, fontSize: 12, paddingHorizontal: 20, lineHeight: 18 }
+    disclaimer: { textAlign: 'center', marginTop: 24, color: Colors.text.tertiary, fontSize: 12, paddingHorizontal: 20, lineHeight: 18 },
+    examSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, marginBottom: 24, justifyContent: 'center' },
+    examPill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.divider },
+    activeExamPill: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    examPillText: { fontSize: 12, fontWeight: '600', color: Colors.text.secondary },
+    activeExamPillText: { color: Colors.white }
 });
 
 export default CompleteProfileScreen;

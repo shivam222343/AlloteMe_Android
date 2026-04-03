@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
 // ⚠️ Keep in sync with src/services/api.js — switch together
-const API_BASE_URL = RENDER_URL;
+const API_BASE_URL = LOCAL_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -18,6 +18,32 @@ export const AuthProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [showAvatarPopup, setShowAvatarPopupState] = useState(false);
+    const [admissionPath, setAdmissionPathState] = useState('MHTCET PCM');
+
+    useEffect(() => {
+        loadAdmissionPath();
+    }, []);
+
+    const loadAdmissionPath = async () => {
+        try {
+            const path = await AsyncStorage.getItem('admissionPath');
+            if (path) setAdmissionPathState(path);
+        } catch (e) {
+            console.error('Failed to load admission path', e);
+        }
+    };
+
+    const setAdmissionPath = async (path) => {
+        setAdmissionPathState(path);
+        try {
+            await AsyncStorage.setItem('admissionPath', path);
+            if (Platform.OS === 'web') {
+                window.location.reload();
+            }
+        } catch (e) {
+            console.error('Failed to save admission path', e);
+        }
+    };
 
     useEffect(() => {
         if (socket && user?._id) {
@@ -220,6 +246,8 @@ export const AuthProvider = ({ children }) => {
             notifications,
             unreadCount,
             setUnreadCount,
+            admissionPath,
+            setAdmissionPath,
             markLocalNotifAsRead,
             markAllLocalNotifsAsRead,
             deleteLocalNotif,

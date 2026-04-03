@@ -5,10 +5,12 @@ import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { institutionAPI, cutoffAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { Colors, Typography, Shadows } from '../constants/theme';
 import { ChevronRight, Search, Bot, Code, CheckCircle2, Building2, MapPin, LayoutGrid } from 'lucide-react-native';
 
 const UploadCutoffScreen = ({ navigation }) => {
+    const { admissionPath } = useAuth();
     const [step, setStep] = useState(1);
     const [institutions, setInstitutions] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -23,28 +25,48 @@ const UploadCutoffScreen = ({ navigation }) => {
     const [bulkParsedData, setBulkParsedData] = useState(null);
 
     const [metaData, setMetaData] = useState({
-        examType: 'MHTCET',
+        examType: (admissionPath || 'MHTCET').toUpperCase(),
         year: '2025',
         round: '1'
     });
 
     useEffect(() => {
         fetchInstitutions();
-    }, []);
+    }, [admissionPath]);
 
     const fetchInstitutions = async () => {
         try {
-            const res = await institutionAPI.getAll();
+            const res = await institutionAPI.getAll(admissionPath);
             setInstitutions(res.data);
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch institutions');
         }
     };
 
-    const filteredInstitutions = institutions.filter(inst =>
-    (inst.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inst.location?.city?.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredInstitutions = institutions.filter(inst => {
+        const matchesQuery = inst.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            inst.location?.city?.toLowerCase().includes(searchQuery.toLowerCase());
+
+        if (!matchesQuery) return false;
+
+        // Since backend already filters by admissionPath, we just need to ensure 
+        // the client-side filter is inclusive enough for searched results.
+        if (!admissionPath) return true;
+
+        const isPCM = admissionPath === 'MHTCET PCM' || admissionPath === 'MHTCET' || admissionPath === 'Engineering';
+        const isPCB = admissionPath === 'MHTCET PCB' || admissionPath === 'Pharmacy';
+
+        const instCat = inst.category || 'MHTCET'; // Default legacy to MHTCET
+
+        if (isPCM) {
+            return instCat === 'MHTCET PCM' || instCat === 'MHTCET' || instCat === 'Engineering';
+        }
+        if (isPCB) {
+            return instCat === 'MHTCET PCB' || instCat === 'Pharmacy';
+        }
+
+        return instCat === admissionPath;
+    });
 
     const handleAiParse = async () => {
         if (!rawText.trim()) return Alert.alert('Empty', 'Paste some text first');

@@ -43,13 +43,14 @@ const VerificationModal = ({ visible, user, onVerified, onClose }) => {
         <Modal
             visible={visible}
             transparent={true}
-            animationType="fade"
+            animationType="slide"
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
                     style={styles.keyboardView}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
                 >
                     <View style={styles.modalContent}>
                         <View style={styles.handle} />

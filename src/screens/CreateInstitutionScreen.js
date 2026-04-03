@@ -6,10 +6,12 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { institutionAPI, uploadAPI } from '../services/api';
 import { Colors, Typography, Spacing, Shadows, BorderRadius } from '../constants/theme';
+import { useAuth } from '../contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, X, Plus, Image as ImageIcon, Globe, MapPin, Hash, ShieldCheck, Award, Bot } from 'lucide-react-native';
 
 const CreateInstitutionScreen = ({ navigation }) => {
+    const { admissionPath } = useAuth();
     const [loading, setLoading] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
     const [rawText, setRawText] = useState('');
@@ -17,6 +19,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
 
     const [formData, setFormData] = useState({
         name: '',
+        category: admissionPath || 'MHTCET',
         university: '',
         dteCode: '',
         type: 'Autonomous',
@@ -190,6 +193,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
 
             const payload = {
                 name: formData.name,
+                category: (formData.category === 'MHTCET' || formData.category === 'Engineering' || !formData.category) ? 'MHTCET' : formData.category,
                 university: formData.university || undefined,
                 dteCode: formData.dteCode || undefined,
                 type: formData.type,
@@ -266,6 +270,14 @@ const CreateInstitutionScreen = ({ navigation }) => {
                         placeholder="e.g. COEP Technological University"
                         leftIcon={ImageIcon}
                     />
+
+                    <View style={styles.autoPathContainer}>
+                        <Text style={styles.autoPathLabel}>Admission Path:</Text>
+                        <View style={styles.autoPathChip}>
+                            <Text style={styles.autoPathText}>{formData.category}</Text>
+                        </View>
+                    </View>
+
                     <View style={styles.row}>
                         <View style={{ flex: 1 }}>
                             <Input
@@ -646,7 +658,16 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 24, marginBottom: 12, color: Colors.primary, paddingHorizontal: 16 },
     card: { marginBottom: 16, marginHorizontal: 16, padding: 16 },
     row: { flexDirection: 'row', gap: 12 },
-    label: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary, marginBottom: 8, marginTop: 12 },
+    label: { fontSize: 11, fontWeight: '800', color: Colors.text.secondary, marginBottom: 10, marginTop: 15, textTransform: 'uppercase', letterSpacing: 0.8 },
+    autoPathContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 10, gap: 10, backgroundColor: '#F0F9FF', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BAE6FD' },
+    autoPathLabel: { fontSize: 12, fontWeight: 'bold', color: '#0369A1' },
+    autoPathChip: { backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
+    autoPathText: { color: Colors.white, fontSize: 12, fontWeight: 'bold' },
+    catScroll: { marginBottom: 20 },
+    catChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F1F5F9', marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+    catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    catChipText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },
+    catChipTextActive: { color: Colors.white },
     imageGallery: { flexDirection: 'row', gap: 12, marginTop: 8 },
     imageWrapper: { width: 80, height: 80, borderRadius: 12, overflow: 'hidden', marginRight: 12, position: 'relative', ...Shadows.sm },
     previewImage: { width: '100%', height: '100%' },

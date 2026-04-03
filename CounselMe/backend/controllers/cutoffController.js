@@ -159,12 +159,25 @@ const predictColleges = async (req, res) => {
     const data = req.method === 'POST' ? req.body : req.query;
 
     let {
-        percentile, rank, pTolerance = 5, rTolerance = 500,
+        percentile, rank, pTolerance = 5, rTolerance = 500, admissionPath = 'Engineering',
         examType, category = 'OPEN', round, year, branches, regions, institutionTypes, seatTypes, isFemale
     } = data;
 
     try {
-        const query = { examType: examType || 'MHTCET' };
+        let query = {};
+        const isEngineering = examType === 'MHTCET' || examType === 'Engineering' || examType === 'MHTCET PCM' ||
+            (!examType && (admissionPath === 'MHTCET' || admissionPath === 'Engineering' || admissionPath === 'MHTCET PCM'));
+
+        const isPharmacy = examType === 'PHARMACY' || examType === 'MHTCET PCB' ||
+            (!examType && (admissionPath === 'PHARMACY' || admissionPath === 'MHTCET PCB'));
+
+        if (isEngineering) {
+            query.examType = { $in: ['MHTCET', 'Engineering', 'MHTCET PCM'] };
+        } else if (isPharmacy) {
+            query.examType = { $in: ['PHARMACY', 'MHTCET PCB'] };
+        } else {
+            query.examType = examType || 'MHTCET';
+        }
 
         // 1. CATEGORY FILTER (Strict logic to exclude specialized quotas unless selected)
         const filterClauses = [];
@@ -213,8 +226,36 @@ const predictColleges = async (req, res) => {
         }
 
         // 4. INSTITUTIONS / REGIONS FILTER
-        const instQuery = {};
-        let needsInstFilter = false;
+        const instFilterClauses = [];
+
+        // Path Filter
+        const pathUpper = admissionPath ? admissionPath.toUpperCase() : '';
+        if (pathUpper === 'ENGINEERING' || pathUpper === 'MHTCET' || pathUpper === 'MHTCET PCM') {
+            instFilterClauses.push({
+                $or: [
+                    { category: /^Engineering$/i },
+                    { category: /^MHTCET$/i },
+                    { category: /^MHTCET PCM$/i },
+                    {
+                        $and: [
+                            { $or: [{ category: { $exists: false } }, { category: null }, { category: '' }] },
+                            { name: { $not: /Pharmacy|Pharma|Medical|Ayurvedic|B\.Pharm/i } }
+                        ]
+                    }
+                ]
+            });
+        } else if (pathUpper === 'PHARMACY' || pathUpper === 'MHTCET PCB') {
+            instFilterClauses.push({
+                $or: [
+                    { category: /Pharmacy/i },
+                    { category: /MHTCET PCB/i }
+                ]
+            });
+        } else {
+            instFilterClauses.push({ category: new RegExp(`^${admissionPath}$`, 'i') });
+        }
+
+        // Regions Filter
         if (regions && regions.length > 0) {
             const regionArray = Array.isArray(regions) ? regions : regions.split(',');
             const citiesToInclude = [];
@@ -223,33 +264,30 @@ const predictColleges = async (req, res) => {
                 if (REGION_CITY_MAP[trimmed]) {
                     citiesToInclude.push(...REGION_CITY_MAP[trimmed]);
                 }
-
-                // Add the tag itself
                 citiesToInclude.push(trimmed);
-
-                // If tag is something like "Pune Region", also add "Pune" as a potential city match
                 if (trimmed.toLowerCase().endsWith(' region')) {
                     citiesToInclude.push(trimmed.replace(/ region$/i, '').trim());
                 }
             });
             const uniqueCities = [...new Set(citiesToInclude)].filter(c => c.length > 1);
 
-            instQuery.$or = [
-                { 'location.region': { $in: uniqueCities.map(c => new RegExp(`^${c}$|${c}`, 'i')) } },
-                { 'location.city': { $in: uniqueCities.map(c => new RegExp(`^${c}$|${c}`, 'i')) } },
-                { name: { $in: uniqueCities.map(c => new RegExp(c, 'i')) } }
-            ];
-            needsInstFilter = true;
+            instFilterClauses.push({
+                $or: [
+                    { 'location.region': { $in: uniqueCities.map(c => new RegExp(`^${c}$|${c}`, 'i')) } },
+                    { 'location.city': { $in: uniqueCities.map(c => new RegExp(`^${c}$|${c}`, 'i')) } },
+                    { name: { $in: uniqueCities.map(c => new RegExp(c, 'i')) } }
+                ]
+            });
         }
 
+        // Institution Type Filter
         if (institutionTypes && institutionTypes.length > 0) {
             const typeArray = Array.isArray(institutionTypes) ? institutionTypes : institutionTypes.split(',');
-            instQuery.type = { $in: typeArray.map(t => new RegExp(t, 'i')) };
-            needsInstFilter = true;
+            instFilterClauses.push({ type: { $in: typeArray.map(t => new RegExp(t, 'i')) } });
         }
 
-        if (needsInstFilter) {
-            const matchingInsts = await Institution.find(instQuery).select('_id');
+        if (instFilterClauses.length > 0) {
+            const matchingInsts = await Institution.find({ $and: instFilterClauses }).select('_id');
             query.collegeId = { $in: matchingInsts.map(i => i._id) };
         }
 

@@ -129,7 +129,15 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     <meta charset="utf-8">
                     <title>AlloteMe Prediction Report</title>
                     <style>
-                        body { font-family: 'Helvetica', Arial, sans-serif; padding: 30px; color: #1e293b; background: #fff; }
+                        body { font-family: 'Helvetica', Arial, sans-serif; padding: 30px; color: #1e293b; background: #fff; line-height: 1.5; }
+                        @media print {
+                            body, html { height: auto !important; overflow: visible !important; }
+                            .container { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
+                            table { page-break-inside: auto; }
+                            tr { page-break-inside: avoid; page-break-after: auto; }
+                            thead { display: table-header-group; }
+                            tfoot { display: table-footer-group; }
+                        }
                         .container { max-width: 900px; margin: auto; }
                         .header { border-bottom: 3px solid #0A66C2; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
                         .brand h1 { color: #0A66C2; margin: 0; font-size: 28px; letter-spacing: -0.5px; }
@@ -137,9 +145,9 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                         .report-meta { text-align: right; }
                         .meta-tag { display: inline-block; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-size: 12px; margin-left: 8px; font-weight: 600; color: #475569; }
                         
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
                         th { background-color: #0A66C2; text-align: left; padding: 12px; font-size: 11px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
-                        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 11px; line-height: 1.4; }
+                        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 11px; line-height: 1.4; color: #334155; }
                         tr:nth-child(even) { background-color: #f8fafc; }
                         
                         .dte { color: #0A66C2; font-weight: 700; font-size: 12px; }
@@ -205,7 +213,81 @@ const PredictionResultsScreen = ({ route, navigation }) => {
             `;
 
             if (Platform.OS === 'web') {
-                await Print.printAsync({ html });
+                // CDN Injection to bypass bundler size/resolution issues (Fixes 500 Error)
+                const loadJS = (src) => new Promise((resolve, reject) => {
+                    const id = 'script-' + src.split('/').pop().replace(/\./g, '-');
+                    if (document.getElementById(id)) return resolve();
+                    const s = document.createElement('script');
+                    s.id = id;
+                    s.src = src;
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                });
+
+                try {
+                    await loadJS('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+                    await loadJS('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+                } catch (e) {
+                    Alert.alert('Download Error', 'Could not load PDF libraries. Please check your internet connection.');
+                    setExportingPDF(false);
+                    return;
+                }
+
+                // jsPDF and autoTable are now on the window object
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // Add Header Background
+                doc.setFillColor(10, 102, 194); // #0A66C2
+                doc.rect(0, 0, 210, 40, 'F');
+
+                // Add Title
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(22);
+                doc.text("AlloteMe Prediction Report", 15, 20);
+                doc.setFontSize(10);
+                doc.text("Personalized College Allotment Strategy", 15, 28);
+
+                // Add Meta Info
+                doc.setFontSize(9);
+                doc.text(`${examType} | ${category} | ${percentile}%ile`, 140, 20);
+                doc.text(`Generated: ${new Date().toLocaleDateString()}`, 140, 28);
+
+                // Add Table
+                const tableData = processedResults.map((item, index) => [
+                    index + 1,
+                    item.collegeId?.dteCode || '—',
+                    item.collegeId?.name || 'Unknown Institution',
+                    item.branch,
+                    `${Number(item.percentile).toFixed(2)}%`,
+                    item.rank || '—',
+                    item.chanceLabel
+                ]);
+
+                // Use the autoTable plugin
+                doc.autoTable({
+                    startY: 45,
+                    head: [['#', 'DTE', 'Institution', 'Course / Branch', 'Cutoff %', 'Rank', 'Chance']],
+                    body: tableData,
+                    headStyles: { fillColor: [10, 102, 194], fontSize: 9, fontStyle: 'bold' },
+                    bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    columnStyles: {
+                        0: { cellWidth: 10 },
+                        1: { cellWidth: 15 },
+                        2: { cellWidth: 'auto' },
+                        6: { fontStyle: 'bold' }
+                    },
+                    didDrawPage: (data) => {
+                        // Footer on every page
+                        doc.setFontSize(8);
+                        doc.setTextColor(148, 163, 184);
+                        doc.text(`Page ${data.pageNumber} | www.alloteme.in | Support: 8010961216`, 15, doc.internal.pageSize.height - 10);
+                    }
+                });
+
+                doc.save(`AlloteMe_Prediction_${new Date().getTime()}.pdf`);
             } else {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
@@ -395,9 +477,10 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     containerStyle={{ flex: 1 }}
                     activationDistance={10}
                     ListEmptyComponent={
-                        <View style={styles.center}>
-                            <Info size={40} color="#cbd5e1" />
-                            <Text style={styles.emptyText}>No results match your filters.</Text>
+                        <View style={styles.centerEmpty}>
+                            <Search size={48} color="#cbd5e1" />
+                            <Text style={styles.emptyTitle}>No Matching Colleges</Text>
+                            <Text style={styles.emptyText}>Try reducing your percentile tolerance or changing the category filter.</Text>
                         </View>
                     }
                 />
@@ -454,8 +537,9 @@ const styles = StyleSheet.create({
     statVal: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary },
     safeText: { color: "#10b981" },
     riskText: { color: "#ef4444" },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 300 },
-    emptyText: { marginTop: 10, color: Colors.text.tertiary }
+    centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 300, paddingHorizontal: 40 },
+    emptyTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text.secondary, marginTop: 16 },
+    emptyText: { marginTop: 8, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 }
 });
 
 export default PredictionResultsScreen;

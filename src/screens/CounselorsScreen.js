@@ -121,7 +121,9 @@ const CounselorsScreen = ({ navigation }) => {
                         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                         ListEmptyComponent={
                             <View style={styles.empty}>
-                                <Text style={styles.emptyText}>No counselors found matching your search.</Text>
+                                <MessageSquare size={48} color="#cbd5e1" />
+                                <Text style={styles.emptyTitle}>No Experts Found</Text>
+                                <Text style={styles.emptyText}>Try searching for a different specialty or location.</Text>
                             </View>
                         }
                     />
@@ -173,8 +175,9 @@ const styles = StyleSheet.create({
     tagText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
     btnRow: { flexDirection: 'row', gap: 10 },
     iconBtn: { padding: 8, backgroundColor: '#f1f5f9', borderRadius: 10 },
-    empty: { marginTop: 60, alignItems: 'center' },
-    emptyText: { color: '#94a3b8' }
+    empty: { marginTop: 80, alignItems: 'center', paddingHorizontal: 40 },
+    emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginTop: 16 },
+    emptyText: { color: '#94a3b8', textAlign: 'center', marginTop: 8 }
 });
 
 export default CounselorsScreen;

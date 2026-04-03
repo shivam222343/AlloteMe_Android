@@ -1,10 +1,23 @@
+const Notification = require('../models/Notification');
 const { getIO } = require('../utils/socket');
 
 const sendNotification = async (userId, title, message, type = 'info') => {
     try {
         const io = getIO();
+
+        // Save to Database if specific user
+        let savedNotification = null;
+        if (userId !== 'all') {
+            savedNotification = await Notification.create({
+                user: userId,
+                title,
+                message,
+                type
+            });
+        }
+
         const notificationData = {
-            _id: Date.now().toString(), // Mock ID for local storage
+            _id: savedNotification?._id || Date.now().toString(),
             title,
             message,
             type,
@@ -13,14 +26,10 @@ const sendNotification = async (userId, title, message, type = 'info') => {
         };
 
         if (userId === 'all') {
-            // Global Notification - Emission Only
             io.emit('notification:received', { ...notificationData, isGlobal: true });
-            console.log(`[Notification] Global broadcast emitted: ${title}`);
             return { success: true };
         } else {
-            // Target User Notification - Emission Only
-            io.to(userId).emit('notification:received', notificationData);
-            console.log(`[Notification] Emitted to ${userId}: ${title}`);
+            io.to(userId.toString()).emit('notification:received', notificationData);
             return { success: true, notification: notificationData };
         }
     } catch (error) {
@@ -48,7 +57,60 @@ const GREETINGS = {
 };
 
 const sendRandomGreeting = async () => {
-    // Convert to IST (UTC + 5:30)
+    const { timeSlot } = getTimeContext();
+    if (!timeSlot) return;
+
+    const messages = GREETINGS[timeSlot];
+    const item = messages[Math.floor(Math.random() * messages.length)];
+    await sendNotification('all', item.title, item.message, item.type);
+};
+
+const triggerDailyNotifications = async (user) => {
+    try {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // Ensure stats exist
+        if (!user.notificationStats) {
+            user.notificationStats = { notificationsToday: 0, lastStatusUpdate: todayStr };
+        }
+
+        // Reset if new day
+        if (user.notificationStats.lastStatusUpdate !== todayStr) {
+            user.notificationStats.notificationsToday = 0;
+            user.notificationStats.lastStatusUpdate = todayStr;
+            user.notificationStats.lastNotificationAt = null;
+        }
+
+        // Must be < 2 notifications today
+        if (user.notificationStats.notificationsToday >= 2) return;
+
+        // Cool-down check: Wait at least 6 hours between notifications
+        const lastSent = user.notificationStats.lastNotificationAt;
+        if (lastSent && (new Date() - new Date(lastSent)) < (6 * 60 * 60 * 1000)) {
+            return;
+        }
+
+        const { timeSlot } = getTimeContext();
+        if (!timeSlot) return;
+
+        const messages = GREETINGS[timeSlot];
+        const item = messages[Math.floor(Math.random() * messages.length)];
+
+        await sendNotification(user._id, item.title, item.message, item.type);
+
+        // Update User
+        user.notificationStats.notificationsToday += 1;
+        user.notificationStats.lastNotificationAt = new Date();
+        await user.save();
+
+        console.log(`[Notification] Auto-trigger success for ${user.email} (${user.notificationStats.notificationsToday}/2)`);
+    } catch (e) {
+        console.error('Auto Notification Error:', e);
+    }
+};
+
+const getTimeContext = () => {
+    // Current IST time
     const now = new Date();
     const utcOffset = now.getTimezoneOffset(); // in minutes
     const istOffset = 330;
@@ -60,13 +122,7 @@ const sendRandomGreeting = async () => {
     else if (hour >= 12 && hour < 17) timeSlot = 'afternoon';
     else if (hour >= 17 && hour < 22) timeSlot = 'evening';
 
-    if (!timeSlot) return;
-
-    const messages = GREETINGS[timeSlot];
-    const item = messages[Math.floor(Math.random() * messages.length)];
-
-    // Broadcast to all active users
-    await sendNotification('all', item.title, item.message, item.type);
+    return { timeSlot, hour };
 };
 
-module.exports = { sendNotification, sendRandomGreeting };
+module.exports = { sendNotification, sendRandomGreeting, triggerDailyNotifications };

@@ -3,20 +3,23 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import MainLayout from '../components/layouts/MainLayout';
 import { institutionAPI } from '../services/api';
 import { Colors, Shadows } from '../constants/theme';
-import { Star, MapPin, Building2, ChevronRight } from 'lucide-react-native';
+import { Star, MapPin, Building2, ChevronRight, Info } from 'lucide-react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 const FeaturedCollegesScreen = () => {
+    const { admissionPath } = useAuth();
     const [colleges, setColleges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [toggling, setToggling] = useState(null);
 
     useEffect(() => {
         fetchColleges();
-    }, []);
+    }, [admissionPath]);
 
     const fetchColleges = async () => {
+        setLoading(true); // Ensure loading shows when switching paths
         try {
-            const res = await institutionAPI.getAll();
+            const res = await institutionAPI.getAll(admissionPath);
             setColleges(res.data);
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch colleges');
@@ -85,6 +88,12 @@ const FeaturedCollegesScreen = () => {
                             <Text style={styles.headerText}>Star the colleges you want to feature in the student dashboard slider.</Text>
                         </View>
                     )}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <Info size={40} color="#CBD5E1" />
+                            <Text style={styles.emptyText}>No colleges found for {admissionPath}.</Text>
+                        </View>
+                    }
                 />
             )}
         </MainLayout>
@@ -113,6 +122,8 @@ const styles = StyleSheet.create({
     locText: { fontSize: 11, color: Colors.text.tertiary },
     dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: Colors.divider },
     ratingText: { fontSize: 12, fontWeight: 'bold', color: '#F59E0B', marginTop: 4 },
+    empty: { padding: 80, alignItems: 'center' },
+    emptyText: { color: Colors.text.tertiary, marginTop: 12, fontWeight: '500' },
     starBtn: {
         width: 44,
         height: 44,

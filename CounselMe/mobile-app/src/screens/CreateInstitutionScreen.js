@@ -16,6 +16,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
         name: '',
         university: '',
+        category: 'Engineering',
         type: 'Government',
         feesPerYear: '',
         description: '',
@@ -99,6 +100,19 @@ const CreateInstitutionScreen = ({ navigation }) => {
                         placeholder="Brief about the institute"
                         multiline
                     />
+
+                    <Text style={[styles.label, { marginTop: 12 }]}>Category</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                        {['Engineering', 'Pharmacy', 'BBA', 'NEET', 'JEE', 'MHTCET'].map(cat => (
+                            <TouchableOpacity
+                                key={cat}
+                                style={[styles.catChip, formData.category === cat && styles.catChipActive]}
+                                onPress={() => setFormData({ ...formData, category: cat })}
+                            >
+                                <Text style={[styles.catChipText, formData.category === cat && styles.catChipTextActive]}>{cat}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </Card>
 
                 <Text style={styles.sectionTitle}>Location</Text>
@@ -157,6 +171,11 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 16, fontWeight: Typography.fontWeight.bold, marginTop: 24, marginBottom: 12 },
     card: { marginBottom: 16 },
     saveBtn: { marginTop: 24 },
+    label: { fontSize: 14, color: Colors.text.secondary, marginBottom: 8, fontWeight: '500' },
+    catChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: '#F1F5F9', marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+    catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    catChipText: { fontSize: 12, fontWeight: '600', color: Colors.text.secondary },
+    catChipTextActive: { color: Colors.white },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
     modalContent: { backgroundColor: Colors.white, borderRadius: 20, padding: 20 },
     modalTitle: { fontSize: 20, fontWeight: Typography.fontWeight.bold, marginBottom: 8 },

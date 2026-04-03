@@ -9,7 +9,7 @@ import { Colors, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Search, LayoutGrid, Cpu, MapPin,
-    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings, Bot
+    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings, Bot, Info, Pencil, Target
 } from 'lucide-react-native';
 import { institutionAPI } from '../services/api';
 import VerificationBanner from '../components/ui/VerificationBanner';
@@ -28,12 +28,15 @@ const StudentDashboard = ({ navigation }) => {
         }, [])
     );
 
-    const { user, hasSkippedProfile, socket, refreshUser } = useAuth();
+    const { user, hasSkippedProfile, socket, refreshUser, admissionPath, setAdmissionPath } = useAuth();
     const [featuredColleges, setFeaturedColleges] = useState([]);
     const [loadingFeatured, setLoadingFeatured] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const flatListRef = React.useRef(null);
+    const pathScrollRef = React.useRef(null);
+
+    const ADMISSION_PATHS = ['MHTCET PCM', 'MHTCET PCB', 'BBA', 'NEET', 'JEE'];
 
     useEffect(() => {
         if (socket) {
@@ -47,13 +50,13 @@ const StudentDashboard = ({ navigation }) => {
                 socket.off('institution:deleted', handleRefresh);
             };
         }
-    }, [socket]);
+    }, [socket, admissionPath]);
 
     useEffect(() => {
-        if (user && !user.isVerified) {
+        if (user && !user.isVerified && !user.phoneNumber) {
             setShowVerificationModal(true);
         }
-    }, [user?.isVerified]);
+    }, [user?.isVerified, user?.phoneNumber]);
 
     useEffect(() => {
         if (user?.role === 'student' && !user?.preferences?.isProfileComplete && !hasSkippedProfile) {
@@ -64,8 +67,20 @@ const StudentDashboard = ({ navigation }) => {
     useFocusEffect(
         useCallback(() => {
             fetchFeatured();
-        }, [])
+        }, [admissionPath])
     );
+
+    useEffect(() => {
+        const index = ADMISSION_PATHS.indexOf(admissionPath);
+        if (index !== -1 && pathScrollRef.current) {
+            // Magnetic slide to the selected tag
+            const chipWidth = 100; // Average chip width with margin
+            pathScrollRef.current.scrollTo({
+                x: Math.max(0, (index * chipWidth) - (Dimensions.get('window').width / 2) + (chipWidth / 2)),
+                animated: true
+            });
+        }
+    }, [admissionPath]);
 
     useEffect(() => {
         if (featuredColleges.length > 0) {
@@ -79,15 +94,17 @@ const StudentDashboard = ({ navigation }) => {
                     index: nextIndex,
                     animated: true
                 });
-            }, 3500);
+            }, 4500); // Increased to 4.5s for readability
             return () => clearInterval(timer);
         }
     }, [currentIndex, featuredColleges]);
 
     const fetchFeatured = async () => {
+        setLoadingFeatured(true);
         try {
-            const res = await institutionAPI.getFeatured();
+            const res = await institutionAPI.getFeatured(admissionPath);
             setFeaturedColleges(res.data);
+            setCurrentIndex(0); // Reset index on path change
         } catch (error) {
             console.error('Featured fetch error:', error);
         } finally {
@@ -103,16 +120,50 @@ const StudentDashboard = ({ navigation }) => {
         }
     };
 
+    const getPathScore = () => {
+        // Check new multi-score map first
+        if (user?.scores && user.scores[admissionPath]) {
+            const s = user.scores[admissionPath];
+            return s.percentile ? `${s.percentile}%` : 'Not Set';
+        }
+
+        const matchesPath = (user?.examType === admissionPath) ||
+            (admissionPath === 'MHTCET PCM' && (user?.examType === 'MHTCET' || user?.examType === 'Engineering')) ||
+            (admissionPath === 'MHTCET PCB' && (user?.examType === 'Pharmacy'));
+
+        if (matchesPath) {
+            return user?.percentile ? `${user.percentile}%` : 'Not Set';
+        }
+        return 'Not Set';
+    };
+
+    const getPathRank = () => {
+        // Check new multi-score map first
+        if (user?.scores && user.scores[admissionPath]) {
+            const s = user.scores[admissionPath];
+            return s.rank || 'Not Set';
+        }
+
+        const matchesPath = (user?.examType === admissionPath) ||
+            (admissionPath === 'MHTCET PCM' && (user?.examType === 'MHTCET' || user?.examType === 'Engineering')) ||
+            (admissionPath === 'MHTCET PCB' && (user?.examType === 'Pharmacy'));
+
+        if (matchesPath) {
+            return user?.rank || 'Not Set';
+        }
+        return 'Not Set';
+    };
+
     const stats = [
-        { label: 'Percentile', value: user?.percentile ? `${user.percentile}%` : '0.0%', icon: TrendingUp, color: Colors.primary },
-        { label: 'Rank', value: user?.rank || 'N/A', icon: GraduationCap, color: '#10B981' },
-        { label: 'Saved', value: user?.savedColleges?.length || 0, icon: Bookmark, color: '#F59E0B' },
+        { label: `${admissionPath} Percentile`, value: getPathScore(), icon: TrendingUp, color: Colors.primary, isEditable: getPathScore() === 'Not Set' },
+        { label: `${admissionPath} Rank`, value: getPathRank(), icon: GraduationCap, color: '#10B981', isEditable: getPathRank() === 'Not Set' },
+        { label: 'Saved', value: user?.savedColleges?.length || 0, icon: Bookmark, color: '#F59E0B', route: 'BrowseColleges' },
         { label: 'Settings', value: 'Manage', icon: Settings, color: '#8B5CF6', route: 'Settings' },
     ];
 
     const menuItems = [
         { label: 'Browse Colleges', icon: Search, sub: 'Explore 500+ institutes', route: 'BrowseColleges' },
-        { label: 'College Predictor', icon: LayoutGrid, sub: 'Check your chances', route: 'Predictor', highlight: true },
+        { label: 'College Predictor', icon: Target, sub: 'Check your chances', route: 'Predictor', highlight: true },
         { label: 'Eta AI Counselor', icon: Bot, sub: '24/7 AI Guidance', route: 'AICounselor' },
         { label: 'Nearby Colleges', icon: MapPin, sub: 'Find local institutes', route: 'NearbyColleges' },
         { label: 'Connect Counselor', icon: MessageSquare, sub: 'Chat with experts', route: 'Counselors' },
@@ -156,17 +207,27 @@ const StudentDashboard = ({ navigation }) => {
         const Icon = item.icon;
         return (
             <TouchableOpacity
-                style={styles.statCard}
-                onPress={() => item.route && navigation.navigate(item.route)}
-                disabled={!item.route}
+                style={[styles.statCard, item.isEditable && styles.statCardEditable]}
+                onPress={() => {
+                    if (item.isEditable) {
+                        navigation.navigate('Profile', { autoOpenEdit: true, admissionPath });
+                    } else if (item.route) {
+                        navigation.navigate(item.route);
+                    }
+                }}
             >
                 <View style={[styles.statIcon, { backgroundColor: item.color + '15' }]}>
                     <Icon size={20} color={item.color} />
                 </View>
-                <View>
-                    <Text style={styles.statVal}>{item.value}</Text>
-                    <Text style={styles.statLab}>{item.label}</Text>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.statVal} numberOfLines={1}>{item.value}</Text>
+                    <Text style={styles.statLab} numberOfLines={1}>{item.label}</Text>
                 </View>
+                {item.isEditable && (
+                    <View style={styles.editBadge}>
+                        <Pencil size={8} color={Colors.white} />
+                    </View>
+                )}
             </TouchableOpacity>
         );
     };
@@ -192,15 +253,43 @@ const StudentDashboard = ({ navigation }) => {
     return (
         <MainLayout title="Dashboard" hideBack>
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                <View style={[styles.welcomeSection, { marginBottom: 16 }]}>
+                <View style={[styles.welcomeSection, { marginBottom: 12 }]}>
                     <Text style={styles.welcomeText}>Welcome back,</Text>
                     <Text style={styles.nameText}>{user?.displayName} 👋</Text>
                 </View>
 
-                {featuredColleges.length > 0 && (
+                {/* Admission Path Selector */}
+                <View style={styles.pathSelectorContainer}>
+                    <ScrollView
+                        ref={pathScrollRef}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.pathList}
+                        decelerationRate="fast"
+                    >
+                        {ADMISSION_PATHS.map((path) => (
+                            <TouchableOpacity
+                                key={path}
+                                style={[styles.pathChip, admissionPath === path && styles.activePathChip]}
+                                onPress={() => setAdmissionPath(path)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.pathText, admissionPath === path && styles.activePathText]}>
+                                    {path}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                {loadingFeatured ? (
+                    <View style={[styles.featuredSection, { height: 180, justifyContent: 'center' }]}>
+                        <ActivityIndicator size="small" color={Colors.primary} />
+                    </View>
+                ) : featuredColleges.length > 0 ? (
                     <View style={styles.featuredSection}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Top Trending Colleges</Text>
+                            <Text style={styles.sectionTitle}>{admissionPath} Trends</Text>
                             <View style={styles.dotContainer}>
                                 {featuredColleges.map((_, i) => (
                                     <View
@@ -232,6 +321,11 @@ const StudentDashboard = ({ navigation }) => {
                                 index,
                             })}
                         />
+                    </View>
+                ) : (
+                    <View style={styles.emptyFeatured}>
+                        <Info size={24} color={Colors.text.tertiary} />
+                        <Text style={styles.emptyFeaturedText}>No featured {admissionPath} colleges at the moment.</Text>
                     </View>
                 )}
 
@@ -284,6 +378,23 @@ const styles = StyleSheet.create({
     welcomeSection: { marginBottom: 20, marginTop: 8 },
     welcomeText: { fontSize: 16, color: Colors.text.tertiary },
     nameText: { fontSize: 24, fontWeight: 'bold', color: Colors.text.primary, marginTop: 4 },
+
+    pathSelectorContainer: { marginBottom: 24, marginTop: 8 },
+    pathList: { paddingHorizontal: 16, gap: 10 },
+    pathChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0'
+    },
+    activePathChip: {
+        backgroundColor: Colors.primary + '15',
+        borderColor: Colors.primary,
+    },
+    pathText: { fontSize: 13, fontWeight: '600', color: Colors.text.tertiary },
+    activePathText: { color: Colors.primary },
 
     // Featured Slider
     featuredSection: { marginBottom: 32 },
@@ -383,6 +494,42 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         letterSpacing: 0.5,
     },
+    emptyFeatured: {
+        height: 180,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 24,
+        marginHorizontal: 16,
+        marginBottom: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderStyle: 'dashed'
+    },
+    emptyFeaturedText: {
+        marginTop: 10,
+        fontSize: 13,
+        color: Colors.text.tertiary,
+        fontWeight: '500'
+    },
+    statCardEditable: {
+        borderColor: Colors.primary,
+        borderStyle: 'dashed',
+        backgroundColor: Colors.primary + '05'
+    },
+    editBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: Colors.primary,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: Colors.white
+    }
 });
 
 export default StudentDashboard;

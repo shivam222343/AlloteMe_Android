@@ -36,10 +36,19 @@ const userSchema = new mongoose.Schema({
     // Student specific info
     examType: {
         type: String,
-        enum: ['MHTCET', 'JEE', 'NEET']
+        enum: ['MHTCET PCM', 'MHTCET PCB', 'BBA', 'NEET', 'JEE', 'MHTCET', 'Engineering', 'Pharmacy']
     },
-    percentile: Number,
-    rank: Number,
+    // Multi-exam score tracking
+    scores: {
+        type: Map,
+        of: {
+            percentile: Number,
+            rank: Number
+        },
+        default: {}
+    },
+    percentile: Number, // Primary/default score (legacy support)
+    rank: Number,       // Primary/default rank (legacy support)
     location: String,
     expectedRegion: String,
     bannerUrl: String,
@@ -77,10 +86,14 @@ const userSchema = new mongoose.Schema({
     lastActive: {
         type: Date,
         default: Date.now
+    },
+    notificationStats: {
+        lastNotificationAt: { type: Date, default: null },
+        notificationsToday: { type: Number, default: 0 },
+        lastStatusUpdate: { type: String, default: "" } // YYYY-MM-DD
     }
 }, {
-    timestamps: true,
-    bufferCommands: false
+    timestamps: true
 });
 
 userSchema.pre('save', async function () {

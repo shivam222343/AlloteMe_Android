@@ -15,6 +15,18 @@ const createInstitution = async (req, res) => {
         // Invalidate lists cache
         await redis.del('institutions_all');
         await redis.del('institutions_featured');
+        const categories = ['ENGINEERING', 'PHARMACY', 'BBA', 'NEET', 'JEE', 'MHTCET', 'MHTCET PCM', 'MHTCET PCB'];
+        for (const cat of categories) {
+            let normalized = cat.toUpperCase().replace(' ', '_');
+            // Apply same normalization as fetch logic
+            if (normalized === 'ENGINEERING' || normalized === 'MHTCET_PCM') {
+                normalized = 'MHTCET';
+            } else if (normalized === 'PHARMACY' || normalized === 'MHTCET_PCB') {
+                normalized = 'MHTCET_PCB';
+            }
+            await redis.del(`institutions_all_${normalized}`);
+            await redis.del(`institutions_featured_${normalized}`);
+        }
 
         emitUpdate('institution:created', createdInstitution);
         res.status(201).json(createdInstitution);
@@ -95,14 +107,55 @@ Only include facilities from the provided list. Extract as much as possible from
 // @access  Public
 const getInstitutions = async (req, res) => {
     try {
-        const cachedData = await redis.get('institutions_all');
+        const { category } = req.query;
+        let filter = {};
+
+        if (category) {
+            const upperCat = category.toUpperCase();
+            if (upperCat === 'ENGINEERING' || upperCat === 'MHTCET' || upperCat === 'MHTCET PCM') {
+                // Return Engineering OR institutions without a category (legacy/default), 
+                // but EXCLUDE those whose names suggest they are Pharmacy/Medical.
+                filter = {
+                    $or: [
+                        { category: /Engineering/i },
+                        { category: /MHTCET/i },
+                        { category: /PCM/i },
+                        {
+                            $and: [
+                                { $or: [{ category: { $exists: false } }, { category: null }, { category: '' }] },
+                                { name: { $not: /Pharmacy|Pharma|Medical|Ayurvedic|B\.Pharm/i } }
+                            ]
+                        }
+                    ]
+                };
+            } else if (upperCat === 'PHARMACY' || upperCat === 'MHTCET PCB') {
+                filter = {
+                    $or: [
+                        { category: /Pharmacy/i },
+                        { category: /PCB/i }
+                    ]
+                };
+            } else {
+                filter = { category: new RegExp(`^${category}$`, 'i') };
+            }
+        }
+
+        let normalizedCategory = category ? category.toUpperCase().trim() : null;
+        if (normalizedCategory === 'ENGINEERING' || normalizedCategory === 'MHTCET' || normalizedCategory === 'MHTCET PCM') {
+            normalizedCategory = 'MHTCET'; // Map all Engineering/PCM variants to the standard 'MHTCET' cache key
+        } else if (normalizedCategory === 'PHARMACY' || normalizedCategory === 'MHTCET PCB') {
+            normalizedCategory = 'MHTCET_PCB';
+        }
+        const cacheKey = normalizedCategory ? `institutions_all_${normalizedCategory}` : 'institutions_all';
+
+        const cachedData = await redis.get(cacheKey);
         if (cachedData) {
-            console.log('[Redis] Hit: institutions_all');
+            console.log(`[Redis] Hit: ${cacheKey}`);
             return res.json(JSON.parse(cachedData));
         }
 
-        const institutions = await Institution.find({});
-        await redis.set('institutions_all', JSON.stringify(institutions), { EX: 86400 }); // Cache for 24 hours
+        const institutions = await Institution.find(filter);
+        await redis.set(cacheKey, JSON.stringify(institutions), { EX: 86400 });
         res.json(institutions);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -166,6 +219,19 @@ const updateInstitution = async (req, res) => {
         await redis.del(`institution_${req.params.id}`);
         await redis.del('institutions_all');
         await redis.del('institutions_featured');
+        // Clear category specific caches too
+        const categories = ['ENGINEERING', 'PHARMACY', 'BBA', 'NEET', 'JEE', 'MHTCET', 'MHTCET PCM', 'MHTCET PCB'];
+        for (const cat of categories) {
+            let normalized = cat.toUpperCase().replace(' ', '_');
+            // Apply same normalization as fetch logic
+            if (normalized === 'ENGINEERING' || normalized === 'MHTCET_PCM') {
+                normalized = 'MHTCET';
+            } else if (normalized === 'PHARMACY' || normalized === 'MHTCET_PCB') {
+                normalized = 'MHTCET_PCB';
+            }
+            await redis.del(`institutions_all_${normalized}`);
+            await redis.del(`institutions_featured_${normalized}`);
+        }
 
         emitUpdate('institution:updated', institution);
         res.json(institution);
@@ -189,6 +255,18 @@ const deleteInstitution = async (req, res) => {
         await redis.del(`institution_${req.params.id}`);
         await redis.del('institutions_all');
         await redis.del('institutions_featured');
+        const categories = ['ENGINEERING', 'PHARMACY', 'BBA', 'NEET', 'JEE', 'MHTCET', 'MHTCET PCM', 'MHTCET PCB'];
+        for (const cat of categories) {
+            let normalized = cat.toUpperCase().replace(' ', '_');
+            // Apply same normalization as fetch logic
+            if (normalized === 'ENGINEERING' || normalized === 'MHTCET_PCM') {
+                normalized = 'MHTCET';
+            } else if (normalized === 'PHARMACY' || normalized === 'MHTCET_PCB') {
+                normalized = 'MHTCET_PCB';
+            }
+            await redis.del(`institutions_all_${normalized}`);
+            await redis.del(`institutions_featured_${normalized}`);
+        }
 
         emitUpdate('institution:deleted', institution._id);
         res.json({ message: 'Institution and associated cutoffs removed' });
@@ -238,6 +316,18 @@ const toggleFeatureInstitution = async (req, res) => {
         await redis.del(`institution_${req.params.id}`);
         await redis.del('institutions_all');
         await redis.del('institutions_featured');
+        const categories = ['ENGINEERING', 'PHARMACY', 'BBA', 'NEET', 'JEE', 'MHTCET', 'MHTCET PCM', 'MHTCET PCB'];
+        for (const cat of categories) {
+            let normalized = cat.toUpperCase().replace(' ', '_');
+            // Apply same normalization as fetch logic
+            if (normalized === 'ENGINEERING' || normalized === 'MHTCET_PCM') {
+                normalized = 'MHTCET';
+            } else if (normalized === 'PHARMACY' || normalized === 'MHTCET_PCB') {
+                normalized = 'MHTCET_PCB';
+            }
+            await redis.del(`institutions_all_${normalized}`);
+            await redis.del(`institutions_featured_${normalized}`);
+        }
 
         emitUpdate('institution:updated', institution);
         res.json(institution);
@@ -251,19 +341,57 @@ const toggleFeatureInstitution = async (req, res) => {
 // @access  Public
 const getFeaturedInstitutions = async (req, res) => {
     try {
-        // Temporarily bypassing cache for debugging featured list
-        /*
-        const cachedData = await redis.get('institutions_featured');
+        const { category } = req.query;
+        let filter = { isFeatured: true };
+
+        if (category) {
+            const upperCat = category.toUpperCase();
+            if (upperCat === 'ENGINEERING' || upperCat === 'MHTCET' || upperCat === 'MHTCET PCM') {
+                filter = {
+                    isFeatured: true,
+                    $or: [
+                        { category: /^Engineering$/i },
+                        { category: /^MHTCET$/i },
+                        { category: /^MHTCET PCM$/i },
+                        {
+                            $and: [
+                                { $or: [{ category: { $exists: false } }, { category: null }, { category: '' }] },
+                                { name: { $not: /Pharmacy|Pharma|Medical|Ayurvedic|B\.Pharm/i } }
+                            ]
+                        }
+                    ]
+                };
+            } else if (upperCat === 'PHARMACY' || upperCat === 'MHTCET PCB') {
+                filter = {
+                    isFeatured: true,
+                    $or: [
+                        { category: /Pharmacy/i },
+                        { category: /MHTCET PCB/i }
+                    ]
+                };
+            } else {
+                filter.category = new RegExp(`^${category}$`, 'i');
+            }
+        }
+
+        let normalizedCategory = category ? category.toUpperCase() : null;
+        if (normalizedCategory === 'ENGINEERING' || normalizedCategory === 'MHTCET' || normalizedCategory === 'MHTCET PCM') {
+            normalizedCategory = 'MHTCET';
+        } else if (normalizedCategory === 'PHARMACY' || normalizedCategory === 'MHTCET PCB') {
+            normalizedCategory = 'MHTCET_PCB';
+        }
+        const cacheKey = normalizedCategory ? `institutions_featured_${normalizedCategory}` : 'institutions_featured';
+
+        // Bypass cache during transition to categories
+        const cachedData = await redis.get(cacheKey);
         if (cachedData) {
-            console.log('[Redis] Hit: institutions_featured');
             return res.json(JSON.parse(cachedData));
         }
-        */
 
-        const institutions = await Institution.find({ isFeatured: true })
+        const institutions = await Institution.find(filter)
             .sort({ 'rating.value': -1 });
 
-        // await redis.set('institutions_featured', JSON.stringify(institutions), { EX: 86400 });
+        await redis.set(cacheKey, JSON.stringify(institutions), { EX: 86400 });
         res.json(institutions);
     } catch (error) {
         res.status(500).json({ message: error.message });
