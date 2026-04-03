@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from './api';
+import { GENERAL_MESSAGES, NOTIFICATION_TIMES, getRandomMessage } from '../constants/notificationMessages';
 
 // Configure how notifications should be handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -19,29 +20,25 @@ Notifications.setNotificationHandler({
  */
 export const registerForPushNotifications = async () => {
     try {
-        // Check if device is physical (push notifications don't work on simulators)
+        // Only on actual devices for real push tokens
         if (!Device.isDevice) {
-            console.log('⚠️ Push notifications only work on physical devices');
+            console.log('⚠️ Push notifications skipped: Simulator/Web detected');
             return null;
         }
 
-        // Check existing permissions
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
 
-        // Request permissions if not granted
         if (existingStatus !== 'granted') {
             const { status } = await Notifications.requestPermissionsAsync();
             finalStatus = status;
         }
 
-        // If permission denied, return null
         if (finalStatus !== 'granted') {
             console.log('❌ Push notification permission denied');
             return null;
         }
 
-        // Get FCM token
         const tokenData = await Notifications.getExpoPushTokenAsync({
             projectId: Constants.expoConfig?.extra?.eas?.projectId,
         });
@@ -49,10 +46,9 @@ export const registerForPushNotifications = async () => {
         const token = tokenData.data;
         console.log('✅ FCM Token obtained:', token);
 
-        // Configure notification channel for Android
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
-                name: 'Default',
+                name: 'CounselMe Notifications',
                 importance: Notifications.AndroidImportance.MAX,
                 vibrationPattern: [0, 250, 250, 250],
                 lightColor: '#0A66C2',
@@ -70,7 +66,6 @@ export const registerForPushNotifications = async () => {
 /**
  * Save FCM token to backend
  * @param {string} token - FCM token
- * @returns {Promise<boolean>} Success status
  */
 export const saveFCMTokenToBackend = async (token) => {
     try {
@@ -85,7 +80,6 @@ export const saveFCMTokenToBackend = async (token) => {
 
 /**
  * Remove FCM token from backend (on logout)
- * @returns {Promise<boolean>} Success status
  */
 export const removeFCMTokenFromBackend = async () => {
     try {
@@ -100,36 +94,24 @@ export const removeFCMTokenFromBackend = async () => {
 
 /**
  * Setup notification listeners
- * @param {Function} onNotificationReceived - Callback when notification is received
- * @param {Function} onNotificationTapped - Callback when notification is tapped
- * @returns {Object} Subscription objects to clean up later
+ * @returns {Object} Subscription objects
  */
 export const setupNotificationListeners = (onNotificationReceived, onNotificationTapped) => {
-    // Listener for notifications received while app is in foreground
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
         console.log('📬 Notification received:', notification);
-        if (onNotificationReceived) {
-            onNotificationReceived(notification);
-        }
+        if (onNotificationReceived) onNotificationReceived(notification);
     });
 
-    // Listener for when user taps on notification
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
         console.log('👆 Notification tapped:', response);
-        if (onNotificationTapped) {
-            onNotificationTapped(response);
-        }
+        if (onNotificationTapped) onNotificationTapped(response);
     });
 
-    return {
-        notificationListener,
-        responseListener,
-    };
+    return { notificationListener, responseListener };
 };
 
 /**
  * Clean up notification listeners
- * @param {Object} subscriptions - Subscription objects from setupNotificationListeners
  */
 export const cleanupNotificationListeners = (subscriptions) => {
     if (subscriptions.notificationListener) {
@@ -141,8 +123,7 @@ export const cleanupNotificationListeners = (subscriptions) => {
 };
 
 /**
- * Schedule a local notification (for testing or offline scenarios)
- * @param {Object} notification - Notification content
+ * Schedule a local notification
  */
 export const scheduleLocalNotification = async (notification) => {
     try {
@@ -153,7 +134,7 @@ export const scheduleLocalNotification = async (notification) => {
                 data: notification.data || {},
                 sound: 'default',
             },
-            trigger: null, // Show immediately
+            trigger: null,
         });
         console.log('✅ Local notification scheduled');
     } catch (error) {
@@ -162,66 +143,77 @@ export const scheduleLocalNotification = async (notification) => {
 };
 
 /**
- * Get notification badge count
- * @returns {Promise<number>} Badge count
+ * Schedule twice daily random reminders
+ * Works offline as it only schedules local notifications
  */
-export const getBadgeCount = async () => {
+export const scheduleDailyRandomReminders = async () => {
     try {
-        const count = await Notifications.getBadgeCountAsync();
-        return count;
+        // 1. Cancel all previous scheduled local notifications to avoid overlap/duplication
+        await Notifications.cancelAllScheduledNotificationsAsync();
+
+        // 2. Pick 2 random time slots from the list (morning and evening ranges if possible)
+        const sortedTimes = [...NOTIFICATION_TIMES].sort((a, b) => a - b);
+        const morningSlots = sortedTimes.filter(t => t < 14);
+        const eveningSlots = sortedTimes.filter(t => t >= 14);
+
+        const t1 = morningSlots[Math.floor(Math.random() * morningSlots.length)] || 10;
+        const t2 = eveningSlots[Math.floor(Math.random() * eveningSlots.length)] || 18;
+
+        // 3. Pick 2 random messages
+        const msg1 = getRandomMessage(GENERAL_MESSAGES);
+        let msg2 = getRandomMessage(GENERAL_MESSAGES);
+        while (msg1.title === msg2.title) msg2 = getRandomMessage(GENERAL_MESSAGES); // Avoid dups
+
+        // 4. Schedule Slot 1 (Daily)
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: msg1.title,
+                body: msg1.body,
+                sound: 'default',
+                data: { type: 'reminder' }
+            },
+            trigger: {
+                hour: t1,
+                minute: 0,
+                repeats: true,
+            },
+        });
+
+        // 5. Schedule Slot 2 (Daily)
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: msg2.title,
+                body: msg2.body,
+                sound: 'default',
+                data: { type: 'reminder' }
+            },
+            trigger: {
+                hour: t2,
+                minute: 30, // Offset a bit for variety
+                repeats: true,
+            },
+        });
+
+        console.log(`✅ Daily reminders scheduled for: ${t1}:00 and ${t2}:30`);
     } catch (error) {
-        console.error('❌ Error getting badge count:', error);
-        return 0;
+        console.error('❌ Error scheduling daily reminders:', error);
     }
 };
 
 /**
- * Set notification badge count
- * @param {number} count - Badge count
- */
-export const setBadgeCount = async (count) => {
-    try {
-        await Notifications.setBadgeCountAsync(count);
-        console.log(`✅ Badge count set to ${count}`);
-    } catch (error) {
-        console.error('❌ Error setting badge count:', error);
-    }
-};
-
-/**
- * Clear all notifications
- */
-export const clearAllNotifications = async () => {
-    try {
-        await Notifications.dismissAllNotificationsAsync();
-        await setBadgeCount(0);
-        console.log('✅ All notifications cleared');
-    } catch (error) {
-        console.error('❌ Error clearing notifications:', error);
-    }
-};
-
-/**
- * Register for push notifications and save token to backend (wrapper for AuthContext)
- * @param {string} userId - User ID (for logging purposes)
- * @returns {Promise<string|null>} FCM token or null if registration failed
+ * Wrapper for AuthContext initialization
  */
 export const registerForPushNotificationsAsync = async (userId) => {
     try {
-        console.log(`📱 Registering push notifications for user: ${userId}`);
+        // Also setup local random notifications whenever this is triggered (offline + online support)
+        await scheduleDailyRandomReminders();
 
-        // Get FCM token
         const token = await registerForPushNotifications();
-
         if (token) {
-            // Save to backend
             await saveFCMTokenToBackend(token);
-            console.log('✅ Push notifications fully registered and saved');
             return token;
-        } else {
-            console.log('⚠️ Could not obtain FCM token');
-            return null;
         }
+        return null;
     } catch (error) {
         console.error('❌ Error in registerForPushNotificationsAsync:', error);
         return null;

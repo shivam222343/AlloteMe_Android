@@ -177,13 +177,38 @@ const SettingsScreen = ({ navigation, route }) => {
                 showsVerticalScrollIndicator={false}
             >
 
-                <Text style={styles.sectionHeader}>Preferences</Text>
+                <Text style={styles.sectionHeader}>Notifications</Text>
                 <View style={styles.section}>
                     <SettingItem
                         icon="notifications-outline"
                         title="Push Notifications"
                         value={notificationsEnabled}
                         onValueChange={setNotificationsEnabled}
+                    />
+                    <View style={styles.divider} />
+                    <SettingItem
+                        icon="send-outline"
+                        title="Test Real-time notification"
+                        type="link"
+                        onPress={async () => {
+                            const { scheduleLocalNotification } = require('../services/NotificationService');
+                            await scheduleLocalNotification({
+                                title: '🔔 Test Notification',
+                                body: 'Your live real-time notification system is working perfectly! ✨',
+                            });
+                            Alert.alert('Sent', 'A local test notification has been triggered.');
+                        }}
+                    />
+                    <View style={styles.divider} />
+                    <SettingItem
+                        icon="calendar-outline"
+                        title="Reschedule Random Reminders"
+                        type="link"
+                        onPress={async () => {
+                            const { scheduleDailyRandomReminders } = require('../services/NotificationService');
+                            await scheduleDailyRandomReminders();
+                            Alert.alert('Scheduled', 'Your twice-daily random counseling reminders have been rescheduled for random times today and tomorrow!');
+                        }}
                     />
                 </View>
 

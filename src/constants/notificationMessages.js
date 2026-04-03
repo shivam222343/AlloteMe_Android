@@ -58,6 +58,20 @@ export const BIRTHDAY_MESSAGES = [
     '🎁 Hope your birthday is as special as you are, {name}! 🎂'
 ];
 
+// General counseling and motivational messages
+export const GENERAL_MESSAGES = [
+    { title: '💡 Pro Tip', body: 'Keep your documents ready for the admission cycle! 📄' },
+    { title: '🎯 Goal Setter', body: 'Have you checked the latest cutoffs for your dream college? 🏫' },
+    { title: '🤖 Eta at your Service', body: 'Need help and counseling? Ask Eta anything about colleges! 💬' },
+    { title: '📅 Stay Updated', body: 'Check out the "Browse" section for the latest institution updates! 🔔' },
+    { title: '🚀 Future Ready', body: 'Every step you take today brings you closer to your dream career! ✨' },
+    { title: '🎓 Counselor\'s Advice', body: 'Don\'t panic about cutoffs. Variety in choice is the key to admission! 🔑' },
+    { title: '🏫 College Search', body: 'Pune, Mumbai or Nagpur? Explore top colleges in your favorite city! 📍' },
+    { title: '💪 Keep Going', body: 'The admission process is a marathon, not a sprint. Stay patient! 🧘' },
+    { title: '📊 Trend Analysis', body: 'Last year\'s cutoffs are just a guide. Stay positive for this year! 📈' },
+    { title: '🌟 Success Mantra', body: 'Start your day by visualizing your first day at your dream college! 🌈' }
+];
+
 // Function to get random message
 export const getRandomMessage = (messages) => {
     return messages[Math.floor(Math.random() * messages.length)];
@@ -77,4 +91,4 @@ export const getBirthdayMessage = (userName) => {
 };
 
 // Notification times (hours in 24-hour format)
-export const NOTIFICATION_TIMES = [8, 12, 15, 18, 20]; // 8 AM, 12 PM, 3 PM, 6 PM, 8 PM
+export const NOTIFICATION_TIMES = [8, 10, 12, 14, 16, 18, 20]; // Expanded for more random variety

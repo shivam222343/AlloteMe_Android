@@ -3,11 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../services/api';
 import { io } from 'socket.io-client';
 import { Platform } from 'react-native';
+import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleLocalNotification } from '../services/NotificationService';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
 // ⚠️ Keep in sync with src/services/api.js — switch together
-const API_BASE_URL = LOCAL_URL;
+const API_BASE_URL = RENDER_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -57,6 +58,9 @@ export const AuthProvider = ({ children }) => {
         loadUser();
         loadLocalNotifications();
 
+        // Trigger notification registration and schedule daily reminders
+        registerForPushNotificationsAsync();
+
         // Initialize socket
         const newSocket = io(API_BASE_URL, {
             transports: ['websocket'],
@@ -71,7 +75,14 @@ export const AuthProvider = ({ children }) => {
         newSocket.on('notification:received', async (data) => {
             console.log('[Socket] New notification:', data);
 
-            // Generate valid object if needed
+            // Trigger actual system notification if app is active
+            scheduleLocalNotification({
+                title: data.title || 'New Notification',
+                body: data.message,
+                data: data
+            });
+
+            // Rest same...
             const newNotif = {
                 _id: data._id || Date.now().toString(),
                 title: data.title,
@@ -195,6 +206,9 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
+        try {
+            await removeFCMTokenFromBackend();
+        } catch (e) { }
         await AsyncStorage.removeItem('userToken');
         setUser(null);
     };

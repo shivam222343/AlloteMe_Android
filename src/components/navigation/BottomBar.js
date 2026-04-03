@@ -10,12 +10,8 @@ const BottomBar = ({ state, navigation }) => {
     const insets = useSafeAreaInsets();
     const isAdmin = user?.role === 'admin';
 
-    const BAR_HEIGHT = Platform.OS === 'ios' ? 65 + insets.bottom : 70;
-
-    // Get visible tab name index
     const currentRoute = state.routes[state.index].name;
 
-    // Hide bar for specific screens
     if (currentRoute === 'PredictionResults' || currentRoute === 'CollegeDetail' || currentRoute === 'AdminUserDetail') {
         return null;
     }
@@ -32,13 +28,16 @@ const BottomBar = ({ state, navigation }) => {
         { name: 'Counselors', icon: User, label: 'Experts' },
     ];
 
+    // On Android, avoid using insets (often 0 even with gesture nav)
+    // Use a safe fixed height — icons sit in the icon area, system nav bar is below the View
+    const safeBottom = Platform.OS === 'ios' ? insets.bottom : 0;
+
     return (
-        <View style={[styles.wrapper, { height: BAR_HEIGHT, paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0 }]}>
-            <View style={styles.container}>
+        <View style={[styles.wrapper, { paddingBottom: safeBottom }]}>
+            <View style={styles.tabRow}>
                 {tabs.map((tab, index) => {
                     const isActive = state.routes[state.index].name === tab.name;
                     const Icon = tab.icon;
-
                     return (
                         <TouchableOpacity
                             key={index}
@@ -46,10 +45,10 @@ const BottomBar = ({ state, navigation }) => {
                             onPress={() => navigation.navigate(tab.name)}
                             activeOpacity={0.7}
                         >
-                            {isActive && <View style={styles.activeIndicator} />}
+                            {isActive && <View style={styles.activeBar} />}
                             <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
                                 <Icon
-                                    size={23}
+                                    size={22}
                                     color={isActive ? Colors.primary : '#94A3B8'}
                                     strokeWidth={isActive ? 2.5 : 2}
                                 />
@@ -73,41 +72,40 @@ const styles = StyleSheet.create({
         ...Shadows.lg,
         elevation: 10,
     },
-    container: {
-        flex: 1,
+    tabRow: {
+        height: 60,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8,
+        justifyContent: 'space-around',
     },
     tab: {
         flex: 1,
-        justifyContent: 'center',
         alignItems: 'center',
-        height: '100%',
-        position: 'relative'
+        justifyContent: 'center',
+        paddingVertical: 6,
     },
-    activeIndicator: {
+    activeBar: {
         position: 'absolute',
         top: 0,
-        width: 24,
+        alignSelf: 'center',
+        width: 28,
         height: 3,
         backgroundColor: Colors.primary,
         borderBottomLeftRadius: 3,
         borderBottomRightRadius: 3,
     },
     iconBox: {
-        padding: 6,
-        borderRadius: 14,
+        padding: 5,
+        borderRadius: 12,
         marginBottom: 2,
     },
     iconBoxActive: {
-        backgroundColor: Colors.primary + '12',
+        backgroundColor: Colors.primary + '15',
     },
     label: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '600',
         color: '#94A3B8',
-        marginTop: -2,
     },
     labelActive: {
         color: Colors.primary,
