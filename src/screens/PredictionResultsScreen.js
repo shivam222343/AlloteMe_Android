@@ -333,13 +333,14 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         }
     };
 
-    const renderItem = ({ item, drag, isActive, getIndex }) => {
+    const renderItem = useCallback(({ item, drag, isActive, getIndex }) => {
         const index = getIndex();
         const isSaved = user?.savedColleges?.some(c => (c._id === item.collegeId?._id || c === item.collegeId?._id));
 
         return (
             <TouchableOpacity
                 onLongPress={drag}
+                delayLongPress={300}
                 onPress={() => navigation.navigate('CollegeDetail', { id: item.collegeId?._id })}
                 disabled={isActive}
                 activeOpacity={0.9}
@@ -347,6 +348,9 @@ const PredictionResultsScreen = ({ route, navigation }) => {
             >
                 <Card style={[styles.resultCard, isActive && styles.activeCard]}>
                     <View style={styles.cardHeader}>
+                        <View style={styles.dragHandle}>
+                            <GripVertical size={16} color="#94a3b8" />
+                        </View>
                         <View style={styles.numberTag}>
                             <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
                         </View>
@@ -419,7 +423,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 </Card>
             </TouchableOpacity>
         );
-    };
+    }, [user, navigation]);
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -475,7 +479,11 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 60 }}
                     containerStyle={{ flex: 1 }}
-                    activationDistance={10}
+                    activationDistance={20}
+                    dragItemOverflow={true}
+                    onDragBegin={() => {
+                        // Light feedback or state if needed
+                    }}
                     ListEmptyComponent={
                         <View style={styles.centerEmpty}>
                             <Search size={48} color="#cbd5e1" />
@@ -510,7 +518,17 @@ const styles = StyleSheet.create({
     sortChipTextActive: { color: Colors.white },
     fullWidthItem: { width: '100%' },
     resultCard: { marginVertical: 0.5, padding: 14, borderRadius: 0, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-    activeCard: { backgroundColor: '#F0F9FF', zIndex: 10, ...Shadows.lg },
+    activeCard: {
+        backgroundColor: '#F0F9FF',
+        zIndex: 100,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        transform: [{ scale: 1.02 }]
+    },
+    dragHandle: { paddingRight: 8, justifyContent: 'center' },
     cardHeader: { flexDirection: 'row', alignItems: 'center' },
     numberTag: { width: 24, height: 24, borderRadius: 6, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center', marginRight: 8 },
     numberText: { fontSize: 10, fontWeight: '800', color: Colors.primary },

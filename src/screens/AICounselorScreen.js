@@ -465,19 +465,43 @@ const AICounselorScreen = ({ navigation }) => {
     }, [messages, chatId]);
 
     const startListening = React.useCallback(async () => {
-        if (!Voice || Platform.OS === 'web') {
-            Alert.alert('Not Supported', 'Voice features are only available in the native app.');
+        if (Platform.OS === 'web') {
+            // Use Web Speech API on web
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                Alert.alert('Not Supported', 'Your browser does not support voice input.');
+                return;
+            }
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-IN';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                setInput(transcript);
+                setIsListening(false);
+            };
+            recognition.onerror = () => setIsListening(false);
+            recognition.onend = () => setIsListening(false);
+            setIsListening(true);
+            recognition.start();
             return;
         }
+        // Native Android: use react-native-voice
+        if (!Voice) return;
         try {
-            await Voice.start('en-US');
+            await Voice.start('en-IN');
         } catch (e) {
             console.error(e);
         }
     }, []);
 
     const stopListening = React.useCallback(async () => {
-        if (!Voice || Platform.OS === 'web') return;
+        if (Platform.OS === 'web') {
+            setIsListening(false);
+            return;
+        }
+        if (!Voice) return;
         try {
             await Voice.stop();
         } catch (e) {
@@ -557,19 +581,37 @@ const AICounselorScreen = ({ navigation }) => {
             };
             setMessages(prev => [...prev, botMsg]);
         } catch (error) {
-            const errorMessage = error.response?.data?.message || "Sorry, I'm having trouble connecting to Eta right now. This usually happens when the API key is invalid or has expired.";
+            const status = error.response?.status;
+            const serverMsg = error.response?.data?.message || '';
+
+            let friendlyMessage;
+
+            if (status === 401 || serverMsg.toLowerCase().includes('api key') || serverMsg.toLowerCase().includes('invalid')) {
+                friendlyMessage = `🔑 **API Key Issue**\n\nYour Groq API key seems to be invalid or missing. Please update it from your profile to continue chatting with Eta.\n\n*Tap the key icon or visit Profile → AI Settings to update.*`;
+                setPopupType('error');
+                setShowKeyPopup(true);
+            } else if (status === 429 || serverMsg.toLowerCase().includes('rate') || serverMsg.toLowerCase().includes('limit')) {
+                friendlyMessage = `⏳ **Too Many Requests**\n\nEta is getting a lot of questions right now! Please wait a moment and try again.\n\nIf this keeps happening, consider adding your own Groq API key in Settings.`;
+            } else if (error.code === 'ECONNABORTED' || serverMsg.toLowerCase().includes('timeout')) {
+                friendlyMessage = `🕐 **Response Timed Out**\n\nEta took too long to respond — this can happen when searching through a large amount of college data.\n\n**Try rephrasing your question** or ask about a specific college or branch.`;
+            } else if (!error.response || error.message?.toLowerCase().includes('network')) {
+                friendlyMessage = `📶 **No Internet Connection**\n\nPlease check your internet connection and try again. Eta needs to be online to answer your questions.`;
+            } else {
+                // Generic server error — show key popup too, might be API key issue
+                friendlyMessage = `😕 **Something went wrong**\n\nEta ran into an unexpected issue while processing your question. Please try again in a moment.\n\n*If the problem persists, try updating your API key or starting a new chat.*`;
+                setPopupType('error');
+                setShowKeyPopup(true);
+            }
+
             const errorMsg = {
                 id: 'bot-error',
-                text: errorMessage,
+                text: friendlyMessage,
                 sender: 'bot',
+                isError: true,
                 timestamp: new Date().toISOString(),
                 isNew: true
             };
             setMessages(prev => [...prev.filter(m => m.id !== 'bot-error'), errorMsg]);
-
-            // Show the key update popup on error
-            setPopupType('error');
-            setShowKeyPopup(true);
         } finally {
             if (statusInterval) clearInterval(statusInterval);
             setLoading(false);

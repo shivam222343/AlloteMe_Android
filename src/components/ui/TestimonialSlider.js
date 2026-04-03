@@ -5,6 +5,7 @@ import { Quote, Star } from 'lucide-react-native';
 import { reviewAPI } from '../../services/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SLIDE_WIDTH = SCREEN_WIDTH - 32; // Standard padding is 16 on each side in MainLayout
 
 const TestimonialSlider = () => {
     const [reviews, setReviews] = useState([]);
@@ -74,7 +75,7 @@ const TestimonialSlider = () => {
 
     const handleScroll = (event) => {
         const offset = event.nativeEvent.contentOffset.x;
-        const index = Math.round(offset / SCREEN_WIDTH);
+        const index = Math.round(offset / SLIDE_WIDTH);
         if (index !== currentIndex) {
             setCurrentIndex(index);
         }
@@ -83,7 +84,7 @@ const TestimonialSlider = () => {
     if (loading || reviews.length === 0) return null;
 
     const renderItem = ({ item, index }) => (
-        <View style={styles.slide}>
+        <View style={[styles.slide, { width: SLIDE_WIDTH }]}>
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
                     <View style={styles.stars}>
@@ -145,8 +146,8 @@ const TestimonialSlider = () => {
                 onScrollBeginDrag={stopAutoPlay}
                 onScrollEndDrag={startAutoPlay}
                 getItemLayout={(data, index) => ({
-                    length: SCREEN_WIDTH,
-                    offset: SCREEN_WIDTH * index,
+                    length: SLIDE_WIDTH,
+                    offset: SLIDE_WIDTH * index,
                     index,
                 })}
             />

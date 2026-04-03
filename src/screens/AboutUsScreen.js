@@ -48,7 +48,7 @@ const AboutUsScreen = ({ navigation }) => {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.foundersScroll}>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={require('../../assets/founders/shivam.png')}
+                                source={require('../../assets/founders/shivam.jpg')}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Shivam Dombe</Text>
@@ -56,7 +56,7 @@ const AboutUsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={require('../../assets/founders/rohan.png')}
+                                source={require('../../assets/founders/rohan.jpg')}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Rohan Mane</Text>
@@ -64,7 +64,7 @@ const AboutUsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={require('../../assets/founders/tejas.png')}
+                                source={require('../../assets/founders/tejas.jpg')}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Tejas Choudhari</Text>
@@ -72,7 +72,7 @@ const AboutUsScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.founderCardContainer}>
                             <Image
-                                source={require('../../assets/founders/omkar.png')}
+                                source={require('../../assets/founders/omkar.jpg')}
                                 style={styles.founderAvatar}
                             />
                             <Text style={styles.founderName}>Omkar Kapare</Text>

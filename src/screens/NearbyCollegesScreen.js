@@ -262,12 +262,12 @@ const NearbyCollegesScreen = ({ navigation }) => {
                         var b = document.createElement('b'); b.innerText = m.name;
                         var btnContainer = document.createElement('div'); btnContainer.className = 'btns';
                         var bi = document.createElement('div'); bi.className = 'btn btn-i'; bi.innerText = 'INFO';
-                        bi.onclick = function() { safeSend(JSON.stringify({type:'NAV', id:m.id})); };
                         var br = document.createElement('div'); br.className = 'btn btn-r'; br.innerText = 'ROUTE';
-                        br.onclick = function() { safeSend(JSON.stringify({type:'ROUTE', id:m.id})); };
                         btnContainer.appendChild(bi); btnContainer.appendChild(br);
                         div.appendChild(b); div.appendChild(btnContainer);
-                        L.marker([m.lat, m.lng], { icon: icon }).addTo(map).bindPopup(div);
+                        var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map).bindPopup(div);
+                        bi.onclick = function() { marker.closePopup(); safeSend(JSON.stringify({type:'NAV', id:m.id})); };
+                        br.onclick = function() { marker.closePopup(); safeSend(JSON.stringify({type:'ROUTE', id:m.id})); };
                     });
                     var rLayer = null;
                     function handleMsg(e) { try { var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; if(d.type === 'DRAW') {
