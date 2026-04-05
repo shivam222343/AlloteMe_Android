@@ -36,7 +36,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
 
     // Fallback for devices/web where insets might be 0
     const topPadding = Math.max(insets.top, Platform.OS === 'ios' ? 0 : 20);
-    const bottomPadding = Math.max(insets.bottom, 0);
+    // On Android, insets.bottom often includes the system nav bar which we don't want to double-pad
+    const bottomPadding = Platform.OS === 'android' ? 0 : Math.max(insets.bottom, 0);
 
     const [showNotifs, setShowNotifs] = useState(false);
 

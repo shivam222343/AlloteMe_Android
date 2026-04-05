@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 3
     },
 
-    listContent: { paddingBottom: 120 },
+    listContent: { paddingBottom: 80 },
     listItem: {
         padding: 20,
         backgroundColor: Colors.white,

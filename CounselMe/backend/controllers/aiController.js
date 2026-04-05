@@ -3,6 +3,7 @@ const Chat = require('../models/Chat');
 const Knowledge = require('../models/Knowledge');
 const Institution = require('../models/Institution');
 const Cutoff = require('../models/Cutoff');
+const Review = require('../models/Review');
 
 const BRANCH_EXPANSION_MAP = {
     'cse': ['Computer Science', 'Computer Engineering', 'CSE', 'Software'],
@@ -203,10 +204,17 @@ const getAICounsel = async (req, res) => {
                 }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(40).lean()
             );
 
-            const cutoffResults = await Promise.all(cutoffTasks);
-            const allCutoffs = [].concat(...cutoffResults);
+            const [cutoffResults, reviewResults] = await Promise.all([
+                Promise.all(cutoffTasks),
+                collegeIds.length > 0
+                    ? Review.find({ institutionId: { $in: collegeIds }, isPublished: true }).sort('-createdAt').limit(20).populate('institutionId', 'name').lean()
+                    : Review.find({ isPublished: true }).sort('-createdAt').limit(5).populate('institutionId', 'name').lean()
+            ]);
 
-            // Deduplicate
+            const allCutoffs = [].concat(...cutoffResults);
+            const userReviews = reviewResults;
+
+            // Deduplicate cutoffs
             const seen = new Set();
             relevantCutoffs = allCutoffs.filter(c => {
                 const key = `${c.collegeId?._id}-${c.branch}-${c.category}-${c.percentile}`;
@@ -215,7 +223,15 @@ const getAICounsel = async (req, res) => {
                 return true;
             });
 
-            console.log(`[AI] Total cutoffs fetched from DB: ${relevantCutoffs.length}`);
+            relevantStudentReviews = userReviews;
+            console.log(`[AI] Total cutoffs: ${relevantCutoffs.length}, Reviews: ${relevantStudentReviews.length}`);
+        }
+
+        const relevantKnowledgeFallback = [];
+        if (relevantKnowledge.length === 0) {
+            // General FAQ check if no specific keywords hit
+            const faqs = await Knowledge.find({ type: 'frequent_question', isActive: true }).limit(2).lean();
+            relevantKnowledgeFallback.push(...faqs.map(f => f.answer));
         }
 
         // 3. Format context for AI
@@ -239,6 +255,12 @@ const getAICounsel = async (req, res) => {
                 year: c.year,
                 round: c.round,
                 location: c.collegeId?.location?.city || c.collegeId?.city
+            })),
+            student_reviews: (relevantStudentReviews || []).map(r => ({
+                college: r.institutionId?.name || 'College',
+                student: r.userName || 'Student',
+                rating: r.rating,
+                comment: r.comment
             }))
         };
 
@@ -277,8 +299,11 @@ ${JSON.stringify(contextData.suggested_cutoffs)}
 === MATCHING COLLEGES IN DATABASE ===
 ${JSON.stringify(contextData.found_colleges)}
 
+=== REAL STUDENT REVIEWS & FEEDBACK FROM FORMS ===
+${JSON.stringify(contextData.student_reviews)}
+
 === KNOWLEDGE BASE ===
-${JSON.stringify(relevantKnowledge.map(k => k.answer || k.content))}`;
+${JSON.stringify(relevantKnowledge.map(k => k.answer || k.content))}${relevantKnowledgeFallback.length > 0 ? '\n' + JSON.stringify(relevantKnowledgeFallback) : ''}`;
         const previousMessages = history || [];
         const messages = [
             { role: 'system', content: systemPrompt },

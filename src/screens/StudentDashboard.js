@@ -360,7 +360,7 @@ const StudentDashboard = ({ navigation }) => {
                     <RatingSection />
                 </View>
 
-                <View style={{ height: 100 }} />
+                <View style={{ height: 40 }} />
             </ScrollView>
 
             <VerificationModal
