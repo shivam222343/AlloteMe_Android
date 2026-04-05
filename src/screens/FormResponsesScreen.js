@@ -19,7 +19,8 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import MainLayout from '../components/layouts/MainLayout';
 import { customFormsAPI } from '../services/api';
-import { Colors, Shadows, FIELD_TYPES } from '../constants/theme';
+import { Colors, Shadows } from '../constants/theme';
+import { FIELD_TYPES } from '../constants/formFields';
 
 const { width } = Dimensions.get('window');
 
@@ -39,14 +40,17 @@ const FormResponsesScreen = ({ route, navigation }) => {
     const fetchData = async () => {
         try {
             setLoading(true);
+            console.log(`[FormResponses] Fetching for formId: ${formId}`);
             const [formRes, respRes] = await Promise.all([
                 customFormsAPI.getById(formId),
                 customFormsAPI.getResponses(formId)
             ]);
 
+            console.log(`[FormResponses] Received ${respRes.data.data?.length || 0} responses`);
             if (formRes.data.success) setForm(formRes.data.data);
-            if (respRes.data.success) setResponses(respRes.data.data);
+            if (respRes.data.success) setResponses(respRes.data.data || []);
         } catch (error) {
+            console.error('[FormResponses] Error:', error);
             Alert.alert('Error', 'Failed to fetch responses');
         } finally {
             setLoading(false);
@@ -198,8 +202,26 @@ const FormResponsesScreen = ({ route, navigation }) => {
     };
 
     const renderResponseItem = ({ item }) => {
-        const firstValue = Object.values(item.answers)[0];
-        const preview = typeof firstValue === 'object' ? (firstValue?.collegeName || firstValue?.rating + ' Start' || '...') : firstValue?.toString();
+        const answers = item.answers || {};
+        const firstValue = Object.values(answers)[0];
+
+        let preview = '...';
+        let stars = null;
+
+        if (typeof firstValue === 'object' && firstValue !== null) {
+            preview = firstValue.collegeName || firstValue.comment || 'Review';
+            if (firstValue.rating) {
+                stars = (
+                    <View style={[styles.starsRow, { marginLeft: 0, marginTop: 4 }]}>
+                        {[1, 2, 3, 4, 5].map(s => (
+                            <Ionicons key={s} name="star" size={12} color={s <= firstValue.rating ? '#F59E0B' : '#E2E8F0'} />
+                        ))}
+                    </View>
+                );
+            }
+        } else if (firstValue) {
+            preview = firstValue.toString();
+        }
 
         return (
             <TouchableOpacity style={styles.responseCard} onPress={() => { setSelectedResponse(item); setDetailVisible(true); }}>
@@ -218,7 +240,10 @@ const FormResponsesScreen = ({ route, navigation }) => {
                             <Text style={styles.badgeText}>Score: {item.score}/{item.totalPossibleScore}</Text>
                         </View>
                     )}
-                    <Text style={styles.previewText} numberOfLines={1}>{preview || '...'}</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.previewText} numberOfLines={1}>{preview}</Text>
+                        {stars}
+                    </View>
                 </View>
             </TouchableOpacity>
         );
@@ -308,6 +333,7 @@ const styles = StyleSheet.create({
     dateText: { fontSize: 11, color: '#64748b' },
     scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     badge: { backgroundColor: '#f0fdf4', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#dcfce7' },
+    chart: { marginVertical: 8 },
     badgeText: { fontSize: 10, fontWeight: '800', color: '#166534' },
     previewText: { fontSize: 13, color: '#475569', flex: 1 },
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

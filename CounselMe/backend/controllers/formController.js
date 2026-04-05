@@ -151,9 +151,12 @@ exports.deleteForm = async (req, res) => {
 // @route GET /api/forms/:id/responses
 exports.getResponses = async (req, res) => {
     try {
+        console.log(`[FormController] Fetching responses for form ID: ${req.params.id}`);
         const responses = await FormResponse.find({ formId: req.params.id }).sort('-createdAt').populate('submittedBy', 'displayName email');
+        console.log(`[FormController] Found ${responses.length} responses for form ${req.params.id}`);
         res.json({ success: true, data: responses });
     } catch (error) {
+        console.error('[FormController] getResponses error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
@@ -210,29 +213,40 @@ exports.submitForm = async (req, res) => {
                     }
                 }
             }
+        }
 
-            // College Review auto-submission
-            if (q.type === 'college_review' && ans && q.autoPostReview) {
-                try {
-                    const reviewData = typeof ans === 'string' ? JSON.parse(ans) : ans;
-                    const { collegeId, rating, comment, reviewerName } = reviewData;
+        // Auto-Post Review logic
+        for (const section of form.sections) {
+            for (const q of section.questions) {
+                const ans = answers[q.id];
 
-                    if (collegeId && rating) {
-                        const submissionName = (reviewerName || name || 'Anonymous Student').trim();
-                        const randomSeed = Math.floor(Math.random() * 10000);
+                if (q.type === 'college_review' && ans && q.autoPostReview) {
+                    console.log(`[FormController] Attempting auto-review for question ${q.id} type ${q.type}`);
+                    try {
+                        const reviewData = typeof ans === 'string' ? JSON.parse(ans) : ans;
+                        const { collegeId, rating, comment, reviewerName } = reviewData;
 
-                        await Review.create({
-                            userName: submissionName,
-                            userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(submissionName)}&background=random&seed=${randomSeed}`,
-                            institutionId: collegeId,
-                            rating: Number(rating),
-                            comment: comment || '',
-                            isPublished: true
-                        });
-                        console.log(`Auto-posted review for college ${collegeId} from form ${form._id}`);
+                        console.log(`[FormController] Review data extracted: CID: ${collegeId}, Rating: ${rating}`);
+
+                        if (collegeId && rating) {
+                            const submissionName = (reviewerName || name || 'Anonymous Student').trim();
+                            const randomSeed = Math.floor(Math.random() * 10000);
+
+                            const newReview = await Review.create({
+                                userName: submissionName,
+                                userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(submissionName)}&background=random&seed=${randomSeed}`,
+                                institutionId: collegeId,
+                                rating: Number(rating),
+                                comment: comment || '',
+                                isPublished: true
+                            });
+                            console.log(`[FormController] AUTO-REVIEW POSTED! ID: ${newReview._id} for college ${collegeId}`);
+                        } else {
+                            console.warn(`[FormController] Skipped auto-review: Missing collegeId (${collegeId}) or rating (${rating})`);
+                        }
+                    } catch (revErr) {
+                        console.error('[FormController] Failed to auto-post review:', revErr);
                     }
-                } catch (revErr) {
-                    console.error('Failed to auto-post review:', revErr);
                 }
             }
         }

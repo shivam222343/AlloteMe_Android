@@ -11,6 +11,7 @@ import {
     CheckCircle2, LayoutGrid, Image as ImageIcon, BedDouble, GitBranch,
     ChevronRight, Trash2, Edit, Maximize2, X as CloseIcon, Star
 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, institutionAPI, cutoffAPI, reviewAPI } from '../services/api';
 import { Colors, Shadows } from '../constants/theme';
@@ -454,19 +455,17 @@ const CollegeDetailScreen = ({ route, navigation }) => {
     const renderReviews = () => {
         return (
             <View style={styles.tabContent}>
-                <View style={styles.reviewSummary}>
-                    <View style={styles.avgBox}>
-                        <Text style={styles.avgText}>{reviewStats.avgRating ? Number(reviewStats.avgRating).toFixed(1) : '0.0'}</Text>
-                        <View style={styles.starsBox}>
-                            <View style={styles.starsRow}>
-                                {[1, 2, 3, 4, 5].map(s => <Star key={s} size={14} color={s <= Math.round(reviewStats.avgRating || 0) ? '#F59E0B' : '#CBD5E1'} fill={s <= Math.round(reviewStats.avgRating || 0) ? '#F59E0B' : 'transparent'} />)}
-                            </View>
-                            <Text style={styles.reviewCount}>{reviewStats.count || 0} reviews</Text>
+                <View style={styles.reviewStatsHeader}>
+                    <View>
+                        <Text style={styles.reviewStatsValue}>{reviewStats.avgRating ? Number(reviewStats.avgRating).toFixed(1) : '0.0'}</Text>
+                        <View style={styles.starsRow}>
+                            {[1, 2, 3, 4, 5].map(s => <Star key={s} size={14} color={s <= Math.round(reviewStats.avgRating || 0) ? '#F59E0B' : '#CBD5E1'} fill={s <= Math.round(reviewStats.avgRating || 0) ? '#F59E0B' : 'transparent'} />)}
                         </View>
+                        <Text style={styles.reviewStatsCount}>{reviewStats.count || 0} {reviewStats.count === 1 ? 'review' : 'reviews'}</Text>
                     </View>
-                    <TouchableOpacity style={styles.writeReviewBtn} onPress={() => setShowReviewModal(true)}>
-                        <Edit size={16} color="white" />
-                        <Text style={styles.writeReviewText}>Write a Review</Text>
+                    <TouchableOpacity style={styles.writeReviewBtnHeader} onPress={() => setShowReviewModal(true)}>
+                        <Ionicons name="create-outline" size={20} color="white" />
+                        <Text style={styles.writeReviewBtnHeaderText}>Write a Review</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -529,14 +528,22 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                                         style={styles.reviewerAvatar}
                                     />
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.reviewerName}>{r.userName || 'Anonymous'}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={styles.reviewerName}>{r.userName || 'Anonymous Student'}</Text>
+                                            {r.userAvatar && (
+                                                <View style={styles.verifiedBadge}>
+                                                    <Ionicons name="checkmark-done-circle" size={12} color={Colors.primary} />
+                                                    <Text style={styles.verifiedText}>Verified</Text>
+                                                </View>
+                                            )}
+                                        </View>
                                         <View style={styles.starsRow}>
                                             {[1, 2, 3, 4, 5].map(s => <Star key={s} size={10} color={s <= r.rating ? '#F59E0B' : '#CBD5E1'} fill={s <= r.rating ? '#F59E0B' : 'transparent'} />)}
                                         </View>
                                     </View>
                                     <Text style={styles.reviewDate}>{new Date(r.createdAt).toLocaleDateString()}</Text>
                                 </View>
-                                <Text style={styles.reviewComment}>{r.comment}</Text>
+                                <Text style={styles.reviewComment}>"{r.comment}"</Text>
                             </View>
                         ))
                     )}
@@ -833,12 +840,12 @@ const styles = StyleSheet.create({
     deleteBtnSmall: { backgroundColor: Colors.error + '10', borderColor: Colors.error + '25' },
 
     // Review Styles
-    reviewSummary: { backgroundColor: '#F8FAFC', padding: 15, borderRadius: 16, marginBottom: 20 },
-    avgBox: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-    avgText: { fontSize: 32, fontWeight: 'bold', color: Colors.text.primary },
-    starsBox: { flex: 1 },
+    reviewStatsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 20 },
+    reviewStatsValue: { fontSize: 40, fontWeight: '800', color: Colors.text.primary },
+    reviewStatsCount: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
+    writeReviewBtnHeader: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12 },
+    writeReviewBtnHeaderText: { color: 'white', fontWeight: 'bold', fontSize: 13 },
     starsRow: { flexDirection: 'row', gap: 4, alignItems: 'center' },
-    reviewCount: { fontSize: 12, color: Colors.text.tertiary, marginTop: 4 },
     submitSection: { backgroundColor: 'white', padding: 15, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9', marginBottom: 20 },
     starsSelector: { flexDirection: 'row', gap: 10, marginBottom: 15, justifyContent: 'center' },
     reviewInput: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, height: 80, textAlignVertical: 'top', fontSize: 14, color: Colors.text.primary, marginBottom: 15, borderWidth: 1, borderColor: '#E2E8F0' },
@@ -848,9 +855,11 @@ const styles = StyleSheet.create({
     reviewItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
     reviewerAvatar: { width: 32, height: 32, borderRadius: 16 },
-    reviewerName: { fontSize: 14, fontWeight: '600', color: Colors.text.primary },
+    reviewerName: { fontSize: 15, fontWeight: '700', color: Colors.text.primary },
+    verifiedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eff6ff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, gap: 2 },
+    verifiedText: { fontSize: 9, fontWeight: '700', color: Colors.primary, textTransform: 'uppercase' },
     reviewDate: { fontSize: 11, color: Colors.text.tertiary },
-    reviewComment: { fontSize: 13, color: Colors.text.secondary, lineHeight: 18 },
+    reviewComment: { fontSize: 14, color: Colors.text.secondary, lineHeight: 22, marginTop: 10, fontStyle: 'italic' },
     emptyReviews: { alignItems: 'center', paddingVertical: 40, gap: 10 },
 
     writeReviewBtn: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, marginTop: 15 },
