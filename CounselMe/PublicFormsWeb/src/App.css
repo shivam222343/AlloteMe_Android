@@ -31,6 +31,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: visible !important;
 }
 
 /* Status Views (Loading, Error) */
@@ -104,11 +105,14 @@ body {
   box-shadow: var(--card-shadow);
   margin-bottom: 24px;
   transition: transform 0.2s ease;
+  overflow: visible !important;
+  z-index: 1;
 }
 
 .question-card {
   padding: 32px;
-  overflow: visible;
+  overflow: visible !important;
+  z-index: 1;
 }
 
 .intro-card {
@@ -323,19 +327,12 @@ body {
 /* Searchable Selector */
 .searchable-selector {
   position: relative;
-  z-index: 100;
+  z-index: 999;
 }
 
 .selector-trigger {
   position: relative;
-}
-
-.selector-trigger .select-icon {
-  transition: transform 0.3s;
-}
-
-.selector-trigger .select-icon.rotate {
-  transform: translateY(-50%) rotate(180deg);
+  z-index: 1000;
 }
 
 .selector-dropdown {
@@ -346,12 +343,12 @@ body {
   background: white;
   border: 2px solid #6366f1;
   border-top: none;
-  border-radius: 0 0 12px 12px;
-  max-height: 250px;
+  border-radius: 0 0 16px 16px;
+  max-height: 280px;
   overflow-y: auto;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
   margin-top: -8px;
-  background: white;
+  z-index: 9999;
 }
 
 .selector-item {

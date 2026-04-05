@@ -213,19 +213,26 @@ exports.submitForm = async (req, res) => {
 
             // College Review auto-submission
             if (q.type === 'college_review' && ans && q.autoPostReview) {
-                const { collegeId, rating, comment, reviewerName } = ans;
-                if (collegeId && rating) {
-                    const submissionName = (reviewerName || name || 'Anonymous Student').trim();
-                    const randomSeed = Math.floor(Math.random() * 1000000);
+                try {
+                    const reviewData = typeof ans === 'string' ? JSON.parse(ans) : ans;
+                    const { collegeId, rating, comment, reviewerName } = reviewData;
 
-                    await Review.create({
-                        userName: submissionName,
-                        userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(submissionName)}&background=random&seed=${randomSeed}`,
-                        institutionId: collegeId,
-                        rating: Number(rating),
-                        comment: comment || '',
-                        isPublished: true
-                    });
+                    if (collegeId && rating) {
+                        const submissionName = (reviewerName || name || 'Anonymous Student').trim();
+                        const randomSeed = Math.floor(Math.random() * 10000);
+
+                        await Review.create({
+                            userName: submissionName,
+                            userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(submissionName)}&background=random&seed=${randomSeed}`,
+                            institutionId: collegeId,
+                            rating: Number(rating),
+                            comment: comment || '',
+                            isPublished: true
+                        });
+                        console.log(`Auto-posted review for college ${collegeId} from form ${form._id}`);
+                    }
+                } catch (revErr) {
+                    console.error('Failed to auto-post review:', revErr);
                 }
             }
         }

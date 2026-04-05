@@ -118,7 +118,7 @@ const AdminFormBuilderScreen = ({ route, navigation }) => {
             type: type,
             required: false,
             options: (type === 'radio' || type === 'checkbox' || type === 'dropdown') ? [{ label: 'Option 1', isCorrect: false }] : [],
-            admissionPath: type === 'college_list' ? 'MHTCET PCM' : null,
+            admissionPath: (type === 'college_list' || type === 'college_review') ? 'MHTCET PCM' : null,
             mediaUrl: '',
             mediaType: 'image',
             autoPostReview: type === 'college_review' ? true : false

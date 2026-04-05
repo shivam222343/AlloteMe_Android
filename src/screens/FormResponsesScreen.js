@@ -19,7 +19,7 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import MainLayout from '../components/layouts/MainLayout';
 import { customFormsAPI } from '../services/api';
-import { Colors, Shadows } from '../constants/theme';
+import { Colors, Shadows, FIELD_TYPES } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -148,27 +148,81 @@ const FormResponsesScreen = ({ route, navigation }) => {
         ]);
     };
 
-    const renderResponseItem = ({ item }) => (
-        <TouchableOpacity style={styles.responseCard} onPress={() => { setSelectedResponse(item); setDetailVisible(true); }}>
-            <View style={styles.cardHeader}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.userName}>{item.name || item.submittedBy?.displayName || 'Anonymous User'}</Text>
-                    <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleString()}</Text>
+    const renderFormattedValue = (val) => {
+        if (!val && val !== 0 && val !== false) return <Text style={[styles.detailText, { color: '#94a3b8' }]}>No answer</Text>;
+
+        if (typeof val === 'boolean') {
+            return (
+                <View style={[styles.inlineBadge, { backgroundColor: val ? '#f0fdf4' : '#fef2f2' }]}>
+                    <Ionicons name={val ? "checkmark-circle" : "close-circle"} size={16} color={val ? "#10b981" : "#ef4444"} />
+                    <Text style={{ marginLeft: 6, fontWeight: '700', color: val ? "#166534" : "#991b1b" }}>{val ? "YES" : "NO"}</Text>
                 </View>
-                <TouchableOpacity onPress={() => handleDeleteResponse(item._id)} style={{ padding: 8 }}>
-                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                </TouchableOpacity>
-            </View>
-            <View style={styles.scoreRow}>
-                {item.totalPossibleScore > 0 && (
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Score: {item.score}/{item.totalPossibleScore}</Text>
+            );
+        }
+
+        if (Array.isArray(val)) {
+            return (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {val.map((v, i) => (
+                        <View key={i} style={styles.inlineBadge}><Text style={styles.badgeTextSmall}>{v}</Text></View>
+                    ))}
+                </View>
+            );
+        }
+
+        if (typeof val === 'object') {
+            // Handle college_review specifically
+            if (val.rating || val.collegeName || val.comment) {
+                return (
+                    <View style={styles.objectBlock}>
+                        {val.collegeName && <Text style={styles.objectSubtitle}>Institution: <Text style={{ fontWeight: '700' }}>{val.collegeName}</Text></Text>}
+                        {val.rating && (
+                            <View style={styles.starsRow}>
+                                {[1, 2, 3, 4, 5].map(s => <Ionicons key={s} name="star" size={16} color={s <= val.rating ? '#F59E0B' : '#E2E8F0'} />)}
+                                <Text style={styles.ratingText}>{val.rating}/5 Rating</Text>
+                            </View>
+                        )}
+                        {val.reviewerName && <Text style={styles.reviewerMini}>Shared as: <Text style={{ fontWeight: '600' }}>{val.reviewerName}</Text></Text>}
+                        {val.comment && (
+                            <View style={styles.commentBox}>
+                                <Text style={styles.commentText}>"{val.comment}"</Text>
+                            </View>
+                        )}
                     </View>
-                )}
-                <Text style={styles.previewText} numberOfLines={1}>{Object.values(item.answers)[0]?.toString() || '...'}</Text>
-            </View>
-        </TouchableOpacity>
-    );
+                );
+            }
+            return <Text style={styles.detailText}>{JSON.stringify(val)}</Text>;
+        }
+
+        return <Text style={styles.detailText}>{val.toString()}</Text>;
+    };
+
+    const renderResponseItem = ({ item }) => {
+        const firstValue = Object.values(item.answers)[0];
+        const preview = typeof firstValue === 'object' ? (firstValue?.collegeName || firstValue?.rating + ' Start' || '...') : firstValue?.toString();
+
+        return (
+            <TouchableOpacity style={styles.responseCard} onPress={() => { setSelectedResponse(item); setDetailVisible(true); }}>
+                <View style={styles.cardHeader}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.userName}>{item.name || item.submittedBy?.displayName || 'Anonymous User'}</Text>
+                        <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleString()}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeleteResponse(item._id)} style={{ padding: 8 }}>
+                        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.scoreRow}>
+                    {item.totalPossibleScore > 0 && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>Score: {item.score}/{item.totalPossibleScore}</Text>
+                        </View>
+                    )}
+                    <Text style={styles.previewText} numberOfLines={1}>{preview || '...'}</Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <MainLayout title="Responses" backButton={true}>
@@ -222,9 +276,12 @@ const FormResponsesScreen = ({ route, navigation }) => {
                         <ScrollView style={styles.modalScroll}>
                             {getQuestions().map(q => (
                                 <View key={q.id} style={styles.detailItem}>
-                                    <Text style={styles.detailLabel}>{q.label}</Text>
+                                    <View style={styles.detailHeader}>
+                                        <Ionicons name={FIELD_TYPES.find(f => f.value === q.type)?.icon || 'help'} size={14} color="#64748B" />
+                                        <Text style={styles.detailLabel}>{q.label}</Text>
+                                    </View>
                                     <View style={styles.detailValueBox}>
-                                        <Text style={styles.detailText}>{JSON.stringify(selectedResponse?.answers[q.id] || '-')}</Text>
+                                        {renderFormattedValue(selectedResponse?.answers[q.id])}
                                     </View>
                                 </View>
                             ))}
@@ -258,10 +315,22 @@ const styles = StyleSheet.create({
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b' },
     modalScroll: { padding: 20 },
-    detailItem: { marginBottom: 20 },
-    detailLabel: { fontSize: 13, fontWeight: '700', color: '#64748b', marginBottom: 8 },
+    detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+    detailLabel: { fontSize: 13, fontWeight: '700', color: '#64748b' },
     detailValueBox: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' },
     detailText: { fontSize: 15, color: '#1e293b' },
+
+    // Formatting styles
+    inlineBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 16, backgroundColor: '#f1f5f9' },
+    badgeTextSmall: { fontSize: 12, fontWeight: '600', color: '#1e293b' },
+    objectBlock: { gap: 6 },
+    objectSubtitle: { fontSize: 13, color: '#64748B' },
+    starsRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
+    ratingText: { fontSize: 13, fontWeight: '700', color: '#F59E0B', marginLeft: 6 },
+    commentBox: { marginTop: 8, padding: 10, backgroundColor: 'white', borderRadius: 8, borderLeftWidth: 3, borderLeftColor: Colors.primary },
+    commentText: { fontSize: 14, fontStyle: 'italic', color: '#334155', lineHeight: 20 },
+    reviewerMini: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+
     empty: { marginTop: 60, alignItems: 'center' },
     emptyText: { color: '#94a3b8', fontSize: 16 }
 });
