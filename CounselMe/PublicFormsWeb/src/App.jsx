@@ -220,7 +220,7 @@ const FormViewer = () => {
           <p>Your response for <strong>{form.title}</strong> has been recorded.</p>
         </div>
 
-        {scoreData?.showMarks && (
+        {form.settings?.isQuiz && scoreData?.showMarks && (
           <div className="score-summary">
             <div className="score-label">Total Points Earned</div>
             <div className="score-box">

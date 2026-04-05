@@ -263,7 +263,13 @@ exports.submitForm = async (req, res) => {
 
         await Form.findByIdAndUpdate(form._id, { $inc: { responseCount: 1 } });
 
-        res.json({ success: true, data: { score, totalPossibleScore, showMarks: form.settings.showMarks } });
+        res.json({
+            success: true, data: {
+                score,
+                totalPossibleScore,
+                showMarks: form.settings.isQuiz && form.settings.showMarks
+            }
+        });
     } catch (error) {
         console.error('[FormController] submitForm:', error);
         res.status(500).json({ success: false, message: 'Server error' });
