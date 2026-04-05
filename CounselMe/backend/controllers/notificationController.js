@@ -1,15 +1,35 @@
-// @desc    Get all notifications for a user (Local Storage Migration)
+const Notification = require('../models/Notification');
+const GlobalNotification = require('../models/GlobalNotification');
+
+// @desc    Get all notifications for a user 
 // @route   GET /api/notifications
 // @access  Private
 const getNotifications = async (req, res) => {
-    res.json([]); // Notifications now handled in frontend AsyncStorage
+    try {
+        const [privateNotifs, globalNotifs] = await Promise.all([
+            Notification.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(30),
+            GlobalNotification.find().sort({ createdAt: -1 }).limit(20)
+        ]);
+
+        const combined = [...privateNotifs, ...globalNotifs]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        res.json(combined);
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error' });
+    }
 };
 
 // @desc    Get unread count
 // @route   GET /api/notifications/unread-count
 // @access  Private
 const getUnreadCount = async (req, res) => {
-    res.json({ count: 0 }); // Unread handling moved to frontend
+    try {
+        const count = await Notification.countDocuments({ user: req.user._id, isRead: false });
+        res.json({ count });
+    } catch (error) {
+        res.status(500).json({ message: 'Server Error' });
+    }
 };
 
 // @desc    Mark all notifications as read

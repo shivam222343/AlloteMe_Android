@@ -181,7 +181,18 @@ const PricingScreen = ({ navigation }) => {
                             <View style={styles.divider} />
 
                             <View style={styles.featuresList}>
-                                {plan.features.map((f, idx) => renderFeature(f, idx))}
+                                {plan.features.length > 6 ? (
+                                    <View style={styles.twoColumnFeatures}>
+                                        <View style={{ flex: 1 }}>
+                                            {plan.features.slice(0, Math.ceil(plan.features.length / 2)).map((f, idx) => renderFeature(f, idx))}
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            {plan.features.slice(Math.ceil(plan.features.length / 2)).map((f, idx) => renderFeature(f, idx + 10))}
+                                        </View>
+                                    </View>
+                                ) : (
+                                    plan.features.map((f, idx) => renderFeature(f, idx))
+                                )}
                             </View>
 
                             <TouchableOpacity
@@ -333,7 +344,8 @@ const styles = StyleSheet.create({
     divider: { height: 1, backgroundColor: '#E2E8F0', width: '100%', marginBottom: 25 },
 
     featuresList: { flex: 1, gap: 14, marginBottom: 25 },
-    featureRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    twoColumnFeatures: { flexDirection: 'row', gap: 10 },
+    featureRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
     iconCircle: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     featureText: { fontSize: 15, color: Colors.text.secondary, fontWeight: '500' },
     featureDisabled: { color: '#CBD5E1', textDecorationLine: 'line-through' },

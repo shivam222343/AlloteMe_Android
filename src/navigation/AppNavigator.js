@@ -43,6 +43,9 @@ import AdminNotificationsScreen from '../screens/AdminNotificationsScreen';
 import SystemAnalyticsScreen from '../screens/SystemAnalyticsScreen';
 import AdminReviewsScreen from '../screens/AdminReviewsScreen';
 import PricingScreen from '../screens/PricingScreen';
+import AdminFormBuilderScreen from '../screens/AdminFormBuilderScreen';
+import FormListScreen from '../screens/FormListScreen';
+import FormResponsesScreen from '../screens/FormResponsesScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -101,6 +104,10 @@ const TabNavigator = () => {
             <Tab.Screen name="SystemAnalytics" component={SystemAnalyticsScreen} />
             <Tab.Screen name="AdminReviews" component={AdminReviewsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="Pricing" component={PricingScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="AdminFormBuilder" component={FormListScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="FormList" component={FormListScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="FormBuilder" component={AdminFormBuilderScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="FormResponses" component={FormResponsesScreen} options={{ tabBarButton: () => null }} />
         </Tab.Navigator>
     );
 };

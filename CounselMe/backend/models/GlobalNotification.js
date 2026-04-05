@@ -1,0 +1,1 @@
+const mongoose = require('mongoose'); const globalNotificationSchema = new mongoose.Schema({ title: { type: String, required: true }, message: { type: String, required: true }, type: { type: String, enum: ['info', 'success', 'warning', 'error'], default: 'info' } }, { timestamps: true }); module.exports = mongoose.model('GlobalNotification', globalNotificationSchema);

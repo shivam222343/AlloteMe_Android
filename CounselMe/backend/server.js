@@ -30,7 +30,10 @@ app.use(cors({
         'https://alloteme.com',
         'https://alloteme.in',
         'https://alloteme.online',
+        'https://forms.alloteme.online',
         'https://web.alloteme.online',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174',
         'http://localhost:5100',
         'http://localhost:8081',
         'http://localhost:8080',
@@ -41,6 +44,7 @@ app.use(cors({
         'http://127.0.0.1:5100',
         'http://127.0.0.1:8081',
         'http://127.0.0.1:8080',
+        'http://127.0.0.1:5174',
         'http://127.0.0.1:19006'
     ],
     credentials: true,
@@ -66,6 +70,9 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/counselors', require('./routes/counselorRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
+app.use('/api/forms', require('./routes/formRoutes'));
+// Public HTML form viewer (shorthand /forms/view/:id)
+app.use('/forms', require('./routes/formRoutes'));
 app.get('/', (req, res) => {
     res.send('CounselMe API is running...');
 });

@@ -545,6 +545,17 @@ const setVerifiedPhone = async (req, res) => {
     }
 };
 
+const getAdmins = async (req, res) => {
+    try {
+        const admins = await User.find({ role: { $in: ['admin', 'staff'] } })
+            .select('displayName email profilePicture _id role')
+            .sort('displayName');
+        res.json({ success: true, data: admins });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch admins' });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -559,6 +570,7 @@ module.exports = {
     verifyOTP,
     setVerifiedPhone,
     getDashboardStats,
+    getAdmins,
     deleteAccount,
     deleteUser,
     updateAvatarPreference

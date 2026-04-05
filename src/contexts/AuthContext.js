@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI } from '../services/api';
+import { authAPI, notificationsAPI } from '../services/api';
 import { io } from 'socket.io-client';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleLocalNotification } from '../services/NotificationService';
@@ -8,7 +8,7 @@ import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleL
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
 // ⚠️ Keep in sync with src/services/api.js — switch together
-const API_BASE_URL = RENDER_URL;
+const API_BASE_URL = LOCAL_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -53,12 +53,52 @@ export const AuthProvider = ({ children }) => {
         }
     }, [socket, user?._id]);
 
-    // Initial load including local notifications
+    const syncNotifications = async () => {
+        if (!user?._id) return;
+        try {
+            const res = await notificationsAPI.getAll();
+            if (res.data) {
+                const serverNotifs = res.data.map(n => ({
+                    _id: n._id,
+                    title: n.title,
+                    message: n.message,
+                    type: n.type || 'info',
+                    read: n.isRead,
+                    createdAt: n.createdAt
+                }));
+
+                setNotifications(prev => {
+                    const combined = [...serverNotifs, ...prev];
+                    // Filter unique by _id
+                    const unique = combined.filter((v, i, a) => a.findIndex(t => t._id === v._id) === i);
+                    const sorted = unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 50);
+                    saveLocalNotifications(sorted);
+                    setUnreadCount(sorted.filter(n => !n.read).length);
+                    return sorted;
+                });
+            }
+        } catch (error) {
+            console.log('[AuthContext] Sync notifications error:', error);
+        }
+    };
+
+    // Initial load: user, local notifications, and deferred server sync
     useEffect(() => {
         loadUser();
         loadLocalNotifications();
+    }, []);
 
-        // Trigger notification registration and schedule daily reminders
+    // Sync notifications from server when user logs in
+    useEffect(() => {
+        if (user?._id) {
+            const syncTimer = setTimeout(syncNotifications, 2000);
+            return () => clearTimeout(syncTimer);
+        }
+    }, [user?._id]);
+
+    // Socket setup
+    useEffect(() => {
+        // Trigger notification registration
         registerForPushNotificationsAsync();
 
         // Initialize socket
@@ -69,7 +109,6 @@ export const AuthProvider = ({ children }) => {
 
         newSocket.on('connect', () => {
             console.log('[Socket] Connected to backend:', newSocket.id);
-            // Moved join logic to the dedicated useEffect above for reactive updates
         });
 
         newSocket.on('notification:received', async (data) => {
@@ -82,7 +121,6 @@ export const AuthProvider = ({ children }) => {
                 data: data
             });
 
-            // Rest same...
             const newNotif = {
                 _id: data._id || Date.now().toString(),
                 title: data.title,

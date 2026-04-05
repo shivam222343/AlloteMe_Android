@@ -3,7 +3,7 @@ const router = express.Router();
 const {
     registerUser, loginUser, getUserProfile, updateUserProfile,
     changePassword, toggleSaveCollege, getAllUsers, getUserById, updateUserRole,
-    sendOTP, verifyOTP, getDashboardStats, deleteAccount, deleteUser, setVerifiedPhone,
+    sendOTP, verifyOTP, getDashboardStats, getAdmins, deleteAccount, deleteUser, setVerifiedPhone,
     updateAvatarPreference
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
@@ -19,6 +19,8 @@ router.post('/change-password', protect, changePassword);
 router.post('/toggle-save', protect, toggleSaveCollege);
 router.post('/update-avatar', protect, updateAvatarPreference);
 
+router.get('/stats', protect, authorize('admin'), getDashboardStats);
+router.get('/admins', protect, authorize('admin', 'staff'), getAdmins);
 router.get('/users', protect, authorize('admin'), getAllUsers);
 router.route('/users/:id')
     .get(protect, authorize('admin'), getUserById)
@@ -28,6 +30,5 @@ router.route('/users/:id')
 router.post('/send-otp', protect, sendOTP);
 router.post('/verify-otp', protect, verifyOTP);
 router.put('/verify-phone', protect, setVerifiedPhone);
-router.get('/stats', protect, authorize('admin'), getDashboardStats);
 
 module.exports = router;

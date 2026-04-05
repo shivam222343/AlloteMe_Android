@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Linking, TouchableOpacity,
-    Alert, Image, Dimensions, Platform, ActivityIndicator
+    Alert, Image, Dimensions, Platform, ActivityIndicator, TextInput
 } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
@@ -12,7 +12,7 @@ import {
     ChevronRight, Trash2, Edit, Maximize2, X as CloseIcon, Star
 } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { authAPI, institutionAPI, cutoffAPI } from '../services/api';
+import { authAPI, institutionAPI, cutoffAPI, reviewAPI } from '../services/api';
 import { Colors, Shadows } from '../constants/theme';
 import OptimizedImage from '../components/ui/OptimizedImage';
 import { Modal } from 'react-native';
@@ -75,6 +75,14 @@ const CollegeDetailScreen = ({ route, navigation }) => {
     const [cutoffs, setCutoffs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Overview');
+    const [reviews, setReviews] = useState([]);
+    const [reviewStats, setReviewStats] = useState({ avgRating: 0, count: 0 });
+    const [loadingReviews, setLoadingReviews] = useState(false);
+    const [myReview, setMyReview] = useState({ rating: 5, comment: '' });
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [showReviewModal, setShowReviewModal] = useState(false);
+
+    const TABS = ['Overview', 'Branches', 'Map', 'Hostel', 'Facilities', 'Gallery', 'Reviews'];
     const [showFullMap, setShowFullMap] = useState(false);
 
     useEffect(() => {
@@ -110,14 +118,51 @@ const CollegeDetailScreen = ({ route, navigation }) => {
 
     const fetchData = async () => {
         try {
-            const [instRes, cutoffRes] = await Promise.all([
+            const [instRes, cutoffRes, reviewRes] = await Promise.all([
                 institutionAPI.getById(id),
-                cutoffAPI.getByInstitution(id)
+                cutoffAPI.getByInstitution(id),
+                reviewAPI.getForInstitution(id)
             ]);
             setInst(instRes.data);
             setCutoffs(cutoffRes.data);
-        } catch (error) { console.error(error); }
-        finally { setLoading(false); }
+            if (reviewRes.data?.success) {
+                setReviews(reviewRes.data.data);
+                setReviewStats(reviewRes.data.stats || { avgRating: 0, count: 0 });
+            }
+        } catch (error) {
+            console.error('FetchData Error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSubmitReview = async () => {
+        if (!myReview.comment.trim()) {
+            Alert.alert('Incomplete', 'Please write a message about the college.');
+            return;
+        }
+        try {
+            setSubmittingReview(true);
+            await reviewAPI.submit({
+                ...myReview,
+                institutionId: id
+            });
+            setMyReview({ rating: 5, comment: '' });
+
+            // Refresh reviews
+            const res = await reviewAPI.getForInstitution(id);
+            if (res.data?.success) {
+                setReviews(res.data.data);
+                setReviewStats(res.data.stats || { avgRating: 0, count: 0 });
+            }
+
+            Alert.alert('Success', 'Your review has been posted! ✨');
+        } catch (error) {
+            Alert.alert('Error', 'Unable to post review.');
+        } finally {
+            setSubmittingReview(false);
+            setShowReviewModal(false);
+        }
     };
 
     const handleToggleSave = async () => {
@@ -406,6 +451,103 @@ const CollegeDetailScreen = ({ route, navigation }) => {
         );
     };
 
+    const renderReviews = () => {
+        return (
+            <View style={styles.tabContent}>
+                <View style={styles.reviewSummary}>
+                    <View style={styles.avgBox}>
+                        <Text style={styles.avgText}>{reviewStats.avgRating ? Number(reviewStats.avgRating).toFixed(1) : '0.0'}</Text>
+                        <View style={styles.starsBox}>
+                            <View style={styles.starsRow}>
+                                {[1, 2, 3, 4, 5].map(s => <Star key={s} size={14} color={s <= Math.round(reviewStats.avgRating || 0) ? '#F59E0B' : '#CBD5E1'} fill={s <= Math.round(reviewStats.avgRating || 0) ? '#F59E0B' : 'transparent'} />)}
+                            </View>
+                            <Text style={styles.reviewCount}>{reviewStats.count || 0} reviews</Text>
+                        </View>
+                    </View>
+                    {!isAdmin && (
+                        <TouchableOpacity style={styles.writeReviewBtn} onPress={() => setShowReviewModal(true)}>
+                            <Edit size={16} color="white" />
+                            <Text style={styles.writeReviewText}>Write a Review</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Review Submission Modal */}
+                <Modal visible={showReviewModal} animationType="slide" transparent={true} onRequestClose={() => setShowReviewModal(false)}>
+                    <View style={styles.modalOverlayAlt}>
+                        <View style={styles.reviewModalContent}>
+                            <View style={styles.modalHeaderAlt}>
+                                <Text style={styles.modalTitleAlt}>Post Regular Review</Text>
+                                <TouchableOpacity onPress={() => setShowReviewModal(false)}>
+                                    <CloseIcon size={24} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView style={{ padding: 20 }}>
+                                <Text style={styles.modalSubLabel}>Your Rating</Text>
+                                <View style={styles.starsSelector}>
+                                    {[1, 2, 3, 4, 5].map(s => (
+                                        <TouchableOpacity key={s} onPress={() => setMyReview(prev => ({ ...prev, rating: s }))}>
+                                            <Star size={32} color={s <= myReview.rating ? '#F59E0B' : '#E2E8F0'} fill={s <= myReview.rating ? '#F59E0B' : 'transparent'} />
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <Text style={styles.modalSubLabel}>Share your experience</Text>
+                                <TextInput
+                                    style={styles.reviewInputModal}
+                                    placeholder="Tell others about the campus life, faculty, or placements..."
+                                    multiline
+                                    value={myReview.comment}
+                                    onChangeText={(t) => setMyReview(prev => ({ ...prev, comment: t }))}
+                                />
+
+                                <TouchableOpacity
+                                    style={[styles.submitBtnAlt, submittingReview && styles.disabledBtn]}
+                                    onPress={handleSubmitReview}
+                                    disabled={submittingReview}
+                                >
+                                    {submittingReview ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.submitBtnTextAlt}>Post Review</Text>}
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </View>
+                    </View>
+                </Modal>
+
+                <View style={[styles.reviewsList, { marginTop: 20 }]}>
+                    {loadingReviews ? (
+                        <ActivityIndicator color={Colors.primary} />
+                    ) : reviews.length === 0 ? (
+                        <View style={styles.emptyReviews}>
+                            <Star size={32} color={Colors.divider} />
+                            <Text style={styles.emptyText}>Be the first to review!</Text>
+                        </View>
+                    ) : (
+                        reviews.map((r, i) => (
+                            <View key={i} style={styles.reviewItem}>
+                                <View style={styles.reviewHeader}>
+                                    <Image
+                                        source={{ uri: r.userAvatar || `https://ui-avatars.com/api/?name=${r.userName || 'U'}&background=random` }}
+                                        style={styles.reviewerAvatar}
+                                    />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.reviewerName}>{r.userName || 'Anonymous'}</Text>
+                                        <View style={styles.starsRow}>
+                                            {[1, 2, 3, 4, 5].map(s => <Star key={s} size={10} color={s <= r.rating ? '#F59E0B' : '#CBD5E1'} fill={s <= r.rating ? '#F59E0B' : 'transparent'} />)}
+                                        </View>
+                                    </View>
+                                    <Text style={styles.reviewDate}>{new Date(r.createdAt).toLocaleDateString()}</Text>
+                                </View>
+                                <Text style={styles.reviewComment}>{r.comment}</Text>
+                            </View>
+                        ))
+                    )}
+                </View>
+                <View style={{ height: 40 }} />
+            </View>
+        );
+    };
+
     const renderTab = () => {
         switch (activeTab) {
             case 'Overview': return renderOverview();
@@ -414,6 +556,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
             case 'Hostel': return renderHostel();
             case 'Facilities': return renderFacilities();
             case 'Gallery': return renderGallery();
+            case 'Reviews': return renderReviews();
             default: return renderOverview();
         }
     };
@@ -678,6 +821,38 @@ const styles = StyleSheet.create({
     adminBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary + '10', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: Colors.primary + '20' },
     adminBtnText: { color: Colors.primary, fontSize: 12, fontWeight: 'bold' },
     deleteBtnSmall: { backgroundColor: Colors.error + '10', borderColor: Colors.error + '25' },
+
+    // Review Styles
+    reviewSummary: { backgroundColor: '#F8FAFC', padding: 15, borderRadius: 16, marginBottom: 20 },
+    avgBox: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+    avgText: { fontSize: 32, fontWeight: 'bold', color: Colors.text.primary },
+    starsBox: { flex: 1 },
+    starsRow: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+    reviewCount: { fontSize: 12, color: Colors.text.tertiary, marginTop: 4 },
+    submitSection: { backgroundColor: 'white', padding: 15, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9', marginBottom: 20 },
+    starsSelector: { flexDirection: 'row', gap: 10, marginBottom: 15, justifyContent: 'center' },
+    reviewInput: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, height: 80, textAlignVertical: 'top', fontSize: 14, color: Colors.text.primary, marginBottom: 15, borderWidth: 1, borderColor: '#E2E8F0' },
+    submitBtn: { backgroundColor: Colors.primary, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    submitBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+    disabledBtn: { opacity: 0.6 },
+    reviewItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+    reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+    reviewerAvatar: { width: 32, height: 32, borderRadius: 16 },
+    reviewerName: { fontSize: 14, fontWeight: '600', color: Colors.text.primary },
+    reviewDate: { fontSize: 11, color: Colors.text.tertiary },
+    reviewComment: { fontSize: 13, color: Colors.text.secondary, lineHeight: 18 },
+    emptyReviews: { alignItems: 'center', paddingVertical: 40, gap: 10 },
+
+    writeReviewBtn: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, marginTop: 15 },
+    writeReviewText: { color: 'white', fontWeight: 'bold', fontSize: 13 },
+    modalOverlayAlt: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    reviewModalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '60%' },
+    modalHeaderAlt: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+    modalTitleAlt: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary },
+    modalSubLabel: { fontSize: 14, fontWeight: '700', color: '#64748B', marginBottom: 10, marginTop: 5 },
+    reviewInputModal: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, height: 120, textAlignVertical: 'top', fontSize: 15, color: Colors.text.primary, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0' },
+    submitBtnAlt: { backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center', ...Shadows.md },
+    submitBtnTextAlt: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });
 
 export default CollegeDetailScreen;

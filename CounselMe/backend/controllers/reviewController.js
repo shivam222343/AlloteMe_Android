@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Review = require('../models/Review');
 const User = require('../models/User');
 
@@ -5,16 +6,17 @@ const User = require('../models/User');
 // @route POST /api/reviews
 exports.submitReview = async (req, res) => {
     try {
-        const { rating, comment } = req.body;
+        const { rating, comment, institutionId } = req.body;
         const userId = req.user.id;
 
         const review = await Review.create({
             user: userId,
-            userName: req.user.displayName,
+            userName: req.user.displayName || req.user.email?.split('@')[0] || 'User',
             userAvatar: req.user.preferences?.avatarUrl,
-            rating,
+            rating: Number(rating),
             comment,
-            isPublished: false // By default, not published
+            institutionId,
+            isPublished: !!institutionId // Auto-publish institution reviews for now
         });
 
         res.status(201).json({ success: true, data: review });
@@ -74,11 +76,32 @@ exports.deleteReview = async (req, res) => {
     }
 };
 
-// @desc Get published reviews (Public)
+// @desc Get reviews for specific institution
+// @route GET /api/reviews/institution/:id
+exports.getInstitutionReviews = async (req, res) => {
+    try {
+        const reviews = await Review.find({ institutionId: req.params.id }).sort('-createdAt');
+        const stats = await Review.aggregate([
+            { $match: { institutionId: new mongoose.Types.ObjectId(req.params.id) } },
+            { $group: { _id: null, avgRating: { $avg: "$rating" }, count: { $sum: 1 } } }
+        ]);
+
+        res.json({
+            success: true,
+            data: reviews,
+            stats: stats[0] || { avgRating: 0, count: 0 }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc Get published reviews (Public - global app reviews)
 // @route GET /api/reviews
 exports.getPublishedReviews = async (req, res) => {
     try {
-        const reviews = await Review.find({ isPublished: true }).sort('-createdAt');
+        const reviews = await Review.find({ isPublished: true, institutionId: null }).sort('-createdAt');
         res.json({ success: true, data: reviews });
     } catch (error) {
         console.error(error);

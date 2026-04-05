@@ -374,8 +374,12 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                             <Text style={[styles.matchPercent, { color: item.chanceColor }]}>{item.chanceLabel}</Text>
                         </View>
 
-                        <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDelete(item.key); }} style={styles.deleteBtn}>
-                            <X size={16} color="#94a3b8" />
+                        <TouchableOpacity
+                            onPress={() => handleDelete(item.key)}
+                            style={styles.deleteBtn}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <X size={18} color="#94a3b8" />
                         </TouchableOpacity>
                     </View>
 
@@ -384,6 +388,18 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                         <View style={styles.badgeRow}>
                             <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
                             <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
+                            {item.category && (
+                                <View style={[
+                                    styles.badge,
+                                    { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
+                                ]}>
+                                    <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
+                                    <Text style={[
+                                        styles.badgeText,
+                                        { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
+                                    ]}>{item.category}</Text>
+                                </View>
+                            )}
                             {item.seatType && (
                                 <View style={[
                                     styles.badge,

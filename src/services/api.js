@@ -2,10 +2,10 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://127.0.0.1:5100/api/';
+const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 // Switch to LOCAL_URL for development, RENDER_URL for production
-const API_BASE_URL = RENDER_URL;
+const API_BASE_URL = LOCAL_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -38,6 +38,7 @@ export const authAPI = {
     deleteUser: (id) => api.delete(`auth/users/${id}`),
     updateAvatarPreference: (data) => api.post('auth/update-avatar', data),
     verifyPhone: (phone) => api.put('auth/verify-phone', { phone }),
+    getAdmins: () => api.get('auth/admins'),
 };
 
 export const counselorAPI = {
@@ -69,7 +70,7 @@ export const institutionAPI = {
 export const cutoffAPI = {
     getAll: () => api.get('cutoffs'),
     predict: (data) => api.post('cutoffs/predict', data),
-    estimateRank: (percentile) => api.get('cutoffs/estimate-rank', { params: { percentile } }),
+    estimateRank: (percentile, admissionPath) => api.get('cutoffs/estimate-rank', { params: { percentile, admissionPath } }),
     getByInstitution: (id) => api.get(`cutoffs/${id}`),
     add: (data) => api.post('cutoffs', data),
     bulkAdd: (data) => api.post('cutoffs/bulk', data),
@@ -106,10 +107,21 @@ export const aiAPI = {
 
 export const reviewAPI = {
     submit: (data) => api.post('reviews', data),
+    getForInstitution: (id) => api.get(`reviews/institution/${id}`),
     getAllAdmin: () => api.get('reviews/admin'),
     getPublished: () => api.get('reviews'),
     togglePublish: (id) => api.patch(`reviews/publish/${id}`),
     delete: (id) => api.delete(`reviews/${id}`),
+};
+
+export const customFormsAPI = {
+    create: (data) => api.post('forms', data),
+    getAllAdmin: () => api.get('forms'),
+    getById: (id) => api.get(`forms/${id}`),
+    update: (id, data) => api.put(`forms/${id}`, data),
+    delete: (id) => api.delete(`forms/${id}`),
+    getResponses: (id) => api.get(`forms/${id}/responses`),
+    deleteResponse: (id) => api.delete(`forms/response/${id}`),
 };
 
 export default {
@@ -120,5 +132,6 @@ export default {
     aiAPI,
     counselorAPI,
     uploadAPI,
-    reviewAPI
+    reviewAPI,
+    customFormsAPI
 };

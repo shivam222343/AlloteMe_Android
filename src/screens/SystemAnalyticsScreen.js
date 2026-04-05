@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI } from '../services/api';
-import { TrendingUp, Users, Home, Activity } from 'lucide-react-native';
+import { TrendingUp, Users, Home, Activity, FileText, ChevronRight } from 'lucide-react-native';
 
-const SystemAnalyticsScreen = () => {
+const SystemAnalyticsScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
 
@@ -71,6 +71,21 @@ const SystemAnalyticsScreen = () => {
                     </View>
                 </View>
 
+                {/* Form Builder Entry */}
+                <TouchableOpacity
+                    style={styles.formBuilderCard}
+                    onPress={() => navigation.navigate('AdminFormBuilder')}
+                >
+                    <View style={styles.formInfo}>
+                        <FileText size={24} color={Colors.primary} />
+                        <View>
+                            <Text style={styles.formBuilderTitle}>Custom Form Builder</Text>
+                            <Text style={styles.formBuilderDesc}>Create surveys & feedback forms</Text>
+                        </View>
+                    </View>
+                    <ChevronRight size={20} color={Colors.text.tertiary} />
+                </TouchableOpacity>
+
                 {/* Registration Chart */}
                 <View style={styles.chartCard}>
                     <View style={styles.chartHeader}>
@@ -79,7 +94,7 @@ const SystemAnalyticsScreen = () => {
                     </View>
                     <LineChart
                         data={regData}
-                        width={Dimensions.get('window').width - 72}
+                        width={Dimensions.get('window').width}
                         height={220}
                         chartConfig={chartConfig}
                         bezier
@@ -95,7 +110,7 @@ const SystemAnalyticsScreen = () => {
                     </View>
                     <BarChart
                         data={predictData}
-                        width={Dimensions.get('window').width - 72}
+                        width={Dimensions.get('window').width}
                         height={220}
                         chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(139, 92, 246, ${opacity})` }}
                         style={styles.chart}
@@ -121,16 +136,32 @@ const chartConfig = {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20 },
+    container: { flex: 1, paddingVertical: 20 },
     loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    statsGrid: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-    statItem: { flex: 1, padding: 16, borderRadius: 20, alignItems: 'center', ...Shadows.xs },
+    statsGrid: { flexDirection: 'row', gap: 0, marginBottom: 20 },
+    statItem: { flex: 1, padding: 16, borderRadius: 0, alignItems: 'center' },
     statValue: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginTop: 8 },
     statLabel: { fontSize: 10, color: '#64748b', fontWeight: '600' },
-    chartCard: { backgroundColor: 'white', padding: 16, borderRadius: 24, marginBottom: 20, ...Shadows.md },
+    chartCard: { backgroundColor: 'white', paddingVertical: 16, borderRadius: 0, marginBottom: 20, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f1f5f9' },
     chartHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
     chartTitle: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
-    chart: { marginVertical: 8, borderRadius: 16 }
+    chart: { marginVertical: 8, borderRadius: 16 },
+
+    formBuilderCard: {
+        backgroundColor: 'white',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 20,
+        borderRadius: 0,
+        marginBottom: 20,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: '#f1f5f9'
+    },
+    formInfo: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+    formBuilderTitle: { fontSize: 16, fontWeight: '700', color: Colors.text.primary },
+    formBuilderDesc: { fontSize: 12, color: Colors.text.tertiary, marginTop: 2 }
 });
 
 export default SystemAnalyticsScreen;

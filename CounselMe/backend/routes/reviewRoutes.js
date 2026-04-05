@@ -4,12 +4,16 @@ const {
     submitReview,
     getAllReviews,
     getPublishedReviews,
+    getInstitutionReviews,
     togglePublish,
     deleteReview
 } = require('../controllers/reviewController');
 const { protect } = require('../middleware/authMiddleware');
 
-// Public route to get verified reviews
+// Public route to get reviews for an institution
+router.get('/institution/:id', getInstitutionReviews);
+
+// Public route to get verified global reviews
 router.get('/', getPublishedReviews);
 
 // Protected routes (submission)

@@ -8,6 +8,11 @@ const ReviewSchema = new mongoose.Schema({
     },
     userName: String,
     userAvatar: String,
+    institutionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Institution',
+        required: false
+    },
     rating: {
         type: Number,
         required: true,

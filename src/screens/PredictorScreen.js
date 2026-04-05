@@ -7,12 +7,12 @@ import Input from '../components/ui/Input';
 import { cutoffAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Shadows } from '../constants/theme';
-import { Sparkles, Settings2, ChevronDown, ChevronUp, CheckCircle2, MapPin, GitBranch, Calendar, ShieldCheck, LucideShieldCheck } from 'lucide-react-native';
+import { Sparkles, Settings2, ChevronDown, ChevronUp, CheckCircle2, MapPin, GitBranch, Calendar, ShieldCheck, LucideShieldCheck, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import Slider from '@react-native-community/slider';
 
-const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJ', 'NT1', 'NT2', 'NT3', 'SEBC', 'EWS', 'DEF', 'PWD', 'ORPHAN', 'TFWS'];
+const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJ', 'NT1', 'NT2', 'NT3', 'SEBC', 'EWS', 'DEF', 'PWD', 'ORPHAN'];
 const CATEGORICAL_BRANCHES = {
     'MHTCET PCM': [
         'Bio Technology', 'Civil Engineering', 'Computer Science and Engineering',
@@ -88,6 +88,8 @@ const PredictorScreen = ({ navigation }) => {
     const [pTolerance, setPTolerance] = useState(10);
     const [rTolerance, setRTolerance] = useState(500);
     const [isFemale, setIsFemale] = useState(false);
+    const [useTFWS, setUseTFWS] = useState(false);
+    const [infoModal, setInfoModal] = useState({ visible: false, title: '', content: '' });
 
     // Advanced Settings
     const [showAdvance, setShowAdvance] = useState(false);
@@ -109,7 +111,7 @@ const PredictorScreen = ({ navigation }) => {
         const timeout = setTimeout(async () => {
             setRankLoading(true);
             try {
-                const res = await cutoffAPI.estimateRank(percentile);
+                const res = await cutoffAPI.estimateRank(percentile, admissionPath);
                 if (res.data?.rank) {
                     setRank(res.data.rank.toString());
                 }
@@ -182,7 +184,8 @@ const PredictorScreen = ({ navigation }) => {
                 seatTypes: selectedSeatTypes.join(','),
                 year: selectedYear,
                 round: 1,
-                isFemale
+                isFemale,
+                useTFWS
             });
 
             const cleanData = res.data.map((item, index) => ({
@@ -295,17 +298,48 @@ const PredictorScreen = ({ navigation }) => {
                         ))}
                     </ScrollView>
 
-                    <View style={styles.genderRow}>
-                        <View>
-                            <Text style={styles.genderLabel}>Are you a Female Candidate?</Text>
-                            <Text style={styles.genderSub}>Include Ladies (L) category seats in results</Text>
+                    <View style={styles.toggleGrid}>
+                        <View style={styles.toggleCard}>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Text style={styles.toggleLabel}>Female Quota</Text>
+                                    <TouchableOpacity onPress={() => setInfoModal({
+                                        visible: true,
+                                        title: 'Female (L) Quota',
+                                        content: 'Ladies quota provides 30% reservation in most Maharashtra colleges. Enabling this includes seats labeled with "L" (e.g., LOPEN, LOBC) in your predictions.'
+                                    })}>
+                                        <Info size={12} color={Colors.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.toggleBase, isFemale && styles.toggleActive]}
+                                onPress={() => setIsFemale(!isFemale)}
+                            >
+                                <View style={[styles.toggleCircle, isFemale ? { right: 4 } : { left: 4 }]} />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            style={[styles.toggleBase, isFemale && styles.toggleActive]}
-                            onPress={() => setIsFemale(!isFemale)}
-                        >
-                            <View style={[styles.toggleCircle, isFemale ? { right: 4 } : { left: 4 }]} />
-                        </TouchableOpacity>
+
+                        <View style={styles.toggleCard}>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Text style={styles.toggleLabel}>TFWS Mode</Text>
+                                    <TouchableOpacity onPress={() => setInfoModal({
+                                        visible: true,
+                                        title: 'What is TFWS?',
+                                        content: 'Tuition Fee Waiver Scheme (TFWS) is for students with family income < 8 LPA. \n\nPros: 100% Tuition fee is waived.\nCons: Students cannot change their college or branch after admission through TFWS.'
+                                    })}>
+                                        <Info size={12} color={Colors.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.toggleBase, useTFWS && styles.toggleActive]}
+                                onPress={() => setUseTFWS(!useTFWS)}
+                            >
+                                <View style={[styles.toggleCircle, useTFWS ? { right: 4 } : { left: 4 }]} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View style={styles.sliderContainer}>
@@ -383,6 +417,22 @@ const PredictorScreen = ({ navigation }) => {
                 </View>
             </View>
 
+            {/* Info Modal */}
+            <Modal visible={infoModal.visible} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <Animatable.View animation="zoomIn" duration={300} style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>{infoModal.title}</Text>
+                        <Text style={styles.modalText}>{infoModal.content}</Text>
+                        <TouchableOpacity
+                            style={styles.modalCloseBtn}
+                            onPress={() => setInfoModal({ ...infoModal, visible: false })}
+                        >
+                            <Text style={styles.modalCloseText}>Got it!</Text>
+                        </TouchableOpacity>
+                    </Animatable.View>
+                </View>
+            </Modal>
+
             {/* Immersive Full Screen Loading Overlay */}
             <Modal visible={loading} transparent animationType="fade">
                 <LinearGradient
@@ -440,12 +490,19 @@ const styles = StyleSheet.create({
     catChipText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },
     catChipTextActive: { color: Colors.white },
 
-    genderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#F1F5F9' },
-    genderLabel: { fontSize: 13, fontWeight: 'bold', color: Colors.text.primary },
-    genderSub: { fontSize: 10, color: Colors.text.tertiary, marginTop: 2 },
-    toggleBase: { width: 50, height: 26, borderRadius: 13, backgroundColor: '#E2E8F0', paddingHorizontal: 4, justifyContent: 'center' },
+    toggleGrid: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+    toggleCard: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 10, borderRadius: 16, borderWidth: 1, borderColor: '#F1F5F9' },
+    toggleLabel: { fontSize: 11, fontWeight: 'bold', color: Colors.text.primary },
+    toggleBase: { width: 36, height: 20, borderRadius: 10, backgroundColor: '#E2E8F0', paddingHorizontal: 2, justifyContent: 'center' },
     toggleActive: { backgroundColor: Colors.primary },
-    toggleCircle: { width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.white, position: 'absolute' },
+    toggleCircle: { width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.white, position: 'absolute' },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { backgroundColor: Colors.white, width: '100%', borderRadius: 24, padding: 24, ...Shadows.lg },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 12 },
+    modalText: { fontSize: 14, color: Colors.text.secondary, lineHeight: 22, marginBottom: 20 },
+    modalCloseBtn: { backgroundColor: Colors.primary, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+    modalCloseText: { color: Colors.white, fontWeight: 'bold' },
 
     sliderContainer: { marginBottom: 20 },
     sliderLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },

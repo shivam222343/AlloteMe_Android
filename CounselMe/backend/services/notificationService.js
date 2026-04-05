@@ -1,13 +1,20 @@
 const Notification = require('../models/Notification');
+const GlobalNotification = require('../models/GlobalNotification');
 const { getIO } = require('../utils/socket');
 
 const sendNotification = async (userId, title, message, type = 'info') => {
     try {
         const io = getIO();
 
-        // Save to Database if specific user
+        // Save to Database
         let savedNotification = null;
-        if (userId !== 'all') {
+        if (userId === 'all') {
+            savedNotification = await GlobalNotification.create({
+                title,
+                message,
+                type
+            });
+        } else {
             savedNotification = await Notification.create({
                 user: userId,
                 title,

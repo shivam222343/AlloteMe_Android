@@ -19,12 +19,17 @@ const CATEGORY_ALIASES = {
 };
 
 const BRANCH_EXPANSION_MAP = {
-    'Computer Science': ['Computer', 'CSE', 'Comp', 'CS', 'AI', 'ML', 'Data'],
+    'Computer': ['Computer', 'CSE', 'Comp', 'CS', 'AI', 'ML', 'Data'],
+    'Science': ['Computer', 'CSE', 'Comp', 'CS'],
     'IT': ['Information', 'IT', 'Comp'],
     'ENTC': ['Electronics', 'Telecommunication', 'EXTC', 'ETC'],
+    'Electronic': ['Electronics', 'Telecommunication', 'EXTC', 'ETC'],
     'Mechanical': ['Mechanical', 'Mech', 'Production', 'Auto'],
     'Civil': ['Civil', 'Construction', 'Environmental'],
-    'Electrical': ['Electrical', 'Power']
+    'Electrical': ['Electrical', 'Power'],
+    'Pharmacy': ['Pharmacy', 'Pharma', 'B.Pharm', 'B. Farm', 'Pharmacology', 'Pharm D', 'Pharm.D'],
+    'Pharm': ['Pharmacy', 'Pharma', 'B.Pharm', 'B. Farm', 'Pharmacology', 'Pharm D', 'Pharm.D'],
+    'Doctor': ['Pharm D', 'Pharm.D', 'Doctorate of pharmacy']
 };
 
 const REGION_CITY_MAP = {
@@ -160,42 +165,45 @@ const predictColleges = async (req, res) => {
 
     let {
         percentile, rank, pTolerance = 5, rTolerance = 500, admissionPath = 'Engineering',
-        examType, category = 'OPEN', round, year, branches, regions, institutionTypes, seatTypes, isFemale
+        examType, category = 'OPEN', round, year, branches, regions, institutionTypes, seatTypes, isFemale, useTFWS
     } = data;
 
     try {
         let query = {};
-        const isEngineering = examType === 'MHTCET' || examType === 'Engineering' || examType === 'MHTCET PCM' ||
-            (!examType && (admissionPath === 'MHTCET' || admissionPath === 'Engineering' || admissionPath === 'MHTCET PCM'));
+        const isPharmacy = (admissionPath === 'PHARMACY' || admissionPath === 'MHTCET PCB') || (examType === 'PHARMACY' || examType === 'MHTCET PCB');
+        const isEngineering = !isPharmacy && (examType === 'MHTCET' || examType === 'Engineering' || examType === 'MHTCET PCM' ||
+            admissionPath === 'MHTCET' || admissionPath === 'Engineering' || admissionPath === 'MHTCET PCM');
 
-        const isPharmacy = examType === 'PHARMACY' || examType === 'MHTCET PCB' ||
-            (!examType && (admissionPath === 'PHARMACY' || admissionPath === 'MHTCET PCB'));
-
-        if (isEngineering) {
-            query.examType = { $in: ['MHTCET', 'Engineering', 'MHTCET PCM'] };
-        } else if (isPharmacy) {
+        if (isPharmacy) {
             query.examType = { $in: ['PHARMACY', 'MHTCET PCB'] };
+        } else if (isEngineering) {
+            query.examType = { $in: ['MHTCET', 'Engineering', 'MHTCET PCM'] };
         } else {
-            query.examType = examType || 'MHTCET';
+            query.examType = examType || admissionPath || 'MHTCET';
         }
 
         // 1. CATEGORY FILTER (Strict logic to exclude specialized quotas unless selected)
         const filterClauses = [];
-        const isSpecializedQuota = category === 'DEF' || category === 'PWD' || category === 'ORPHAN' || category === 'TFWS';
+        const isSpecializedQuota = category === 'DEF' || category === 'PWD' || category === 'ORPHAN' || category === 'TFWS' || useTFWS === true || useTFWS === 'true';
 
         if (category) {
-            const aliases = CATEGORY_ALIASES[category.toUpperCase()];
-            if (aliases && aliases.length > 0) {
-                query.category = { $in: aliases.map(a => new RegExp(a, 'i')) };
-            } else {
-                query.category = new RegExp(category, 'i');
+            const aliases = CATEGORY_ALIASES[category.toUpperCase()] || [category];
+            const matchingCategories = aliases.map(a => new RegExp(a, 'i'));
+
+            if (useTFWS === true || useTFWS === 'true') {
+                matchingCategories.push(/TFWS/i);
             }
+
+            query.category = { $in: matchingCategories };
         }
 
         // AUTO-EXCLUSION FOR REGULAR CATEGORIES:
         // If not sitting for a special quota, exclude seats starting with special codes.
         if (!isSpecializedQuota) {
             filterClauses.push({ category: { $not: /DEF|PWD|ORPHAN|TFWS|PH|D1|D2|D3|P1|P2|P3/i } });
+        } else if (useTFWS === true || useTFWS === 'true') {
+            // If only TFWS is active, we still want to exclude other specialized quotas like DEF/PWD
+            filterClauses.push({ category: { $not: /DEF|PWD|ORPHAN|PH|D1|D2|D3|P1|P2|P3/i } });
         }
 
         if (round && round !== 'All') query.round = parseInt(round);
@@ -209,6 +217,12 @@ const predictColleges = async (req, res) => {
                 const trimmed = b.trim();
                 if (trimmed) {
                     expandedKeywords.push(trimmed);
+
+                    // Add keywords split by spaces and parentheses for multi-term matches
+                    // This supports cases like "Pharmacy (B.farm)" matching "Pharmacy"
+                    const subKeywords = trimmed.split(/[\s\(\)\-]+/).filter(k => k.length >= 2);
+                    expandedKeywords.push(...subKeywords);
+
                     Object.keys(BRANCH_EXPANSION_MAP).forEach(key => {
                         if (trimmed.toLowerCase().includes(key.toLowerCase())) {
                             expandedKeywords.push(...BRANCH_EXPANSION_MAP[key]);
@@ -216,7 +230,7 @@ const predictColleges = async (req, res) => {
                     });
                 }
             });
-            const uniqueKeywords = [...new Set(expandedKeywords)].filter(k => k.length > 2);
+            const uniqueKeywords = [...new Set(expandedKeywords)].filter(k => k.length >= 2);
             if (uniqueKeywords.length > 0) {
                 const branchConditions = uniqueKeywords.map(k => ({
                     branch: { $regex: new RegExp(k, 'i') }
@@ -248,7 +262,13 @@ const predictColleges = async (req, res) => {
             instFilterClauses.push({
                 $or: [
                     { category: /Pharmacy/i },
-                    { category: /MHTCET PCB/i }
+                    { category: /MHTCET PCB/i },
+                    {
+                        $and: [
+                            { $or: [{ category: { $exists: false } }, { category: null }, { category: '' }] },
+                            { name: /Pharmacy|Pharma|B\.Pharm|B-Pharm|D\.Pharm|M\.Pharm/i }
+                        ]
+                    }
                 ]
             });
         } else {
@@ -401,14 +421,23 @@ const getCutoffsByInstitution = async (req, res) => {
 
 const estimateRank = async (req, res) => {
     try {
-        const { percentile } = req.query;
+        const { percentile, admissionPath, examType } = req.query;
         if (!percentile) return res.status(400).json({ message: "Percentile required" });
         const p = parseFloat(percentile);
 
-        const actualData = await Cutoff.findOne({
-            percentile: { $lte: p + 0.05, $gte: p - 0.05 },
+        const query = {
+            percentile: { $lte: p + 0.1, $gte: p - 0.1 },
             rank: { $ne: null }
-        }).sort({ percentile: -1 });
+        };
+
+        const target = examType || admissionPath;
+        if (target === 'PHARMACY' || target === 'MHTCET PCB') {
+            query.examType = 'MHTCET PCB';
+        } else if (target === 'ENGINEERING' || target === 'MHTCET PCM' || target === 'MHTCET') {
+            query.examType = 'MHTCET PCM';
+        }
+
+        const actualData = await Cutoff.findOne(query).sort({ percentile: -1 });
 
         if (actualData && actualData.rank) {
             return res.json({ rank: actualData.rank });
