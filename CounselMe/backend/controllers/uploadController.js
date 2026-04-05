@@ -20,6 +20,7 @@ const uploadImage = async (req, res) => {
         });
 
         res.json({
+            success: true,
             url: result.secure_url,
             public_id: result.public_id
         });

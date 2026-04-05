@@ -90,10 +90,13 @@ const AdminFormBuilderScreen = ({ route, navigation }) => {
             setLoading(true);
             try {
                 const formData = new FormData();
-                formData.append('file', { uri: result.assets[0].uri, name: 'banner.jpg', type: 'image/jpeg' });
-                const upRes = await uploadAPI.uploadSingle(formData);
-                if (upRes.data.success) setBannerImage(upRes.data.url);
-            } catch (err) { Alert.alert('Upload Error'); }
+                formData.append('image', { uri: result.assets[0].uri, name: 'banner.jpg', type: 'image/jpeg' });
+                const upRes = await uploadAPI.upload(formData);
+                if (upRes.data.success) {
+                    setBannerImage(upRes.data.url);
+                    Alert.alert('Success', 'Banner uploaded successfully');
+                }
+            } catch (err) { Alert.alert('Upload Error', 'Could not upload banner to cloud'); }
             finally { setLoading(false); }
         }
     };

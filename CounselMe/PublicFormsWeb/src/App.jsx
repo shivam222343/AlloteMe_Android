@@ -379,22 +379,46 @@ const FormViewer = () => {
                       colleges={q.colleges}
                       value={answers[q.id]}
                       placeholder="Choose a college from the list"
-                      onChange={(c) => handleInputChange(q.id, c.name)}
+                      onChange={(c) => {
+                        handleInputChange(q.id, c.name);
+                        // Bonus: Auto-sync any empty college_review fields in other sections
+                        const newAnswers = { ...answers, [q.id]: c.name };
+                        form.sections.forEach(s => s.questions.forEach(que => {
+                          if (que.type === 'college_review') {
+                            newAnswers[que.id] = {
+                              ...(newAnswers[que.id] || { rating: 5, comment: '' }),
+                              collegeId: c._id,
+                              collegeName: c.name
+                            };
+                          }
+                        }));
+                        setAnswers(newAnswers);
+                      }}
                     />
                   </div>
                 )}
 
                 {q.type === 'college_review' && (
                   <div className="review-block">
-                    <div className="review-label">Select Institution</div>
-                    <div className="select-wrapper" style={{ marginBottom: 20 }}>
-                      <CollegeSelector
-                        colleges={q.colleges}
-                        value={answers[q.id]?.collegeName}
-                        placeholder="Which college are you reviewing?"
-                        onChange={(c) => handleInputChange(q.id, { ...answers[q.id], collegeId: c._id, collegeName: c.name })}
-                      />
-                    </div>
+                    {(!answers[q.id]?.collegeId) && (
+                      <>
+                        <div className="review-label">Select Institution</div>
+                        <div className="select-wrapper" style={{ marginBottom: 20 }}>
+                          <CollegeSelector
+                            colleges={q.colleges}
+                            value={answers[q.id]?.collegeName}
+                            placeholder="Which college are you reviewing?"
+                            onChange={(c) => handleInputChange(q.id, { ...answers[q.id], collegeId: c._id, collegeName: c.name })}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {answers[q.id]?.collegeName && (
+                      <div className="selected-college-badge">
+                        Reviewing: <strong>{answers[q.id].collegeName}</strong>
+                      </div>
+                    )}
 
                     <div className="review-label">Your Experience</div>
                     <div className="reviewer-info" style={{ marginBottom: 15 }}>

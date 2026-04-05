@@ -464,12 +464,10 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                             <Text style={styles.reviewCount}>{reviewStats.count || 0} reviews</Text>
                         </View>
                     </View>
-                    {!isAdmin && (
-                        <TouchableOpacity style={styles.writeReviewBtn} onPress={() => setShowReviewModal(true)}>
-                            <Edit size={16} color="white" />
-                            <Text style={styles.writeReviewText}>Write a Review</Text>
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity style={styles.writeReviewBtn} onPress={() => setShowReviewModal(true)}>
+                        <Edit size={16} color="white" />
+                        <Text style={styles.writeReviewText}>Write a Review</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Review Submission Modal */}
@@ -685,7 +683,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
             </ScrollView>
 
             {/* Floating Action Button for Reviews */}
-            {activeTab === 'Reviews' && !isAdmin && (
+            {activeTab === 'Reviews' && (
                 <TouchableOpacity
                     style={styles.reviewFab}
                     onPress={() => setShowReviewModal(true)}
