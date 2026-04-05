@@ -25,6 +25,55 @@ const API_BASE = IS_LOCAL
   ? 'http://127.0.0.1:5100/api/forms'
   : 'https://alloteme-android-cqdu.onrender.com/api/forms';
 
+const CollegeSelector = ({ colleges, value, onChange, placeholder = "Select a college..." }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filtered = (colleges || []).filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.dteCode?.toLowerCase().includes(searchTerm.toLowerCase())
+  ).slice(0, 100);
+
+  return (
+    <div className="searchable-selector">
+      <div className="selector-trigger" onClick={() => setIsOpen(!isOpen)}>
+        <input
+          type="text"
+          className="aesthetic-input"
+          placeholder={searchTerm || value || placeholder}
+          value={searchTerm}
+          onChange={(e) => { setSearchTerm(e.target.value); setIsOpen(true); }}
+          onFocus={() => setIsOpen(true)}
+        />
+        <ChevronDown className={`select-icon ${isOpen ? 'rotate' : ''}`} size={18} />
+      </div>
+
+      {isOpen && (
+        <div className="selector-dropdown">
+          {filtered.length > 0 ? (
+            filtered.map(c => (
+              <div
+                key={c._id}
+                className={`selector-item ${value === c.name || value === c._id ? 'active' : ''}`}
+                onClick={() => {
+                  onChange(c);
+                  setSearchTerm('');
+                  setIsOpen(false);
+                }}
+              >
+                <div className="item-name">{c.name}</div>
+                {c.dteCode && <div className="item-code">DTE: {c.dteCode}</div>}
+              </div>
+            ))
+          ) : (
+            <div className="no-results">No colleges found matching "{searchTerm}"</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const FormViewer = () => {
   const { id } = useParams();
   const [form, setForm] = useState(null);
@@ -326,62 +375,64 @@ const FormViewer = () => {
 
                 {q.type === 'college_list' && (
                   <div className="select-wrapper">
-                    <select
-                      className="aesthetic-select"
+                    <CollegeSelector
+                      colleges={q.colleges}
                       value={answers[q.id]}
-                      onChange={(e) => handleInputChange(q.id, e.target.value)}
-                    >
-                      <option value="">Choose a college from list</option>
-                      {q.colleges?.map(c => (
-                        <option key={c._id} value={c.name}>{c.name} ({c.dteCode})</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="select-icon" size={18} />
+                      placeholder="Choose a college from the list"
+                      onChange={(c) => handleInputChange(q.id, c.name)}
+                    />
                   </div>
                 )}
 
                 {q.type === 'college_review' && (
                   <div className="review-block">
-                    <div className="select-wrapper" style={{ marginBottom: 15 }}>
-                      <select
-                        className="aesthetic-select"
-                        value={answers[q.id]?.collegeId || ''}
-                        onChange={(e) => handleInputChange(q.id, { ...answers[q.id], collegeId: e.target.value })}
-                      >
-                        <option value="">Which college are you reviewing?</option>
-                        {q.colleges?.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                      </select>
-                      <ChevronDown className="select-icon" size={18} />
+                    <div className="review-label">Select Institution</div>
+                    <div className="select-wrapper" style={{ marginBottom: 20 }}>
+                      <CollegeSelector
+                        colleges={q.colleges}
+                        value={answers[q.id]?.collegeName}
+                        placeholder="Which college are you reviewing?"
+                        onChange={(c) => handleInputChange(q.id, { ...answers[q.id], collegeId: c._id, collegeName: c.name })}
+                      />
                     </div>
 
+                    <div className="review-label">Your Experience</div>
                     <div className="reviewer-info" style={{ marginBottom: 15 }}>
                       <input
                         type="text"
                         className="aesthetic-input"
-                        placeholder="Your Name (for display on review)"
+                        placeholder="Your Display Name (Example: Shivam D.)"
                         value={answers[q.id]?.reviewerName || ''}
                         onChange={(e) => handleInputChange(q.id, { ...answers[q.id], reviewerName: e.target.value })}
                       />
                     </div>
 
-                    <div className="star-rating">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <Star
-                          key={star}
-                          size={32}
-                          fill={star <= (answers[q.id]?.rating || 0) ? '#F59E0B' : 'transparent'}
-                          strokeWidth={1.5}
-                          color={star <= (answers[q.id]?.rating || 0) ? '#F59E0B' : '#CBD5E1'}
-                          className="luxury-star"
-                          onClick={() => handleInputChange(q.id, { ...answers[q.id], rating: star })}
-                        />
-                      ))}
+                    <div className="star-rating-box">
+                      <div className="star-label">Rate your satisfaction:</div>
+                      <div className="star-rating">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <Star
+                            key={star}
+                            size={32}
+                            fill={star <= (answers[q.id]?.rating || 0) ? '#F59E0B' : 'transparent'}
+                            strokeWidth={1.5}
+                            color={star <= (answers[q.id]?.rating || 0) ? '#F59E0B' : '#CBD5E1'}
+                            className="luxury-star"
+                            onClick={() => handleInputChange(q.id, { ...answers[q.id], rating: star })}
+                          />
+                        ))}
+                      </div>
                     </div>
+
                     <textarea
                       className="aesthetic-input textarea-input review-text"
-                      placeholder="Share your detailed experience... (This will be posted to the college review tab)"
+                      placeholder="Write your review here. Be honest about placement, faculty and campus. (Minimum 10 words recommended)"
                       value={answers[q.id]?.comment || ''}
-                      onChange={(e) => handleInputChange(q.id, { ...answers[q.id], comment: e.target.value })}
+                      onChange={(e) => {
+                        handleInputChange(q.id, { ...answers[q.id], comment: e.target.value });
+                        e.target.style.height = 'auto';
+                        e.target.style.height = (e.target.scrollHeight + 2) + 'px';
+                      }}
                     />
                   </div>
                 )}

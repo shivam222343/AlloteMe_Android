@@ -17,7 +17,7 @@ exports.createForm = async (req, res) => {
                     if (q.admissionPath.includes('PCM')) searchTerms.push('Engineering', 'Technology');
                     if (q.admissionPath.includes('PCB')) searchTerms.push('Pharmacy', 'B-Pharm');
                     if (q.admissionPath.includes('NEET')) searchTerms.push('Medical', 'NEET');
-                    
+
                     const query = {
                         $or: [
                             { admissionPath: { $in: searchTerms } },
@@ -215,12 +215,12 @@ exports.submitForm = async (req, res) => {
             if (q.type === 'college_review' && ans && q.autoPostReview) {
                 const { collegeId, rating, comment, reviewerName } = ans;
                 if (collegeId && rating) {
-                    // Try to find a name: check field specific first, then global name, then default
-                    const submissionName = reviewerName || name || answers.name || answers.displayName || 'Anonymous';
-                    
+                    const submissionName = (reviewerName || name || 'Anonymous Student').trim();
+                    const randomSeed = Math.floor(Math.random() * 1000000);
+
                     await Review.create({
                         userName: submissionName,
-                        userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(submissionName)}&background=random`,
+                        userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(submissionName)}&background=random&seed=${randomSeed}`,
                         institutionId: collegeId,
                         rating: Number(rating),
                         comment: comment || '',

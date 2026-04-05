@@ -316,7 +316,108 @@ body {
   transform: scale(1.15);
 }
 
-/* Media */
+/* Searchable Selector */
+.searchable-selector {
+  position: relative;
+  z-index: 100;
+}
+
+.selector-trigger {
+  position: relative;
+}
+
+.selector-trigger .select-icon {
+  transition: transform 0.3s;
+}
+
+.selector-trigger .select-icon.rotate {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.selector-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #6366f1;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  max-height: 250px;
+  overflow-y: auto;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  margin-top: -8px;
+  background: white;
+}
+
+.selector-item {
+  padding: 12px 18px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s;
+}
+
+.selector-item:hover {
+  background: #f8fafc;
+}
+
+.selector-item.active {
+  background: #eef2ff;
+  border-left: 4px solid #6366f1;
+}
+
+.item-name {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.item-code {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.no-results {
+  padding: 20px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* Review Block Enhancements */
+.review-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  margin-top: 5px;
+}
+
+.star-rating-box {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.star-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.star-rating {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
 .premium-media {
   margin-top: 20px;
   border-radius: 12px;
@@ -527,12 +628,15 @@ body {
   .app-container {
     padding: 12px;
   }
+
   .intro-card .content {
     padding: 24px;
   }
+
   .intro-card h1 {
     font-size: 24px;
   }
+
   .question-card {
     padding: 20px;
   }

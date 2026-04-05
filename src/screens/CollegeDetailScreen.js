@@ -683,6 +683,18 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                 {/* 3 – Tab Content (inline, no nested ScrollView) */}
                 {renderTab()}
             </ScrollView>
+
+            {/* Floating Action Button for Reviews */}
+            {activeTab === 'Reviews' && !isAdmin && (
+                <TouchableOpacity
+                    style={styles.reviewFab}
+                    onPress={() => setShowReviewModal(true)}
+                    activeOpacity={0.8}
+                >
+                    <Edit size={24} color="white" />
+                    <Text style={styles.reviewFabText}>Write Review</Text>
+                </TouchableOpacity>
+            )}
         </MainLayout>
     );
 };
@@ -852,7 +864,23 @@ const styles = StyleSheet.create({
     modalSubLabel: { fontSize: 14, fontWeight: '700', color: '#64748B', marginBottom: 10, marginTop: 5 },
     reviewInputModal: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, height: 120, textAlignVertical: 'top', fontSize: 15, color: Colors.text.primary, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0' },
     submitBtnAlt: { backgroundColor: Colors.primary, paddingVertical: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center', ...Shadows.md },
-    submitBtnTextAlt: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+    submitBtnTextAlt: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+
+    reviewFab: {
+        position: 'absolute',
+        bottom: 30,
+        right: 20,
+        backgroundColor: Colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 30,
+        ...Shadows.md,
+        zIndex: 100
+    },
+    reviewFabText: { color: 'white', fontWeight: 'bold', fontSize: 14 }
 });
 
 export default CollegeDetailScreen;
