@@ -79,6 +79,7 @@ const SEAT_TYPES = [
     'All India Level'
 ];
 const YEARS = [2025, 2024, 2023, 2022];
+const ROUNDS = [1, 2, 3];
 
 const PredictorScreen = ({ navigation }) => {
     const { user, socket, admissionPath } = useAuth();
@@ -101,6 +102,7 @@ const PredictorScreen = ({ navigation }) => {
     const [selectedTypes, setSelectedTypes] = useState([]);
     const [selectedSeatTypes, setSelectedSeatTypes] = useState([]);
     const [selectedYear, setSelectedYear] = useState(2025);
+    const [selectedRound, setSelectedRound] = useState(1);
     const [loading, setLoading] = useState(false);
     const [rankLoading, setRankLoading] = useState(false);
 
@@ -186,7 +188,7 @@ const PredictorScreen = ({ navigation }) => {
                 institutionTypes: selectedTypes.join(','),
                 seatTypes: selectedSeatTypes.join(','),
                 year: selectedYear,
-                round: 1,
+                round: selectedRound,
                 isFemale,
                 useTFWS,
                 isDEF,
@@ -424,18 +426,37 @@ const PredictorScreen = ({ navigation }) => {
                             <View style={styles.advanceGroup}>
                                 <View style={styles.advanceLabelRow}>
                                     <Calendar size={14} color={Colors.text.tertiary} />
-                                    <Text style={styles.advanceLabel}>Cutoff Year</Text>
+                                    <Text style={styles.advanceLabel}>Cutoff Year & Round</Text>
                                 </View>
-                                <View style={styles.chipGrid}>
-                                    {YEARS.map(y => (
-                                        <TouchableOpacity
-                                            key={y}
-                                            style={[styles.advanceChip, selectedYear === y && styles.advanceChipActive]}
-                                            onPress={() => setSelectedYear(y)}
-                                        >
-                                            <Text style={[styles.advanceChipText, selectedYear === y && styles.advanceChipTextActive]}>{y}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                <View style={{ flexDirection: 'row', gap: 20 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.advanceLabel, { marginBottom: 8, fontSize: 10 }]}>YEAR</Text>
+                                        <View style={styles.chipGrid}>
+                                            {YEARS.map(y => (
+                                                <TouchableOpacity
+                                                    key={y}
+                                                    style={[styles.advanceChip, selectedYear === y && styles.advanceChipActive]}
+                                                    onPress={() => setSelectedYear(y)}
+                                                >
+                                                    <Text style={[styles.advanceChipText, selectedYear === y && styles.advanceChipTextActive]}>{y}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.advanceLabel, { marginBottom: 8, fontSize: 10 }]}>ROUND</Text>
+                                        <View style={styles.chipGrid}>
+                                            {ROUNDS.map(r => (
+                                                <TouchableOpacity
+                                                    key={r}
+                                                    style={[styles.advanceChip, selectedRound === r && styles.advanceChipActive]}
+                                                    onPress={() => setSelectedRound(r)}
+                                                >
+                                                    <Text style={[styles.advanceChipText, selectedRound === r && styles.advanceChipTextActive]}>R{r}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
                                 </View>
                             </View>
                         </View>
