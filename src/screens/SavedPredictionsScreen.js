@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, LayoutAnimation } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
@@ -12,6 +12,8 @@ const SavedPredictionsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const { user, toggleSavePredictionOptimistic, updateProfile } = useAuth();
     const [isReordering, setIsReordering] = useState(false);
+
+    const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : c);
 
     // Filter to handle cases where user object might be temporarily null/syncing
     const savedList = useMemo(() => user?.savedPredictions || [], [user?.savedPredictions]);
@@ -27,7 +29,7 @@ const SavedPredictionsScreen = ({ navigation }) => {
                     style: "destructive",
                     onPress: async () => {
                         const predictionData = {
-                            collegeId: item.collegeId?._id || item.collegeId,
+                            collegeId: getCollegeId(item.collegeId),
                             branch: item.branch,
                             year: item.year,
                             round: item.round
@@ -142,7 +144,7 @@ const SavedPredictionsScreen = ({ navigation }) => {
         );
     }, [navigation, handleRemove]);
 
-    if (loading) {
+    if (!user) {
         return (
             <View style={styles.center}>
                 <ActivityIndicator size="large" color={Colors.primary} />

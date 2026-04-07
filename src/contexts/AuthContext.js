@@ -284,11 +284,14 @@ export const AuthProvider = ({ children }) => {
     const toggleSavePredictionOptimistic = async (prediction) => {
         if (!user) return;
 
+        const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : c);
+        const predCollegeId = getCollegeId(prediction.collegeId);
+
         // Prediction object needs to have collegeId, branch, year, round...
         const prevSaved = [...(user.savedPredictions || [])];
 
         const existingIdx = prevSaved.findIndex(p =>
-            (p.collegeId?._id === prediction.collegeId || p.collegeId === prediction.collegeId) &&
+            getCollegeId(p.collegeId) === predCollegeId &&
             p.branch === prediction.branch &&
             p.year === prediction.year &&
             p.round === prediction.round

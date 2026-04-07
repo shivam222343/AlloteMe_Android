@@ -49,9 +49,14 @@ const PredictionResultsScreen = ({ route, navigation }) => {
     };
 
     const handleSavePrediction = async (item) => {
+        const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : (c || null));
+        const collegeId = getCollegeId(item.collegeId);
+        
+        if (!collegeId) return;
+
         // Optimized for smoothness: toggleSavePredictionOptimistic is already async but doesn't block UI
         const predictionData = {
-            collegeId: item.collegeId?._id,
+            collegeId: collegeId,
             branch: item.branch,
             year: item.year,
             round: item.round,
@@ -63,8 +68,6 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         };
 
         toggleSavePredictionOptimistic(predictionData);
-        
-        // No longer using Alert.alert for every click to keep it "smooth"
     };
 
     const userPerc = useMemo(() => parseFloat(percentile) || 0, [percentile]);
@@ -355,14 +358,17 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const renderItem = useCallback(({ item, drag, isActive, getIndex }) => {
         const index = getIndex();
+        const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : c);
+        const itemCollegeId = getCollegeId(item.collegeId);
+        
         const isSaved = user?.savedPredictions?.some(p => 
-            (p.collegeId?._id === item.collegeId?._id || p.collegeId === item.collegeId?._id) &&
+            getCollegeId(p.collegeId) === itemCollegeId &&
             p.branch === item.branch &&
             p.year === item.year &&
             p.round === item.round
         );
 
-        const isCollegeBookmarked = user?.savedColleges?.some(c => (c._id === item.collegeId?._id || c === item.collegeId?._id));
+        const isCollegeBookmarked = user?.savedColleges?.some(c => getCollegeId(c) === itemCollegeId);
 
         return (
             <TouchableOpacity
