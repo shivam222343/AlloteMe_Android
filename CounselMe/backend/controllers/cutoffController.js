@@ -17,6 +17,7 @@ const CATEGORY_ALIASES = {
     'DEF': ['DEF', 'DF', 'D1', 'D2', 'D3'],
     'PWD': ['PWD', 'PH', 'P1', 'P2', 'P3']
 };
+const BRANCH_STOP_WORDS = ['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science', 'department', 'branch', 'course', 'degree', 'diploma', 'studies', 'management', 'applied', 'general', 'basic', 'advanced', 'program', 'programme', 'group', 'specialization', 'specialisation', 'stream'];
 
 const BRANCH_EXPANSION_MAP = {
     'Computer': ['Computer', 'CSE', 'Comp', 'CS', 'AI', 'ML', 'Data'],
@@ -215,22 +216,36 @@ const predictColleges = async (req, res) => {
             const expandedKeywords = [];
             branchArray.forEach(b => {
                 const trimmed = b.trim();
+                const lowered = trimmed.toLowerCase();
+                
                 if (trimmed) {
-                    expandedKeywords.push(trimmed);
+                    // Only add the full trimmed name if it's not just a stop word
+                    if (!BRANCH_STOP_WORDS.includes(lowered)) {
+                        expandedKeywords.push(trimmed);
+                    }
 
                     // Add keywords split by spaces and parentheses for multi-term matches
-                    // This supports cases like "Pharmacy (B.farm)" matching "Pharmacy"
-                    const subKeywords = trimmed.split(/[\s\(\)\-]+/).filter(k => k.length >= 2);
+                    // We filter out common stop words and generic terms to avoid over-matching
+                    const subKeywords = trimmed.split(/[\s\(\)\-]+/)
+                        .filter(k => k.length >= 2 && !BRANCH_STOP_WORDS.includes(k.toLowerCase()));
                     expandedKeywords.push(...subKeywords);
 
+                    // Check for expansion map keys using word boundaries to avoid partial matches (like 'it' in 'Information')
                     Object.keys(BRANCH_EXPANSION_MAP).forEach(key => {
-                        if (trimmed.toLowerCase().includes(key.toLowerCase())) {
+                        const keyRegex = new RegExp(`\\b${key}\\b`, 'i');
+                        if (keyRegex.test(trimmed)) {
                             expandedKeywords.push(...BRANCH_EXPANSION_MAP[key]);
                         }
                     });
                 }
             });
-            const uniqueKeywords = [...new Set(expandedKeywords)].filter(k => k.length >= 2);
+
+            // Final cleanup: ensure no stop words slipped in, keep unique and long enough keywords
+            const uniqueKeywords = [...new Set(expandedKeywords)].filter(k => 
+                k.length >= 2 && 
+                !BRANCH_STOP_WORDS.includes(k.toLowerCase())
+            );
+
             if (uniqueKeywords.length > 0) {
                 const branchConditions = uniqueKeywords.map(k => ({
                     branch: { $regex: new RegExp(k, 'i') }

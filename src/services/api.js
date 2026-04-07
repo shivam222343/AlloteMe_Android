@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 // Switch to LOCAL_URL for development, RENDER_URL for production
-const API_BASE_URL = LOCAL_URL;
+const API_BASE_URL = RENDER_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,

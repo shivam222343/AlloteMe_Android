@@ -20,6 +20,8 @@ const BRANCH_EXPANSION_MAP = {
     'textile': ['Textile', 'TX'],
 };
 
+const BRANCH_STOP_WORDS = ['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science', 'department', 'branch', 'course', 'degree', 'diploma', 'studies', 'management', 'applied', 'general', 'basic', 'advanced', 'program', 'programme', 'group', 'specialization', 'specialisation', 'stream', 'predicted', 'prediction', 'predictor', 'suggest', 'suggestion', 'colleges', 'college', 'list', 'show', 'tell', 'about'];
+
 const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'TFWS', 'VJ', 'NT', 'SBC', 'EWS', 'EBC', 'VJNT'];
 
 // @desc    Get AI consultation with context and history
@@ -59,7 +61,10 @@ const getAICounsel = async (req, res) => {
         const isPredictionQuery = /predict|chance|cutoff|can i get|get into|admission|percentile|rank|college|suggest/i.test(lowerMsg);
 
         // Extract and expand keywords
-        let expandedKeywords = message.split(/[\s,/?!.]+/).filter(word => word.length >= 3);
+        let rawKeywords = message.split(/[\s,/?!.]+/).filter(word => 
+            word.length >= 3 && 
+            !BRANCH_STOP_WORDS.includes(word.toLowerCase())
+        );
         const branchKeywordsFound = [];
 
         // Dynamic Category Detection - prioritize all categories mentioned in chat
@@ -89,20 +94,20 @@ const getAICounsel = async (req, res) => {
             activeCategories = [userProfile.category];
         }
 
-        expandedKeywords.forEach(word => {
+        rawKeywords.forEach(word => {
             const lowWord = word.toLowerCase();
-            if (BRANCH_EXPANSION_MAP[lowWord]) {
-                branchKeywordsFound.push(...BRANCH_EXPANSION_MAP[lowWord]);
-            }
-            // Check for partial matches in the map keys
+            // Check for expansion map keys using word boundaries
             Object.keys(BRANCH_EXPANSION_MAP).forEach(key => {
-                if (key.includes(lowWord) || lowWord.includes(key)) {
+                const keyRegex = new RegExp(`\\b${key}\\b`, 'i');
+                if (keyRegex.test(lowWord)) {
                     branchKeywordsFound.push(...BRANCH_EXPANSION_MAP[key]);
                 }
             });
         });
 
-        const finalKeywords = [...new Set([...expandedKeywords, ...branchKeywordsFound])];
+        const finalKeywords = [...new Set([...rawKeywords, ...branchKeywordsFound])].filter(k => 
+            !BRANCH_STOP_WORDS.includes(k.toLowerCase())
+        );
         const searchRegex = finalKeywords.length > 0 ? new RegExp(finalKeywords.join('|'), 'i') : null;
 
         // ⚠️ CRITICAL FIX: Map user profile examType to DB stored examType values

@@ -19,11 +19,8 @@ import {
 import confetti from 'canvas-confetti';
 import './App.css';
 
-// Using address 127.0.0.1 to be more specific with backend running locally
-const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_BASE = IS_LOCAL
-  ? 'http://127.0.0.1:5100/api/forms'
-  : 'https://alloteme-android-cqdu.onrender.com/api/forms';
+// Production Render API Base
+const API_BASE = 'https://alloteme-android-cqdu.onrender.com/api/forms';
 
 const CollegeSelector = ({ colleges, value, onChange, placeholder = "Select a college..." }) => {
   const [searchTerm, setSearchTerm] = useState('');
