@@ -140,8 +140,33 @@ const getAICounsel = async (req, res) => {
         // Always run DB search for ANY counselor query
         if (isPredictionQuery || searchRegex) {
             const isBranchSpecific = branchKeywordsFound.length > 0;
+            const p = parseFloat(userProfile.percentile);
 
-            // Step A: Find colleges matching the query
+            // Strategy 2 (Branch), 3 (Percentile), 4 (Fallback) are independent of college discovery
+            const independentCutoffQueries = [];
+            if (isBranchSpecific) {
+                independentCutoffQueries.push(
+                    Cutoff.find({
+                        branch: searchRegex,
+                        category: { $in: activeCategories }
+                    }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(100).lean()
+                );
+            }
+            if (!isNaN(p)) {
+                independentCutoffQueries.push(
+                    Cutoff.find({
+                        category: { $in: activeCategories },
+                        percentile: { $lte: p + 10, $gte: p - 30 }
+                    }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(150).lean()
+                );
+            }
+            independentCutoffQueries.push(
+                Cutoff.find({
+                    category: { $in: activeCategories }
+                }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(40).lean()
+            );
+
+            // Step A: Find colleges and run independent cutoff searches in PARALLEL
             const collegeFilterConditions = [];
             if (searchRegex) {
                 collegeFilterConditions.push({ name: searchRegex });
@@ -154,87 +179,43 @@ const getAICounsel = async (req, res) => {
                 collegeFilterConditions.push({ 'location.city': new RegExp(userProfile.location, 'i') });
             }
 
-            const [knowledge, colleges] = await Promise.all([
+            const [knowledge, colleges, independentResult, reviews] = await Promise.all([
                 Knowledge.find(searchRegex ? {
                     type: { $ne: 'frequent_question' },
                     $or: [{ question: searchRegex }, { content: searchRegex }]
                 } : { type: 'general' }).limit(3).lean(),
                 collegeFilterConditions.length > 0
                     ? Institution.find({ $or: collegeFilterConditions }).limit(15).select('name location type dteCode branches').lean()
-                    : Institution.find({}).limit(5).select('name location type dteCode branches').lean()
+                    : Institution.find({}).limit(5).select('name location type dteCode branches').lean(),
+                Promise.all(independentCutoffQueries),
+                Review.find({ isPublished: true }).sort('-createdAt').limit(20).populate('institutionId', 'name').lean()
             ]);
 
             relevantKnowledge = knowledge;
             relevantColleges = colleges;
+            relevantStudentReviews = reviews;
 
             const collegeIds = colleges.map(c => c._id);
-            console.log(`[AI] Found ${colleges.length} colleges, ${collegeIds.length} IDs`);
+            const allCutoffsAccumulated = [].concat(...independentResult);
 
-            // Step B: Fetch cutoffs - use multiple strategies
-            const p = parseFloat(userProfile.percentile);
-            const cutoffTasks = [];
-
-            // Strategy 1: By specific colleges found in query
+            // Strategy 1: Specific to colleges found (MUST be sequential to getting collegeIds)
             if (collegeIds.length > 0) {
-                cutoffTasks.push(
-                    Cutoff.find({
-                        collegeId: { $in: collegeIds },
-                        category: { $in: activeCategories }
-                        // NO examType filter — search all exam types
-                    }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(100).lean()
-                );
-            }
-
-            // Strategy 2: By branch keyword + category (if branch was mentioned)
-            if (isBranchSpecific) {
-                cutoffTasks.push(
-                    Cutoff.find({
-                        branch: searchRegex,
-                        category: { $in: activeCategories }
-                        // NO examType filter
-                    }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(100).lean()
-                );
-            }
-
-            // Strategy 3: By percentile range + category (general prediction)
-            if (!isNaN(p)) {
-                cutoffTasks.push(
-                    Cutoff.find({
-                        category: { $in: activeCategories },
-                        percentile: { $lte: p + 10, $gte: p - 30 }
-                        // NO examType filter — broader results
-                    }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(150).lean()
-                );
-            }
-
-            // Strategy 4: Final fallback — any cutoffs for this category, no examType restriction
-            cutoffTasks.push(
-                Cutoff.find({
+                const specificCutoffs = await Cutoff.find({
+                    collegeId: { $in: collegeIds },
                     category: { $in: activeCategories }
-                }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(40).lean()
-            );
-
-            const [cutoffResults, reviewResults] = await Promise.all([
-                Promise.all(cutoffTasks),
-                collegeIds.length > 0
-                    ? Review.find({ institutionId: { $in: collegeIds }, isPublished: true }).sort('-createdAt').limit(20).populate('institutionId', 'name').lean()
-                    : Review.find({ isPublished: true }).sort('-createdAt').limit(5).populate('institutionId', 'name').lean()
-            ]);
-
-            const allCutoffs = [].concat(...cutoffResults);
-            const userReviews = reviewResults;
+                }).populate('collegeId', 'name location').sort({ percentile: -1 }).limit(100).lean();
+                
+                allCutoffsAccumulated.push(...specificCutoffs);
+            }
 
             // Deduplicate cutoffs
             const seen = new Set();
-            relevantCutoffs = allCutoffs.filter(c => {
-                const key = `${c.collegeId?._id}-${c.branch}-${c.category}-${c.percentile}`;
+            relevantCutoffs = allCutoffsAccumulated.filter(c => {
+                const key = `${c.collegeId?._id || c.collegeId}-${c.branch}-${c.category}-${c.percentile}`;
                 if (seen.has(key)) return false;
                 seen.add(key);
                 return true;
             });
-
-            relevantStudentReviews = userReviews;
-            console.log(`[AI] Total cutoffs: ${relevantCutoffs.length}, Reviews: ${relevantStudentReviews.length}`);
         }
 
         const relevantKnowledgeFallback = [];
