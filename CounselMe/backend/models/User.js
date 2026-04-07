@@ -101,6 +101,7 @@ const userSchema = new mongoose.Schema({
         year: Number,
         round: Number,
         percentile: Number, // Cutoff percentile
+        rank: Number,       // Cutoff rank
         category: String,
         seatType: String,
         chanceLabel: String,

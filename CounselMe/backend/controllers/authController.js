@@ -322,6 +322,12 @@ const toggleSaveCollege = async (req, res) => {
 
         // Return populated saved colleges to sync frontend state
         const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university');
+        
+        // Push update via Socket for real-time smoothness
+        if (req.io) {
+            req.io.to(req.user._id.toString()).emit('user:updated', updatedUser);
+        }
+
         res.json({ success: true, savedColleges: updatedUser.savedColleges });
     } else {
         res.status(404).json({ message: 'User not found' });
@@ -341,7 +347,9 @@ const toggleSavePrediction = async (req, res) => {
             p.collegeId.toString() === prediction.collegeId &&
             p.branch === prediction.branch &&
             p.year === prediction.year &&
-            p.round === prediction.round
+            p.round === prediction.round &&
+            (p.category || '') === (prediction.category || '') &&
+            (p.seatType || '') === (prediction.seatType || '')
         );
 
         if (existingIndex > -1) {
@@ -356,6 +364,12 @@ const toggleSavePrediction = async (req, res) => {
 
         // Return populated saved predictions to sync frontend state
         const updatedUser = await User.findById(req.user._id).populate('savedPredictions.collegeId', 'name location dteCode');
+        
+        // Push update via Socket for real-time smoothness
+        if (req.io) {
+            req.io.to(req.user._id.toString()).emit('user:updated', updatedUser);
+        }
+
         res.json({ success: true, savedPredictions: updatedUser.savedPredictions });
     } else {
         res.status(404).json({ message: 'User not found' });

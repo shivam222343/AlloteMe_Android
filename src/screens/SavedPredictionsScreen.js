@@ -1,24 +1,40 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, LayoutAnimation } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, LayoutAnimation, Platform, TextInput } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
-import { MapPin, Layers, Calendar, GripVertical, ChevronLeft, Trash2, X, ShieldCheck, Bookmark } from 'lucide-react-native';
+import { MapPin, Layers, Calendar, GripVertical, ChevronLeft, Trash2, X, ShieldCheck, Bookmark, FileText, Download, Search } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import DraggableFlatList from 'react-native-draggable-flatlist';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SavedPredictionsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const { user, toggleSavePredictionOptimistic, updateProfile } = useAuth();
     const [isReordering, setIsReordering] = useState(false);
+    const [exportingPDF, setExportingPDF] = useState(false);
+    const [exportingCSV, setExportingCSV] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const [isSearchVisible, setIsSearchVisible] = useState(false);
 
     const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : c);
 
-    // Filter to handle cases where user object might be temporarily null/syncing
-    const savedList = useMemo(() => user?.savedPredictions || [], [user?.savedPredictions]);
+    // Filter and Search logic
+    const savedList = useMemo(() => {
+        let list = user?.savedPredictions || [];
+        if (searchText) {
+            list = list.filter(item => {
+                const collName = (item.collegeId?.name || '').toLowerCase();
+                const branch = (item.branch || '').toLowerCase();
+                return collName.includes(searchText.toLowerCase()) || branch.includes(searchText.toLowerCase());
+            });
+        }
+        return list;
+    }, [user?.savedPredictions, searchText]);
 
-    const handleRemove = (item) => {
+    const handleRemove = useCallback((item) => {
         Alert.alert(
             "Remove Prediction",
             "Are you sure you want to remove this prediction from your saved list?",
@@ -39,19 +55,154 @@ const SavedPredictionsScreen = ({ navigation }) => {
                 }
             ]
         );
+    }, [toggleSavePredictionOptimistic]);
+
+    const exportToPDF = async () => {
+        if (savedList.length === 0) return;
+        setExportingPDF(true);
+        try {
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>AlloteMe Saved Predictions</title>
+                    <style>
+                        body { font-family: 'Helvetica', Arial, sans-serif; padding: 30px; color: #1e293b; background: #fff; line-height: 1.5; }
+                        .container { max-width: 900px; margin: auto; }
+                        .header { border-bottom: 3px solid #0A66C2; padding-bottom: 20px; margin-bottom: 30px; }
+                        .brand h1 { color: #0A66C2; margin: 0; font-size: 28px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; border: 1px solid #e2e8f0; }
+                        th { background-color: #0A66C2; text-align: left; padding: 12px; font-size: 11px; color: #ffffff; text-transform: uppercase; }
+                        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
+                        tr:nth-child(even) { background-color: #f8fafc; }
+                        .college-name { font-weight: 700; }
+                        .footer { margin-top: 50px; text-align: center; color: #64748b; font-size: 12px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <div class="brand">
+                                <h1>AlloteMe Saved List</h1>
+                                <p>Student ID: ${user?.email || 'User'}</p>
+                            </div>
+                        </div>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>DTE</th>
+                                    <th>Institution</th>
+                                    <th>Branch</th>
+                                    <th>Category/Quota</th>
+                                    <th>Cutoff %</th>
+                                    <th>Rank</th>
+                                    <th>Chance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${savedList.map((item, index) => `
+                                    <tr>
+                                        <td>${index + 1}</td>
+                                        <td>${item.collegeId?.dteCode || '—'}</td>
+                                        <td class="college-name">${item.collegeId?.name || 'Unknown'}</td>
+                                        <td>${item.branch}</td>
+                                        <td>${[item.category, item.seatType].filter(Boolean).join(' / ')}</td>
+                                        <td style="font-weight:bold;">${Number(item.percentile).toFixed(2)}%</td>
+                                        <td>${item.rank || '—'}</td>
+                                        <td style="color:${item.chanceColor}">${item.chanceLabel}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        <div class="footer">
+                            <p>Generated via AlloteMe Android App - Personal Admission Strategy</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            if (Platform.OS === 'web') {
+                const loadJS = (src) => new Promise((resolve) => {
+                    const s = document.createElement('script');
+                    s.src = src;
+                    s.onload = resolve;
+                    document.head.appendChild(s);
+                });
+                await loadJS('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+                await loadJS('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.autoTable({
+                    head: [['#', 'DTE', 'Institution', 'Branch', 'Category/Quota', 'Cutoff %', 'Rank', 'Chance']],
+                    body: savedList.map((item, idx) => [
+                        idx + 1,
+                        item.collegeId?.dteCode || '—',
+                        item.collegeId?.name || 'Unknown',
+                        item.branch,
+                        [item.category, item.seatType].filter(Boolean).join(' / '),
+                        `${Number(item.percentile).toFixed(2)}%`,
+                        item.rank || '—',
+                        item.chanceLabel
+                    ]),
+                });
+                doc.save('Saved_Predictions.pdf');
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+                await Sharing.shareAsync(uri);
+            }
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+        } finally {
+            setExportingPDF(false);
+        }
+    };
+
+    const exportToCSV = async () => {
+        if (savedList.length === 0) return;
+        setExportingCSV(true);
+        try {
+            let csv = '\uFEFFNo,DTE Code,College,Branch,Category,Quota,Cutoff%,Rank,Chance\n';
+            savedList.forEach((item, idx) => {
+                const name = item.collegeId?.name?.replace(/"/g, '""') || 'Unknown';
+                const branch = item.branch?.replace(/"/g, '""') || '';
+                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${name}","${branch}","${item.category || ''}","${item.seatType || ''}",${item.percentile},${item.rank || ''},${item.chanceLabel}\n`;
+            });
+
+            if (Platform.OS === 'web') {
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'Saved_Predictions.csv';
+                link.click();
+            } else {
+                const fileUri = `${FileSystem.cacheDirectory}Saved_Predictions.csv`;
+                await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
+                await Sharing.shareAsync(fileUri);
+            }
+        } catch (error) {
+            console.error('CSV Export Error:', error);
+        } finally {
+            setExportingCSV(false);
+        }
     };
 
     const handleDragEnd = async (data) => {
+        if (searchText) {
+            Alert.alert("Sort Active", "Reordering is only allowed when search is cleared.");
+            return;
+        }
+        
         try {
-            // Optimistically update local state if AuthContext supports it, 
-            // but here we just call updateProfile which will update the user state
-            setIsReordering(true);
             await updateProfile({ savedPredictions: data });
         } catch (error) {
             console.error('Error saving reorder:', error);
             Alert.alert('Error', 'Failed to save new order.');
-        } finally {
-            setIsReordering(false);
         }
     };
 
@@ -63,7 +214,7 @@ const SavedPredictionsScreen = ({ navigation }) => {
 
         return (
             <TouchableOpacity
-                onLongPress={drag}
+                onLongPress={searchText ? null : drag}
                 delayLongPress={300}
                 onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
                 disabled={isActive}
@@ -130,8 +281,14 @@ const SavedPredictionsScreen = ({ navigation }) => {
                     {item.percentile && (
                         <View style={styles.statsRow}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.statLabel}>CUTOFF</Text>
+                                <Text style={styles.statLabel}>PERCENTILE</Text>
                                 <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.statLabel}>RANK</Text>
+                                <Text style={styles.statVal}>
+                                    {item.rank || (item.percentile ? Math.round(((100 - item.percentile) / 100) * 380000) : '—')}
+                                </Text>
                             </View>
                             <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
                                 <Text style={styles.statLabel}>CHANCE</Text>
@@ -160,20 +317,40 @@ const SavedPredictionsScreen = ({ navigation }) => {
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.title}>Saved Predictions</Text>
-                    <Text style={styles.subtitle}>{savedList.length} items synced to account</Text>
+                    <Text style={styles.subtitle}>{savedList.length} items synced</Text>
+                </View>
+                <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={() => setIsSearchVisible(!isSearchVisible)} style={styles.actionIcon}><Search size={20} color={Colors.text.secondary} /></TouchableOpacity>
+                    <TouchableOpacity style={styles.exportBtn} onPress={exportToPDF} disabled={exportingPDF}>{exportingPDF ? <ActivityIndicator size="small" color={Colors.primary} /> : <FileText size={18} color={Colors.primary} />}</TouchableOpacity>
+                    <TouchableOpacity style={styles.exportBtn} onPress={exportToCSV} disabled={exportingCSV}>{exportingCSV ? <ActivityIndicator size="small" color={Colors.primary} /> : <Download size={18} color={Colors.primary} />}</TouchableOpacity>
                 </View>
             </View>
+
+            {isSearchVisible && (
+                <View style={styles.searchBar}>
+                    <Search size={16} color={Colors.text.tertiary} />
+                    <TextInput
+                        placeholder="Search saved..."
+                        style={styles.searchInput}
+                        value={searchText}
+                        onChangeText={setSearchText}
+                        autoFocus
+                    />
+                    <TouchableOpacity onPress={() => { setSearchText(''); setIsSearchVisible(false); }}><X size={16} color={Colors.text.tertiary} /></TouchableOpacity>
+                </View>
+            )}
 
             <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
                 <DraggableFlatList
                     data={savedList}
                     onDragEnd={({ data }) => handleDragEnd(data)}
-                    keyExtractor={(item) => item.key}
+                    keyExtractor={(item) => item._id || `${getCollegeId(item.collegeId)}_${item.branch}`}
                     renderItem={renderItem}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 60 }}
                     containerStyle={{ flex: 1 }}
                     activationDistance={20}
+                    dragItemOverflow={true}
                     ListEmptyComponent={
                         <View style={styles.centerEmpty}>
                             <Bookmark size={48} color="#cbd5e1" />
@@ -195,6 +372,11 @@ const styles = StyleSheet.create({
     headerTitleContainer: { flex: 1, marginLeft: 8 },
     title: { fontSize: 17, fontWeight: 'bold', color: Colors.text.primary },
     subtitle: { fontSize: 11, color: Colors.text.tertiary },
+    headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    actionIcon: { padding: 8 },
+    exportBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center' },
+    searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, margin: 12, paddingHorizontal: 12, height: 44, borderRadius: 12, ...Shadows.xs },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 14, color: Colors.text.primary },
     fullWidthItem: { width: '100%' },
     resultCard: { marginVertical: 0.5, padding: 14, borderRadius: 0, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     activeCard: {

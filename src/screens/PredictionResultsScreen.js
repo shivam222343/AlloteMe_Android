@@ -25,42 +25,71 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         }
     }, [resultsParam]);
 
-    const { user, refreshUser, toggleSavePredictionOptimistic } = useAuth();
+    const { user, refreshUser, toggleSaveOptimistic, toggleSavePredictionOptimistic } = useAuth();
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [sortBy, setSortBy] = useState('none');
     const [savingId, setSavingId] = useState(null);
+    const [localSavedPredictions, setLocalSavedPredictions] = useState(new Set());
 
-    const handleToggleSave = async (id) => {
+    // Sync local saved state with user object on mount or when user changes
+    useEffect(() => {
+        const keys = new Set();
+        (user?.savedPredictions || []).forEach(p => {
+            const collId = p.collegeId?._id || p.collegeId;
+            if (collId) {
+                const key = `${collId}_${p.branch}_${p.year}_${p.round}_${p.category || ''}_${p.seatType || ''}`;
+                keys.add(key);
+            }
+        });
+        setLocalSavedPredictions(keys);
+    }, [user?.savedPredictions]);
+
+    const handleToggleSave = useCallback(async (id) => {
         if (!id || savingId) return;
         setSavingId(id);
         try {
-            const res = await authAPI.toggleSave(id);
-            if (res.data.success) {
-                await refreshUser();
-            }
+            await toggleSaveOptimistic(id);
         } catch (error) {
-            console.error(error);
+            console.error('Save college failed:', error);
         } finally {
             setSavingId(null);
         }
-    };
+    }, [savingId, toggleSaveOptimistic]);
 
-    const handleSavePrediction = async (item) => {
+    const handleSavePrediction = useCallback(async (item) => {
         const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : (c || null));
         const collegeId = getCollegeId(item.collegeId);
         
         if (!collegeId) return;
 
-        // Optimized for smoothness: toggleSavePredictionOptimistic is already async but doesn't block UI
+        const predictionKey = `${collegeId}_${item.branch}_${item.year}_${item.round}_${item.category || ''}_${item.seatType || ''}`;
+        
+        // INSTANT UI FEEDBACK (Local state)
+        LayoutAnimation.configureNext({
+            duration: 200,
+            update: { type: LayoutAnimation.Types.easeInEaseOut },
+            create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+            delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+        });
+
+        setLocalSavedPredictions(prev => {
+            const next = new Set(prev);
+            if (next.has(predictionKey)) next.delete(predictionKey);
+            else next.add(predictionKey);
+            return next;
+        });
+
+        // Background Sync (Context state)
         const predictionData = {
             collegeId: collegeId,
             branch: item.branch,
             year: item.year,
             round: item.round,
             percentile: item.percentile,
+            rank: item.rank,
             category: item.category,
             seatType: item.seatType,
             chanceLabel: item.chanceLabel,
@@ -68,7 +97,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         };
 
         toggleSavePredictionOptimistic(predictionData);
-    };
+    }, [toggleSavePredictionOptimistic]);
 
     const userPerc = useMemo(() => parseFloat(percentile) || 0, [percentile]);
 
@@ -205,6 +234,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                                     <th>DTE Code</th>
                                     <th>Institution</th>
                                     <th>Course / Branch</th>
+                                    <th>Category/Quota</th>
                                     <th>Cutoff %</th>
                                     <th>Rank</th>
                                     <th>Chance</th>
@@ -217,6 +247,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                                         <td class="dte">${item.collegeId?.dteCode || '—'}</td>
                                         <td class="college-name">${item.collegeId?.name || 'Unknown'}</td>
                                         <td class="branch">${item.branch}</td>
+                                        <td style="font-size:10px;">${[item.category, item.seatType].filter(Boolean).join(' / ')}</td>
                                         <td style="font-weight:700;">${Number(item.percentile).toFixed(2)}%</td>
                                         <td style="color:#64748b;">${item.rank || '—'}</td>
                                         <td style="color:${item.chanceColor}">${item.chanceLabel}</td>
@@ -283,6 +314,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     item.collegeId?.dteCode || '—',
                     item.collegeId?.name || 'Unknown Institution',
                     item.branch,
+                    [item.category, item.seatType].filter(Boolean).join(' / '),
                     `${Number(item.percentile).toFixed(2)}%`,
                     item.rank || '—',
                     item.chanceLabel
@@ -291,7 +323,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 // Use the autoTable plugin
                 doc.autoTable({
                     startY: 45,
-                    head: [['#', 'DTE', 'Institution', 'Course / Branch', 'Cutoff %', 'Rank', 'Chance']],
+                    head: [['#', 'DTE', 'Institution', 'Course / Branch', 'Category/Quota', 'Cutoff %', 'Rank', 'Chance']],
                     body: tableData,
                     headStyles: { fillColor: [10, 102, 194], fontSize: 9, fontStyle: 'bold' },
                     bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
@@ -300,7 +332,8 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                         0: { cellWidth: 10 },
                         1: { cellWidth: 15 },
                         2: { cellWidth: 'auto' },
-                        6: { fontStyle: 'bold' }
+                        4: { cellWidth: 20 },
+                        7: { fontStyle: 'bold' }
                     },
                     didDrawPage: (data) => {
                         // Footer on every page
@@ -327,11 +360,11 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         if (processedResults.length === 0) return;
         setExportingCSV(true);
         try {
-            let csv = '\uFEFFNo,DTE Code,College,Branch,Cutoff%,Rank,Chance\n';
+            let csv = '\uFEFFNo,DTE Code,College,Branch,Category,Quota,Cutoff%,Rank,Chance\n';
             processedResults.forEach((item, idx) => {
                 const name = item.collegeId?.name?.replace(/"/g, '""') || 'Unknown';
                 const branch = item.branch?.replace(/"/g, '""') || '';
-                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${name}","${branch}",${item.percentile},${item.rank || ''},${item.chanceLabel}\n`;
+                csv += `${idx + 1},${item.collegeId?.dteCode || ''},"${name}","${branch}","${item.category || ''}","${item.seatType || ''}",${item.percentile},${item.rank || ''},${item.chanceLabel}\n`;
             });
 
             if (Platform.OS === 'web') {
@@ -360,19 +393,15 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         const index = getIndex();
         const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : c);
         const itemCollegeId = getCollegeId(item.collegeId);
+        const predictionKey = `${itemCollegeId}_${item.branch}_${item.year}_${item.round}_${item.category || ''}_${item.seatType || ''}`;
         
-        const isSaved = user?.savedPredictions?.some(p => 
-            getCollegeId(p.collegeId) === itemCollegeId &&
-            p.branch === item.branch &&
-            p.year === item.year &&
-            p.round === item.round
-        );
-
+        // Priority to local state for instant feel, fallback to synced user state
+        const isSaved = localSavedPredictions.has(predictionKey);
         const isCollegeBookmarked = user?.savedColleges?.some(c => getCollegeId(c) === itemCollegeId);
 
         return (
             <TouchableOpacity
-                onLongPress={drag}
+                onLongPress={searchText ? null : drag}
                 delayLongPress={300}
                 onPress={() => navigation.navigate('CollegeDetail', { id: item.collegeId?._id })}
                 disabled={isActive}
@@ -403,8 +432,19 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                             </View>
                         </View>
 
-                        <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: item.chanceColor + '10' }]}>
-                            <Text style={[styles.matchPercent, { color: item.chanceColor }]}>{item.chanceLabel}</Text>
+                        <View style={[
+                            styles.matchBadge, 
+                            { 
+                                borderColor: isSaved ? Colors.primary : item.chanceColor, 
+                                backgroundColor: isSaved ? Colors.primary + '15' : (item.chanceColor || '#0A66C2') + '10' 
+                            }
+                        ]}>
+                            <Text style={[
+                                styles.matchPercent, 
+                                { color: isSaved ? Colors.primary : (item.chanceColor || '#0A66C2') }
+                            ]}>
+                                {isSaved ? 'SAVED' : item.chanceLabel}
+                            </Text>
                         </View>
 
                         <TouchableOpacity
@@ -480,7 +520,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 </Card>
             </TouchableOpacity>
         );
-    }, [user, navigation]);
+    }, [navigation, localSavedPredictions, user?.savedColleges, handleToggleSave, handleSavePrediction]);
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -527,6 +567,10 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     onDragEnd={({ data }) => {
                         if (sortBy !== 'none') {
                             Alert.alert("Sort Active", "Reordering is only allowed in 'Priority' sort mode.");
+                            return;
+                        }
+                        if (searchText) {
+                            Alert.alert("Search Active", "Reordering is only allowed when search is cleared.");
                             return;
                         }
                         setResults(data);

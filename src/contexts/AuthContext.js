@@ -138,6 +138,14 @@ export const AuthProvider = ({ children }) => {
             setUnreadCount(prev => prev + 1);
         });
 
+        newSocket.on('user:updated', (data) => {
+            console.log('[Socket] User profile updated remotely:', data?._id);
+            if (data) {
+                // Ensure we don't accidentally wipe notifications or token if the payload is partial
+                setUser(prev => ({ ...prev, ...data }));
+            }
+        });
+
         setSocket(newSocket);
 
         return () => {
@@ -294,7 +302,9 @@ export const AuthProvider = ({ children }) => {
             getCollegeId(p.collegeId) === predCollegeId &&
             p.branch === prediction.branch &&
             p.year === prediction.year &&
-            p.round === prediction.round
+            p.round === prediction.round &&
+            (p.category || '') === (prediction.category || '') &&
+            (p.seatType || '') === (prediction.seatType || '')
         );
 
         // Immediate local UI change
