@@ -185,26 +185,36 @@ const predictColleges = async (req, res) => {
 
         // 1. CATEGORY FILTER (Strict logic to exclude specialized quotas unless selected)
         const filterClauses = [];
-        const isSpecializedQuota = category === 'DEF' || category === 'PWD' || category === 'ORPHAN' || category === 'TFWS' || useTFWS === true || useTFWS === 'true';
+
+        // Specialized Flags
+        const activeTFWS = (useTFWS === true || useTFWS === 'true');
+        const activeDEF = (data.isDEF === true || data.isDEF === 'true' || category === 'DEF');
+        const activePWD = (data.isPWD === true || data.isPWD === 'true' || category === 'PWD');
+        const activeOrphan = (data.isOrphan === true || data.isOrphan === 'true' || category === 'ORPHAN');
+
+        const isSpecializedQuota = activeTFWS || activeDEF || activePWD || activeOrphan;
 
         if (category) {
             const aliases = CATEGORY_ALIASES[category.toUpperCase()] || [category];
-            const matchingCategories = aliases.map(a => new RegExp(a, 'i'));
+            const matchingCategories = aliases.map(a => new RegExp(`^${a}$`, 'i'));
 
-            if (useTFWS === true || useTFWS === 'true') {
-                matchingCategories.push(/TFWS/i);
-            }
+            if (activeTFWS) matchingCategories.push(/TFWS/i);
+            if (activeDEF) matchingCategories.push(/DEF|DF|D1|D2|D3/i);
+            if (activePWD) matchingCategories.push(/PWD|PH|P1|P2|P3/i);
+            if (activeOrphan) matchingCategories.push(/ORPHAN/i);
 
             query.category = { $in: matchingCategories };
         }
 
-        // AUTO-EXCLUSION FOR REGULAR CATEGORIES:
-        // If not sitting for a special quota, exclude seats starting with special codes.
-        if (!isSpecializedQuota) {
-            filterClauses.push({ category: { $not: /DEF|PWD|ORPHAN|TFWS|PH|D1|D2|D3|P1|P2|P3/i } });
-        } else if (useTFWS === true || useTFWS === 'true') {
-            // If only TFWS is active, we still want to exclude other specialized quotas like DEF/PWD
-            filterClauses.push({ category: { $not: /DEF|PWD|ORPHAN|PH|D1|D2|D3|P1|P2|P3/i } });
+        // AUTO-EXCLUSION: Exclude specialized segments if they are not active
+        const exclusionSegments = [];
+        if (!activeTFWS) exclusionSegments.push('TFWS');
+        if (!activeDEF) exclusionSegments.push('DEF', 'DF', 'D1', 'D2', 'D3');
+        if (!activePWD) exclusionSegments.push('PWD', 'PH', 'P1', 'P2', 'P3');
+        if (!activeOrphan) exclusionSegments.push('ORPHAN');
+
+        if (exclusionSegments.length > 0) {
+            filterClauses.push({ category: { $not: new RegExp(exclusionSegments.join('|'), 'i') } });
         }
 
         if (round && round !== 'All') query.round = parseInt(round);

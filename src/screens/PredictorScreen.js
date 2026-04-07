@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import Slider from '@react-native-community/slider';
 
-const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJ', 'NT1', 'NT2', 'NT3', 'SEBC', 'EWS', 'DEF', 'PWD', 'ORPHAN'];
+const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'VJ', 'NT1', 'NT2', 'NT3', 'SEBC', 'EWS'];
 const CATEGORICAL_BRANCHES = {
     'MHTCET PCM': [
         'Bio Technology', 'Civil Engineering', 'Computer Science and Engineering',
@@ -89,6 +89,9 @@ const PredictorScreen = ({ navigation }) => {
     const [rTolerance, setRTolerance] = useState(500);
     const [isFemale, setIsFemale] = useState(false);
     const [useTFWS, setUseTFWS] = useState(false);
+    const [isDEF, setIsDEF] = useState(false);
+    const [isPWD, setIsPWD] = useState(false);
+    const [isOrphan, setIsOrphan] = useState(false);
     const [infoModal, setInfoModal] = useState({ visible: false, title: '', content: '' });
 
     // Advanced Settings
@@ -185,7 +188,10 @@ const PredictorScreen = ({ navigation }) => {
                 year: selectedYear,
                 round: 1,
                 isFemale,
-                useTFWS
+                useTFWS,
+                isDEF,
+                isPWD,
+                isOrphan
             });
 
             const cleanData = res.data.map((item, index) => ({
@@ -316,7 +322,7 @@ const PredictorScreen = ({ navigation }) => {
                                 style={[styles.toggleBase, isFemale && styles.toggleActive]}
                                 onPress={() => setIsFemale(!isFemale)}
                             >
-                                <View style={[styles.toggleCircle, isFemale ? { right: 4 } : { left: 4 }]} />
+                                <View style={[styles.toggleCircle, isFemale ? { right: 2 } : { left: 2 }]} />
                             </TouchableOpacity>
                         </View>
 
@@ -337,7 +343,46 @@ const PredictorScreen = ({ navigation }) => {
                                 style={[styles.toggleBase, useTFWS && styles.toggleActive]}
                                 onPress={() => setUseTFWS(!useTFWS)}
                             >
-                                <View style={[styles.toggleCircle, useTFWS ? { right: 4 } : { left: 4 }]} />
+                                <View style={[styles.toggleCircle, useTFWS ? { right: 2 } : { left: 2 }]} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Specialized Quotas Row */}
+                    <View style={[styles.toggleGrid, { marginBottom: 15 }]}>
+                        <View style={styles.toggleCard}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.toggleLabel}>Defense (DEF)</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.toggleBase, isDEF && styles.toggleActive]}
+                                onPress={() => setIsDEF(!isDEF)}
+                            >
+                                <View style={[styles.toggleCircle, isDEF ? { right: 2 } : { left: 2 }]} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.toggleCard}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.toggleLabel}>PWD / PH</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.toggleBase, isPWD && styles.toggleActive]}
+                                onPress={() => setIsPWD(!isPWD)}
+                            >
+                                <View style={[styles.toggleCircle, isPWD ? { right: 2 } : { left: 2 }]} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.toggleCard}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.toggleLabel}>Orphan</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.toggleBase, isOrphan && styles.toggleActive]}
+                                onPress={() => setIsOrphan(!isOrphan)}
+                            >
+                                <View style={[styles.toggleCircle, isOrphan ? { right: 2 } : { left: 2 }]} />
                             </TouchableOpacity>
                         </View>
                     </View>

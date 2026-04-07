@@ -22,7 +22,7 @@ const BRANCH_EXPANSION_MAP = {
 
 const BRANCH_STOP_WORDS = ['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science', 'department', 'branch', 'course', 'degree', 'diploma', 'studies', 'management', 'applied', 'general', 'basic', 'advanced', 'program', 'programme', 'group', 'specialization', 'specialisation', 'stream', 'predicted', 'prediction', 'predictor', 'suggest', 'suggestion', 'colleges', 'college', 'list', 'show', 'tell', 'about', 'engg'];
 
-const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'TFWS', 'VJ', 'NT', 'SBC', 'EWS', 'EBC', 'VJNT'];
+const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'TFWS', 'VJ', 'NT', 'SBC', 'EWS', 'EBC', 'VJNT', 'DEF', 'PWD', 'ORPHAN', 'PH'];
 
 // @desc    Get AI consultation with context and history
 // @route   POST /api/ai/counsel
