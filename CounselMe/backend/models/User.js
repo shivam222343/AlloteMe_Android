@@ -91,7 +91,22 @@ const userSchema = new mongoose.Schema({
         lastNotificationAt: { type: Date, default: null },
         notificationsToday: { type: Number, default: 0 },
         lastStatusUpdate: { type: String, default: "" } // YYYY-MM-DD
-    }
+    },
+    savedPredictions: [{
+        collegeId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Institution'
+        },
+        branch: String,
+        year: Number,
+        round: Number,
+        percentile: Number, // Cutoff percentile
+        category: String,
+        seatType: String,
+        chanceLabel: String,
+        chanceColor: String,
+        savedAt: { type: Date, default: Date.now }
+    }]
 }, {
     timestamps: true
 });

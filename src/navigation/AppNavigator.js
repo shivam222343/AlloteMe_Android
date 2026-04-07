@@ -46,6 +46,7 @@ import PricingScreen from '../screens/PricingScreen';
 import AdminFormBuilderScreen from '../screens/AdminFormBuilderScreen';
 import FormListScreen from '../screens/FormListScreen';
 import FormResponsesScreen from '../screens/FormResponsesScreen';
+import SavedPredictionsScreen from '../screens/SavedPredictionsScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -83,6 +84,7 @@ const TabNavigator = () => {
             <Tab.Screen name="PredictionResults" component={PredictionResultsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="NearbyColleges" component={NearbyCollegesScreen} />
             <Tab.Screen name="SavedColleges" component={SavedCollegesScreen} />
+            <Tab.Screen name="SavedPredictions" component={SavedPredictionsScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="CreateInstitution" component={CreateInstitutionScreen} />
             <Tab.Screen name="UploadCutoff" component={UploadCutoffScreen} />
             <Tab.Screen name="AITraining" component={AITrainingScreen} />

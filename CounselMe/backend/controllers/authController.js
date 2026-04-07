@@ -104,6 +104,7 @@ const loginUser = async (req, res) => {
             bannerUrl: user.bannerUrl,
             preferences: user.preferences,
             savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
+            savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
             token: generateToken(user._id),
             groqApiKey: user.groqApiKey,
             showAvatarPopup: !user.preferences?.hasConfirmedAvatar
@@ -177,6 +178,7 @@ const getUserProfile = async (req, res) => {
                 bannerUrl: user.bannerUrl,
                 preferences: user.preferences,
                 savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
+                savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
                 groqApiKey: user.groqApiKey,
                 isVerified: user.isVerified,
                 phoneNumber: user.phoneNumber
@@ -241,6 +243,7 @@ const updateUserProfile = async (req, res) => {
         if (req.body.expectedRegion !== undefined) user.expectedRegion = req.body.expectedRegion;
         if (req.body.bannerUrl !== undefined) user.bannerUrl = req.body.bannerUrl;
         if (req.body.preferences) user.preferences = req.body.preferences;
+        if (req.body.savedPredictions) user.savedPredictions = req.body.savedPredictions;
 
         // Handle Groq API Key (can be null if removed)
         if (req.body.groqApiKey !== undefined) {
@@ -256,23 +259,30 @@ const updateUserProfile = async (req, res) => {
         // Invalidate cache
         await redis.del(`user_profile_${req.user._id}`);
 
+        // Return populated user including saved entities
+        const finalUser = await User.findById(updatedUser._id)
+            .populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')
+            .populate('savedPredictions.collegeId', 'name location dteCode');
+
         res.json({
-            _id: updatedUser._id,
-            displayName: updatedUser.displayName,
-            email: updatedUser.email,
-            role: updatedUser.role,
-            examType: updatedUser.examType,
-            scores: updatedUser.scores,
-            percentile: updatedUser.percentile,
-            rank: updatedUser.rank,
-            location: updatedUser.location,
-            expectedRegion: updatedUser.expectedRegion,
-            bannerUrl: updatedUser.bannerUrl,
-            preferences: updatedUser.preferences,
-            groqApiKey: updatedUser.groqApiKey,
-            isVerified: updatedUser.isVerified,
-            phoneNumber: updatedUser.phoneNumber,
-            token: generateToken(updatedUser._id)
+            _id: finalUser._id,
+            displayName: finalUser.displayName,
+            email: finalUser.email,
+            role: finalUser.role,
+            examType: finalUser.examType,
+            scores: finalUser.scores,
+            percentile: finalUser.percentile,
+            rank: finalUser.rank,
+            location: finalUser.location,
+            expectedRegion: finalUser.expectedRegion,
+            bannerUrl: finalUser.bannerUrl,
+            preferences: finalUser.preferences,
+            savedColleges: finalUser.savedColleges,
+            savedPredictions: finalUser.savedPredictions,
+            groqApiKey: finalUser.groqApiKey,
+            isVerified: finalUser.isVerified,
+            phoneNumber: finalUser.phoneNumber,
+            token: generateToken(finalUser._id)
         });
     } else {
         res.status(404).json({ message: 'User not found' });
@@ -310,21 +320,43 @@ const toggleSaveCollege = async (req, res) => {
         // Invalidate cache
         await redis.del(`user_profile_${req.user._id}`);
 
-        /*
-                if (!isSaved) {
-                    const { sendNotification } = require('../services/notificationService');
-                    sendNotification(
-                        req.user._id,
-                        "College Saved ⭐",
-                        "Great choice! Saving colleges helps our prediction engine learn your interests. ❤️",
-                        "success"
-                    );
-                }
-                */
-
         // Return populated saved colleges to sync frontend state
         const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university');
         res.json({ success: true, savedColleges: updatedUser.savedColleges });
+    } else {
+        res.status(404).json({ message: 'User not found' });
+    }
+};
+
+const toggleSavePrediction = async (req, res) => {
+    const { prediction } = req.body; // { collegeId, branch, year, round, percentile, category, seatType, chanceLabel, chanceColor }
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+        if (!user.savedPredictions) user.savedPredictions = [];
+
+        // Check if already saved (match by collegeId, branch, year, round)
+        const existingIndex = user.savedPredictions.findIndex(p =>
+            p.collegeId && prediction.collegeId &&
+            p.collegeId.toString() === prediction.collegeId &&
+            p.branch === prediction.branch &&
+            p.year === prediction.year &&
+            p.round === prediction.round
+        );
+
+        if (existingIndex > -1) {
+            user.savedPredictions.splice(existingIndex, 1);
+        } else {
+            user.savedPredictions.push(prediction);
+        }
+        await user.save();
+
+        // Invalidate cache
+        await redis.del(`user_profile_${req.user._id}`);
+
+        // Return populated saved predictions to sync frontend state
+        const updatedUser = await User.findById(req.user._id).populate('savedPredictions.collegeId', 'name location dteCode');
+        res.json({ success: true, savedPredictions: updatedUser.savedPredictions });
     } else {
         res.status(404).json({ message: 'User not found' });
     }
@@ -573,5 +605,6 @@ module.exports = {
     getAdmins,
     deleteAccount,
     deleteUser,
-    updateAvatarPreference
+    updateAvatarPreference,
+    toggleSavePrediction
 };

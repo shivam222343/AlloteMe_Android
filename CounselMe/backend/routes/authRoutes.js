@@ -4,7 +4,7 @@ const {
     registerUser, loginUser, getUserProfile, updateUserProfile,
     changePassword, toggleSaveCollege, getAllUsers, getUserById, updateUserRole,
     sendOTP, verifyOTP, getDashboardStats, getAdmins, deleteAccount, deleteUser, setVerifiedPhone,
-    updateAvatarPreference
+    updateAvatarPreference, toggleSavePrediction
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -17,6 +17,7 @@ router.route('/profile')
 
 router.post('/change-password', protect, changePassword);
 router.post('/toggle-save', protect, toggleSaveCollege);
+router.post('/toggle-save-prediction', protect, toggleSavePrediction);
 router.post('/update-avatar', protect, updateAvatarPreference);
 
 router.get('/stats', protect, authorize('admin'), getDashboardStats);

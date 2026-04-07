@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
-import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck, Star } from 'lucide-react-native';
+import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck, Star, Bookmark } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import OptimizedImage from '../components/ui/OptimizedImage';
@@ -11,6 +11,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PredictionResultsScreen = ({ route, navigation }) => {
     const insets = useSafeAreaInsets();
@@ -24,7 +25,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         }
     }, [resultsParam]);
 
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, toggleSavePredictionOptimistic } = useAuth();
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
     const [searchText, setSearchText] = useState('');
@@ -45,6 +46,25 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         } finally {
             setSavingId(null);
         }
+    };
+
+    const handleSavePrediction = async (item) => {
+        // Optimized for smoothness: toggleSavePredictionOptimistic is already async but doesn't block UI
+        const predictionData = {
+            collegeId: item.collegeId?._id,
+            branch: item.branch,
+            year: item.year,
+            round: item.round,
+            percentile: item.percentile,
+            category: item.category,
+            seatType: item.seatType,
+            chanceLabel: item.chanceLabel,
+            chanceColor: item.chanceColor
+        };
+
+        toggleSavePredictionOptimistic(predictionData);
+        
+        // No longer using Alert.alert for every click to keep it "smooth"
     };
 
     const userPerc = useMemo(() => parseFloat(percentile) || 0, [percentile]);
@@ -335,7 +355,14 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const renderItem = useCallback(({ item, drag, isActive, getIndex }) => {
         const index = getIndex();
-        const isSaved = user?.savedColleges?.some(c => (c._id === item.collegeId?._id || c === item.collegeId?._id));
+        const isSaved = user?.savedPredictions?.some(p => 
+            (p.collegeId?._id === item.collegeId?._id || p.collegeId === item.collegeId?._id) &&
+            p.branch === item.branch &&
+            p.year === item.year &&
+            p.round === item.round
+        );
+
+        const isCollegeBookmarked = user?.savedColleges?.some(c => (c._id === item.collegeId?._id || c === item.collegeId?._id));
 
         return (
             <TouchableOpacity
@@ -373,6 +400,14 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                         <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: item.chanceColor + '10' }]}>
                             <Text style={[styles.matchPercent, { color: item.chanceColor }]}>{item.chanceLabel}</Text>
                         </View>
+
+                        <TouchableOpacity
+                            onPress={() => handleSavePrediction(item)}
+                            style={styles.saveBtn}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Bookmark size={18} color={isSaved ? Colors.primary : '#94a3b8'} fill={isSaved ? Colors.primary : 'transparent'} />
+                        </TouchableOpacity>
 
                         <TouchableOpacity
                             onPress={() => handleDelete(item.key)}
@@ -558,6 +593,7 @@ const styles = StyleSheet.create({
     dteText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
     matchBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', marginRight: 8 },
     matchPercent: { fontSize: 10, fontWeight: 'bold' },
+    saveBtn: { padding: 4, marginRight: 4 },
     deleteBtn: { padding: 4 },
     branchSection: { marginVertical: 8 },
     branchName: { fontSize: 13, fontWeight: '700', color: Colors.text.primary },

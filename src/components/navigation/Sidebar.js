@@ -26,7 +26,8 @@ const Sidebar = ({ navigation, state }) => {
         { label: 'Browse Colleges', icon: Search, route: 'BrowseColleges' },
         { label: 'College Predictor', icon: Target, route: 'Predictor' },
         { label: 'Nearby Colleges', icon: Users, route: 'NearbyColleges' },
-        { label: 'Saved Colleges', icon: Bookmark, route: 'SavedColleges' },
+        { label: 'Saved Colleges', icon: Star, route: 'SavedColleges' },
+        { label: 'Saved Predictions', icon: Bookmark, route: 'SavedPredictions' },
         { label: 'AI Counselor', icon: Bot, route: 'AICounselor' },
         { label: 'Settings', icon: Settings, route: 'Settings' },
     ];

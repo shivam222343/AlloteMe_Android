@@ -31,6 +31,7 @@ export const authAPI = {
     getProfile: () => api.get('auth/profile'),
     updateProfile: (data) => api.put('auth/profile', data),
     toggleSave: (collegeId) => api.post('auth/toggle-save', { collegeId }),
+    toggleSavePrediction: (prediction) => api.post('auth/toggle-save-prediction', { prediction }),
     getStats: (category) => api.get('auth/stats', { params: { category } }),
     getAllUsers: () => api.get('auth/users'),
     getUserById: (id) => api.get(`auth/users/${id}`),

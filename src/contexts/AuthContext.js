@@ -281,6 +281,58 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const toggleSavePredictionOptimistic = async (prediction) => {
+        if (!user) return;
+
+        // Prediction object needs to have collegeId, branch, year, round...
+        const prevSaved = [...(user.savedPredictions || [])];
+
+        const existingIdx = prevSaved.findIndex(p =>
+            (p.collegeId?._id === prediction.collegeId || p.collegeId === prediction.collegeId) &&
+            p.branch === prediction.branch &&
+            p.year === prediction.year &&
+            p.round === prediction.round
+        );
+
+        // Immediate local UI change
+        let newSaved;
+        if (existingIdx > -1) {
+            newSaved = prevSaved.filter((_, i) => i !== existingIdx);
+        } else {
+            // Include essential bits for local rendering until server returns populated
+            newSaved = [...prevSaved, { ...prediction, key: Date.now().toString() }];
+        }
+
+        setUser(prev => ({ ...prev, savedPredictions: newSaved }));
+
+        try {
+            const res = await authAPI.toggleSavePrediction(prediction);
+            if (res.data.success) {
+                // Final sync with server-populated entities
+                setUser(prev => ({ ...prev, savedPredictions: res.data.savedPredictions }));
+            }
+        } catch (error) {
+            console.error('[AuthContext] Toggle save prediction error:', error);
+            // Rollback on error
+            setUser(prev => ({ ...prev, savedPredictions: prevSaved }));
+        }
+    };
+
+    const updateProfile = async (data) => {
+        try {
+            const response = await authAPI.updateProfile(data);
+            if (response.data) {
+                // Remove password from local state if present
+                const { token, ...userData } = response.data;
+                setUser(userData);
+                return { success: true, data: userData };
+            }
+        } catch (error) {
+            console.error('[AuthContext] Update profile error:', error);
+            return { success: false, message: error.response?.data?.message || 'Update failed' };
+        }
+    };
+
     return (
         <AuthContext.Provider value={{
             isAuthenticated: !!user,
@@ -291,7 +343,9 @@ export const AuthProvider = ({ children }) => {
             register,
             logout,
             refreshUser,
+            updateProfile,
             toggleSaveOptimistic,
+            toggleSavePredictionOptimistic,
             hasSkippedProfile,
             setHasSkippedProfile,
             socket,
