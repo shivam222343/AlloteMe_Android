@@ -17,7 +17,7 @@ const CATEGORY_ALIASES = {
     'DEF': ['DEF', 'DF', 'D1', 'D2', 'D3'],
     'PWD': ['PWD', 'PH', 'P1', 'P2', 'P3']
 };
-const BRANCH_STOP_WORDS = ['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science', 'department', 'branch', 'course', 'degree', 'diploma', 'studies', 'management', 'applied', 'general', 'basic', 'advanced', 'program', 'programme', 'group', 'specialization', 'specialisation', 'stream'];
+const BRANCH_STOP_WORDS = ['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science', 'department', 'branch', 'course', 'degree', 'diploma', 'studies', 'management', 'applied', 'general', 'basic', 'advanced', 'program', 'programme', 'group', 'specialization', 'specialisation', 'stream', 'engg'];
 
 const BRANCH_EXPANSION_MAP = {
     'Computer': ['Computer', 'CSE', 'Comp', 'CS', 'AI', 'ML', 'Data'],
@@ -247,9 +247,13 @@ const predictColleges = async (req, res) => {
             );
 
             if (uniqueKeywords.length > 0) {
-                const branchConditions = uniqueKeywords.map(k => ({
-                    branch: { $regex: new RegExp(k, 'i') }
-                }));
+                const branchConditions = uniqueKeywords.map(k => {
+                    // Escape special characters for regex safety
+                    const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    return {
+                        branch: { $regex: new RegExp(`\\b${escaped}\\b`, 'i') }
+                    };
+                });
                 filterClauses.push({ $or: branchConditions });
             }
         }

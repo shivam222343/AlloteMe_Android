@@ -20,7 +20,7 @@ const BRANCH_EXPANSION_MAP = {
     'textile': ['Textile', 'TX'],
 };
 
-const BRANCH_STOP_WORDS = ['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science', 'department', 'branch', 'course', 'degree', 'diploma', 'studies', 'management', 'applied', 'general', 'basic', 'advanced', 'program', 'programme', 'group', 'specialization', 'specialisation', 'stream', 'predicted', 'prediction', 'predictor', 'suggest', 'suggestion', 'colleges', 'college', 'list', 'show', 'tell', 'about'];
+const BRANCH_STOP_WORDS = ['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science', 'department', 'branch', 'course', 'degree', 'diploma', 'studies', 'management', 'applied', 'general', 'basic', 'advanced', 'program', 'programme', 'group', 'specialization', 'specialisation', 'stream', 'predicted', 'prediction', 'predictor', 'suggest', 'suggestion', 'colleges', 'college', 'list', 'show', 'tell', 'about', 'engg'];
 
 const CATEGORIES = ['OPEN', 'OBC', 'SC', 'ST', 'TFWS', 'VJ', 'NT', 'SBC', 'EWS', 'EBC', 'VJNT'];
 
@@ -108,7 +108,12 @@ const getAICounsel = async (req, res) => {
         const finalKeywords = [...new Set([...rawKeywords, ...branchKeywordsFound])].filter(k => 
             !BRANCH_STOP_WORDS.includes(k.toLowerCase())
         );
-        const searchRegex = finalKeywords.length > 0 ? new RegExp(finalKeywords.join('|'), 'i') : null;
+        
+        // Match only whole words to prevent false positives (like CS matching Electronics)
+        const escapedKeywords = finalKeywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const searchRegex = escapedKeywords.length > 0 
+            ? new RegExp(escapedKeywords.map(k => `\\b${k}\\b`).join('|'), 'i') 
+            : null;
 
         // ⚠️ CRITICAL FIX: Map user profile examType to DB stored examType values
         // Cutoff model stores: 'MHTCET PCM', 'MHTCET PCB', 'JEE', 'NEET', 'PHARMACY', 'BBA'
