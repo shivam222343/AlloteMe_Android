@@ -35,9 +35,27 @@ const SavedPredictionsScreen = ({ navigation }) => {
     }, [user?.savedPredictions, searchText]);
 
     const handleRemove = useCallback((item) => {
+        const title = "Remove Prediction";
+        const message = "Are you sure you want to remove this prediction from your saved list?";
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                const predictionData = {
+                    collegeId: getCollegeId(item.collegeId),
+                    branch: item.branch,
+                    year: item.year,
+                    round: item.round,
+                    category: item.category,
+                    seatType: item.seatType
+                };
+                toggleSavePredictionOptimistic(predictionData);
+            }
+            return;
+        }
+
         Alert.alert(
-            "Remove Prediction",
-            "Are you sure you want to remove this prediction from your saved list?",
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -48,7 +66,9 @@ const SavedPredictionsScreen = ({ navigation }) => {
                             collegeId: getCollegeId(item.collegeId),
                             branch: item.branch,
                             year: item.year,
-                            round: item.round
+                            round: item.round,
+                            category: item.category,
+                            seatType: item.seatType
                         };
                         toggleSavePredictionOptimistic(predictionData);
                     }

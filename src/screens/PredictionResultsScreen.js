@@ -566,11 +566,15 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     data={processedResults}
                     onDragEnd={({ data }) => {
                         if (sortBy !== 'none') {
-                            Alert.alert("Sort Active", "Reordering is only allowed in 'Priority' sort mode.");
+                            const msg = "Reordering is only allowed in 'Priority' sort mode.";
+                            if (Platform.OS === 'web') alert(msg);
+                            else Alert.alert("Sort Active", msg);
                             return;
                         }
                         if (searchText) {
-                            Alert.alert("Search Active", "Reordering is only allowed when search is cleared.");
+                            const msg = "Reordering is only allowed when search is cleared.";
+                            if (Platform.OS === 'web') alert(msg);
+                            else Alert.alert("Search Active", msg);
                             return;
                         }
                         setResults(data);
