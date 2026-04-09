@@ -260,44 +260,6 @@ const StudentDashboard = ({ navigation }) => {
                     <Text style={styles.nameText}>{user?.displayName} 👋</Text>
                 </View>
 
-                {/* Subscription Status Card */}
-                <TouchableOpacity 
-                    style={styles.subCard} 
-                    onPress={() => navigation.navigate('Pricing')}
-                    activeOpacity={0.9}
-                >
-                    <LinearGradient
-                        colors={[Colors.primary, '#4338CA']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.subGradient}
-                    >
-                        <View style={styles.subInfo}>
-                            <View style={styles.subBadge}>
-                                <Crown size={12} color="white" fill="white" />
-                                <Text style={styles.subBadgeText}>
-                                    {(user?.subscription?.type || 'Free').toUpperCase()} PLAN
-                                </Text>
-                            </View>
-                            <Text style={styles.subTitle}>Ready for your dream college?</Text>
-                            <Text style={styles.subDesc}>Track your counseling resources</Text>
-                        </View>
-                        <View style={styles.perkContainer}>
-                            <View style={styles.perkItem}>
-                                <Sparkles size={14} color="white" />
-                                <Text style={styles.perkVal}>
-                                    {user?.subscription?.usage?.aiPrompts || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts}
-                                </Text>
-                            </View>
-                            <View style={styles.perkItem}>
-                                <Target size={14} color="white" />
-                                <Text style={styles.perkVal}>
-                                    {user?.subscription?.usage?.predictions || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions}
-                                </Text>
-                            </View>
-                        </View>
-                    </LinearGradient>
-                </TouchableOpacity>
 
                 {/* Admission Path Selector */}
                 <View style={styles.pathSelectorContainer}>
@@ -373,6 +335,48 @@ const StudentDashboard = ({ navigation }) => {
                 <View style={styles.statsRow}>
                     {stats.map((s, i) => <StatCard key={i} item={s} />)}
                 </View>
+
+                {/* Subscription Status Card - Premium Feel */}
+                <TouchableOpacity 
+                    style={styles.premiumSubCard} 
+                    onPress={() => navigation.navigate('Pricing')}
+                    activeOpacity={0.9}
+                >
+                    <View style={styles.premiumSubInfo}>
+                        <View style={styles.premiumSubBadge}>
+                            <Crown size={12} color="#F59E0B" fill="#F59E0B" />
+                            <Text style={styles.premiumSubBadgeText}>
+                                {(user?.subscription?.type || 'Free').toUpperCase()} PLAN
+                            </Text>
+                        </View>
+                        <Text style={styles.premiumSubTitle}>Your Admissions Power-Ups</Text>
+                        <Text style={styles.premiumSubDesc}>Keep track of your usage & limits</Text>
+                    </View>
+                    <View style={styles.premiumPerkContainer}>
+                        <View style={styles.premiumPerkItem}>
+                            <View style={[styles.premiumPerkIcon, { backgroundColor: '#F59E0B15' }]}>
+                                <Zap size={14} color="#F59E0B" fill="#F59E0B" />
+                            </View>
+                            <View>
+                                <Text style={styles.premiumPerkLabel}>AI Prompts</Text>
+                                <Text style={styles.premiumPerkVal}>
+                                    {user?.subscription?.usage?.aiPrompts || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts}
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={styles.premiumPerkItem}>
+                            <View style={[styles.premiumPerkIcon, { backgroundColor: '#8B5CF615' }]}>
+                                <Target size={14} color="#8B5CF6" fill="#8B5CF6" />
+                            </View>
+                            <View>
+                                <Text style={styles.premiumPerkLabel}>Predictions</Text>
+                                <Text style={styles.premiumPerkVal}>
+                                    {user?.subscription?.usage?.predictions || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                </TouchableOpacity>
 
                 <View style={[styles.sectionHeader, { marginTop: 8 }]}>
                     <Text style={styles.sectionTitle}>Counseling Tools</Text>
@@ -571,46 +575,78 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.white
     },
-    subCard: {
+    premiumSubCard: {
+        backgroundColor: Colors.white,
         marginHorizontal: 16,
-        borderRadius: 24,
-        overflow: 'hidden',
         marginBottom: 24,
-        ...Shadows.md
-    },
-    subGradient: {
-        padding: 20,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-    },
-    subInfo: { flex: 1 },
-    subBadge: {
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: '#F59E0B',
+        padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'space-between',
+        ...Shadows.sm,
+    },
+    premiumSubInfo: {
+        flex: 1,
+    },
+    premiumSubBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F59E0B10',
         paddingHorizontal: 8,
         paddingVertical: 4,
-        borderRadius: 8,
+        borderRadius: 6,
         alignSelf: 'flex-start',
-        marginBottom: 8
+        marginBottom: 8,
+        gap: 6
     },
-    subBadgeText: { color: 'white', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-    subTitle: { fontSize: 17, fontWeight: 'bold', color: 'white' },
-    subDesc: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-    perkContainer: { gap: 8 },
-    perkItem: {
+    premiumSubBadgeText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#F59E0B',
+        letterSpacing: 0.5
+    },
+    premiumSubTitle: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+        marginBottom: 2
+    },
+    premiumSubDesc: {
+        fontSize: 12,
+        color: Colors.text.tertiary,
+    },
+    premiumPerkContainer: {
+        flexDirection: 'column',
+        gap: 12,
+        paddingLeft: 16,
+        borderLeftWidth: 1,
+        borderLeftColor: '#F1F5F9',
+    },
+    premiumPerkItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 12,
-        minWidth: 70
+        gap: 10
     },
-    perkVal: { color: 'white', fontSize: 12, fontWeight: 'bold' }
+    premiumPerkIcon: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    premiumPerkLabel: {
+        fontSize: 10,
+        color: Colors.text.tertiary,
+        marginBottom: 1
+    },
+    premiumPerkVal: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+    },
 });
 
 export default StudentDashboard;

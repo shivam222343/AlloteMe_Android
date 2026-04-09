@@ -13,7 +13,20 @@ const API_BASE_URL = RENDER_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const [user, setUserState] = useState(null);
+    
+    // Custom setUser that also handles initialization
+    const setUser = (data) => {
+        if (data && !data.subscription) {
+            data.subscription = {
+                type: 'free',
+                usage: { aiPrompts: 0, predictions: 0, exports: 0 }
+            };
+        } else if (data && data.subscription && !data.subscription.usage) {
+            data.subscription.usage = { aiPrompts: 0, predictions: 0, exports: 0 };
+        }
+        setUserState(data);
+    };
     const [loading, setLoading] = useState(true);
     const [hasSkippedProfile, setHasSkippedProfile] = useState(false);
     const [socket, setSocket] = useState(null);
@@ -207,16 +220,7 @@ export const AuthProvider = ({ children }) => {
     const refreshUser = async () => {
         try {
             const response = await authAPI.getProfile();
-            const userData = response.data;
-            
-            // Initialize subscription if missing
-            if (!userData.subscription) {
-                userData.subscription = {
-                    type: 'free',
-                    usage: { aiPrompts: 0, predictions: 0, exports: 0 }
-                };
-            }
-            setUser(userData);
+            setUser(response.data);
         } catch (error) {
             console.error('Failed to refresh user', error);
         }
@@ -266,7 +270,19 @@ export const AuthProvider = ({ children }) => {
             const token = await AsyncStorage.getItem('userToken');
             if (token) {
                 const response = await authAPI.getProfile();
-                setUser(response.data);
+                const userData = response.data;
+                
+                // Ensure subscription object exists
+                if (!userData.subscription) {
+                    userData.subscription = {
+                        type: 'free',
+                        usage: { aiPrompts: 0, predictions: 0, exports: 0 }
+                    };
+                } else if (!userData.subscription.usage) {
+                    userData.subscription.usage = { aiPrompts: 0, predictions: 0, exports: 0 };
+                }
+                
+                setUser(userData);
             }
         } catch (error) {
             console.error('Failed to load user', error);

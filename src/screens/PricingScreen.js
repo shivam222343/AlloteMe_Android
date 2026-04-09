@@ -90,7 +90,11 @@ const PricingScreen = ({ navigation }) => {
 
             const res = await updateProfile({ subscription: updatedSubscription });
             if (res.success) {
-                setSuccessMessage(`You've successfully upgraded to the ${plan.name} Plan! ✨`);
+                const message = plan.id === 'free' 
+                    ? "Congratulations! Your Free Plan has been activated! 🎓✨"
+                    : `Congratulations! You've successfully upgraded to the ${plan.name} Plan! 🎊🏆✨`;
+                
+                setSuccessMessage(message);
                 setShowSuccess(true);
                 Animated.spring(successAnim, {
                     toValue: 1,
@@ -183,7 +187,7 @@ const PricingScreen = ({ navigation }) => {
                 alert('You are already on the Free plan!');
                 return;
             }
-            // Logic to switch back to free if allowed
+            successHandler('free_activation');
         } else {
             let RazorpayCheckout;
             try {
