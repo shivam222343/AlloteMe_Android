@@ -107,7 +107,16 @@ const userSchema = new mongoose.Schema({
         chanceLabel: String,
         chanceColor: String,
         savedAt: { type: Date, default: Date.now }
-    }]
+    }],
+    subscription: {
+        type: { type: String, enum: ['free', 'standard', 'advance'], default: 'free' },
+        paymentId: { type: String },
+        usage: {
+            aiPrompts: { type: Number, default: 0 },
+            predictions: { type: Number, default: 0 },
+            exports: { type: Number, default: 0 }
+        }
+    }
 }, {
     timestamps: true
 });

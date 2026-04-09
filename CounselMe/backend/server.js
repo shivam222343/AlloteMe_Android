@@ -71,6 +71,7 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/counselors', require('./routes/counselorRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/forms', require('./routes/formRoutes'));
+app.use('/api/system', require('./routes/systemRoutes'));
 // Public HTML form viewer (shorthand /forms/view/:id)
 app.use('/forms', require('./routes/formRoutes'));
 app.get('/', (req, res) => {

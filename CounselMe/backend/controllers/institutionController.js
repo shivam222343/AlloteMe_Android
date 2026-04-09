@@ -212,7 +212,7 @@ const updateInstitution = async (req, res) => {
         const institution = await Institution.findByIdAndUpdate(
             req.params.id,
             { $set: req.body },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         );
 
         // Invalidate specific and list caches

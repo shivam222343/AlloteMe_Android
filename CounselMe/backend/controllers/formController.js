@@ -125,7 +125,7 @@ exports.updateForm = async (req, res) => {
         const form = await Form.findByIdAndUpdate(
             req.params.id,
             { ...rest, ...(updatedSections && { sections: updatedSections }) },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!form) return res.status(404).json({ success: false, message: 'Form not found' });

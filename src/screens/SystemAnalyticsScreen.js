@@ -1,28 +1,91 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity, TextInput, Alert, Switch } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
-import { authAPI } from '../services/api';
-import { TrendingUp, Users, Home, Activity, FileText, ChevronRight } from 'lucide-react-native';
+import { authAPI, systemAPI } from '../services/api';
+import { TrendingUp, Users, Home, Activity, FileText, ChevronRight, Settings, Tag, Trash2, Save, Plus } from 'lucide-react-native';
 
 const SystemAnalyticsScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
+    
+    const [basicPrice, setBasicPrice] = useState('99');
+    const [premiumPrice, setPremiumPrice] = useState('499');
+    
+    const [coupons, setCoupons] = useState([]);
+    const [newCouponCode, setNewCouponCode] = useState('');
+    const [newCouponDiscount, setNewCouponDiscount] = useState('');
 
     useEffect(() => {
-        fetchAnalytics();
+        fetchData();
     }, []);
 
-    const fetchAnalytics = async () => {
+    const fetchData = async () => {
         try {
-            const res = await authAPI.getStats();
-            setData(res.data);
+            const [statsRes, settingsRes, couponsRes] = await Promise.all([
+                authAPI.getStats(),
+                systemAPI.getSettings(),
+                systemAPI.getCoupons()
+            ]);
+            setData(statsRes.data);
+            if (settingsRes.data.basicPrice) setBasicPrice(settingsRes.data.basicPrice.toString());
+            if (settingsRes.data.premiumPrice) setPremiumPrice(settingsRes.data.premiumPrice.toString());
+            setCoupons(couponsRes.data || []);
         } catch (error) {
-            console.error('Failed to fetch analytics', error);
+            console.error('Failed to fetch admin data', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSavePrices = async () => {
+        try {
+            await systemAPI.updateSetting({ key: 'basicPrice', value: Number(basicPrice) });
+            await systemAPI.updateSetting({ key: 'premiumPrice', value: Number(premiumPrice) });
+            Alert.alert('Success', 'Pricing updated successfully!');
+        } catch (e) {
+            Alert.alert('Error', 'Failed to update pricing');
+        }
+    };
+
+    const handleCreateCoupon = async () => {
+        if (!newCouponCode || !newCouponDiscount) return;
+        try {
+            const res = await systemAPI.createCoupon({
+                code: newCouponCode.toUpperCase(),
+                discountPercentage: Number(newCouponDiscount),
+                maxUses: 0 // Unlimited by default here, can enhance later
+            });
+            setCoupons([res.data, ...coupons]);
+            setNewCouponCode('');
+            setNewCouponDiscount('');
+        } catch (e) {
+            Alert.alert('Error', e.response?.data?.message || 'Failed to create coupon');
+        }
+    };
+
+    const handleToggleCoupon = async (id) => {
+        try {
+            const res = await systemAPI.toggleCoupon(id);
+            setCoupons(coupons.map(c => c._id === id ? res.data : c));
+        } catch (e) {
+            Alert.alert('Error', 'Failed to toggle coupon');
+        }
+    };
+
+    const handleDeleteCoupon = async (id) => {
+        Alert.alert('Delete', 'Are you sure?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: async () => {
+                try {
+                    await systemAPI.deleteCoupon(id);
+                    setCoupons(coupons.filter(c => c._id !== id));
+                } catch (e) {
+                    Alert.alert('Error', 'Failed to delete coupon');
+                }
+            }}
+        ]);
     };
 
     if (loading) {
@@ -36,18 +99,16 @@ const SystemAnalyticsScreen = ({ navigation }) => {
     }
 
     const regData = {
-        labels: data?.analytics?.registrations.map(r => r._id.slice(5)) || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        datasets: [{
-            data: data?.analytics?.registrations.map(r => r.count) || [0, 0, 0, 0, 0, 0, 0]
-        }]
+        labels: data?.analytics?.registrations.map(r => r._id.slice(5)) || ['Mon'],
+        datasets: [{ data: data?.analytics?.registrations.map(r => r.count) || [0] }]
     };
+    if (regData.labels.length === 0) { regData.labels = ['None']; regData.datasets[0].data = [0]; }
 
     const predictData = {
-        labels: data?.analytics?.predictionHits.map(p => p.day) || ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
-        datasets: [{
-            data: data?.analytics?.predictionHits.map(p => p.count) || [0, 0, 0, 0, 0, 0, 0]
-        }]
+        labels: data?.analytics?.predictionHits.map(p => p.day) || ['M'],
+        datasets: [{ data: data?.analytics?.predictionHits.map(p => p.count) || [0] }]
     };
+    if (predictData.labels.length === 0) { predictData.labels = ['None']; predictData.datasets[0].data = [0]; }
 
     return (
         <MainLayout title="Intelligence Dashboard">
@@ -56,19 +117,98 @@ const SystemAnalyticsScreen = ({ navigation }) => {
                 <View style={styles.statsGrid}>
                     <View style={[styles.statItem, { backgroundColor: '#eff6ff' }]}>
                         <Users size={20} color="#3b82f6" />
-                        <Text style={styles.statValue}>{data?.users}</Text>
+                        <Text style={styles.statValue}>{data?.users || 0}</Text>
                         <Text style={styles.statLabel}>Total Students</Text>
                     </View>
                     <View style={[styles.statItem, { backgroundColor: '#f0fdf4' }]}>
                         <Home size={20} color="#10b981" />
-                        <Text style={styles.statValue}>{data?.institutions}</Text>
+                        <Text style={styles.statValue}>{data?.institutions || 0}</Text>
                         <Text style={styles.statLabel}>Institutions</Text>
                     </View>
                     <View style={[styles.statItem, { backgroundColor: '#fef2f2' }]}>
                         <Activity size={20} color="#ef4444" />
-                        <Text style={styles.statValue}>{data?.analytics?.activeSessions}</Text>
+                        <Text style={styles.statValue}>{data?.analytics?.activeSessions || 0}</Text>
                         <Text style={styles.statLabel}>Active Now</Text>
                     </View>
+                </View>
+
+                {/* Pricing Configuration */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <Settings size={20} color={Colors.primary} />
+                        <Text style={styles.sectionTitle}>Pricing Configuration</Text>
+                    </View>
+                    
+                    <View style={styles.inputRow}>
+                        <Text style={styles.inputLabel}>Basic Plan Price (₹)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={basicPrice}
+                            onChangeText={setBasicPrice}
+                            keyboardType="numeric"
+                        />
+                    </View>
+                    <View style={styles.inputRow}>
+                        <Text style={styles.inputLabel}>Premium Plan Price (₹)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={premiumPrice}
+                            onChangeText={setPremiumPrice}
+                            keyboardType="numeric"
+                        />
+                    </View>
+                    
+                    <TouchableOpacity style={styles.saveBtn} onPress={handleSavePrices}>
+                        <Save size={18} color="white" />
+                        <Text style={styles.saveBtnText}>Save Pricing</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Coupon Manager */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <Tag size={20} color={Colors.primary} />
+                        <Text style={styles.sectionTitle}>Coupon Codes</Text>
+                    </View>
+                    
+                    <View style={styles.addCouponBox}>
+                        <TextInput
+                            style={[styles.input, { flex: 2, marginRight: 8 }]}
+                            placeholder="CODE (e.g. FLAT50)"
+                            value={newCouponCode}
+                            onChangeText={setNewCouponCode}
+                            autoCapitalize="characters"
+                        />
+                        <TextInput
+                            style={[styles.input, { flex: 1, marginRight: 8 }]}
+                            placeholder="% Off"
+                            value={newCouponDiscount}
+                            onChangeText={setNewCouponDiscount}
+                            keyboardType="numeric"
+                        />
+                        <TouchableOpacity style={styles.addBtn} onPress={handleCreateCoupon}>
+                            <Plus size={20} color="white" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {coupons.map(coupon => (
+                        <View key={coupon._id} style={styles.couponItem}>
+                            <View>
+                                <Text style={styles.couponCode}>{coupon.code} <Text style={styles.couponDiscount}>({coupon.discountPercentage}% OFF)</Text></Text>
+                                <Text style={styles.couponUses}>Used: {coupon.timesUsed}</Text>
+                            </View>
+                            <View style={styles.couponActions}>
+                                <Switch 
+                                    value={coupon.isActive} 
+                                    onValueChange={() => handleToggleCoupon(coupon._id)} 
+                                    trackColor={{ true: Colors.primary, false: '#cbd5e1' }}
+                                />
+                                <TouchableOpacity onPress={() => handleDeleteCoupon(coupon._id)} style={styles.delBtn}>
+                                    <Trash2 size={18} color={Colors.error} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ))}
                 </View>
 
                 {/* Form Builder Entry */}
@@ -102,22 +242,6 @@ const SystemAnalyticsScreen = ({ navigation }) => {
                     />
                 </View>
 
-                {/* Prediction Chart */}
-                <View style={styles.chartCard}>
-                    <View style={styles.chartHeader}>
-                        <Activity size={18} color="#8b5cf6" />
-                        <Text style={styles.chartTitle}>Predictor Activity</Text>
-                    </View>
-                    <BarChart
-                        data={predictData}
-                        width={Dimensions.get('window').width}
-                        height={220}
-                        chartConfig={{ ...chartConfig, color: (opacity = 1) => `rgba(139, 92, 246, ${opacity})` }}
-                        style={styles.chart}
-                        verticalLabelRotation={0}
-                    />
-                </View>
-
                 <View style={{ height: 100 }} />
             </ScrollView>
         </MainLayout>
@@ -143,9 +267,27 @@ const styles = StyleSheet.create({
     statValue: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginTop: 8 },
     statLabel: { fontSize: 10, color: '#64748b', fontWeight: '600' },
     chartCard: { backgroundColor: 'white', paddingVertical: 16, borderRadius: 0, marginBottom: 20, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f1f5f9' },
-    chartHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    chartHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, paddingHorizontal: 16 },
     chartTitle: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
     chart: { marginVertical: 8, borderRadius: 16 },
+
+    sectionCard: { backgroundColor: 'white', padding: 20, marginBottom: 20, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f1f5f9' },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text.primary },
+    inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
+    inputLabel: { fontSize: 14, color: Colors.text.secondary, fontWeight: '500' },
+    input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 10, fontSize: 14, minWidth: 100, backgroundColor: '#f8fafc' },
+    saveBtn: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 8, gap: 8, marginTop: 5 },
+    saveBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
+
+    addCouponBox: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+    addBtn: { backgroundColor: Colors.primary, padding: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+    couponItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+    couponCode: { fontSize: 15, fontWeight: '800', color: Colors.text.primary },
+    couponDiscount: { fontSize: 13, fontWeight: '600', color: '#10b981' },
+    couponUses: { fontSize: 12, color: Colors.text.tertiary, marginTop: 4 },
+    couponActions: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+    delBtn: { padding: 5 },
 
     formBuilderCard: {
         backgroundColor: 'white',

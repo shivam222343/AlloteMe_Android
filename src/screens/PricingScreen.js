@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, SafeAreaView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, SafeAreaView, Platform, Alert, Linking, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Shadows, Spacing } from '../constants/theme';
 import { Gem, Check, X, ChevronLeft, Zap, Crown, ShieldCheck, Video, Headset, PartyPopper, Flame } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../contexts/AuthContext';
+import { systemAPI } from '../services/api';
 
 // Safe way to access env in Expo
 const RAZORPAY_KEY_ID = 'rzp_live_SbVLw7f5p7qeQN';
@@ -79,14 +80,65 @@ const PricingScreen = ({ navigation }) => {
     const [successMessage, setSuccessMessage] = useState('');
     const successAnim = useRef(new Animated.Value(0)).current;
 
+    const [dynamicPlans, setDynamicPlans] = useState(PLANS);
+    const [couponCode, setCouponCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponMessage, setCouponMessage] = useState('');
+
+    useEffect(() => {
+        // Fetch dynamic pricing from backend
+        const fetchPrices = async () => {
+            try {
+                const res = await systemAPI.getSettings();
+                const settings = res.data;
+                const updatedPlans = PLANS.map(plan => {
+                    if (plan.id === 'standard' && settings.basicPrice) {
+                        return { ...plan, price: `₹${settings.basicPrice}` };
+                    }
+                    if (plan.id === 'advance' && settings.premiumPrice) {
+                        return { ...plan, price: `₹${settings.premiumPrice}` };
+                    }
+                    return plan;
+                });
+                setDynamicPlans(updatedPlans);
+            } catch (err) {
+                console.log('Using default prices');
+            }
+        };
+        fetchPrices();
+    }, []);
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode) return;
+        try {
+            setCouponMessage('Validating...');
+            const res = await systemAPI.validateCoupon(couponCode);
+            setAppliedCoupon(res.data);
+            setCouponMessage(`Discount Applied: ${res.data.discountPercentage}% OFF`);
+        } catch (err) {
+            setAppliedCoupon(null);
+            setCouponMessage(err.response?.data?.message || 'Invalid Coupon');
+        }
+    };
+
     const handleSelectPlan = async (plan) => {
-        const amount = parseInt(plan.price.replace('₹', '')) * 100;
+        let amount = parseInt(plan.price.replace('₹', '')) || 0;
+        if (appliedCoupon && amount > 0) {
+            const discount = (amount * appliedCoupon.discountPercentage) / 100;
+            amount = Math.max(0, Math.round(amount - discount));
+        }
+        
+        // Convert to paisa for Razorpay
+        amount = amount * 100;
         
         const successHandler = async (paymentId) => {
+            if (appliedCoupon) {
+                try { await systemAPI.applyCoupon({ code: appliedCoupon.code }); } catch (e) {}
+            }
             const updatedSubscription = {
                 type: plan.id,
                 paymentId: paymentId,
-                usage: user?.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }
+                usage: { aiPrompts: 0, predictions: 0, exports: 0 } // Reset usage on new plan
             };
 
             // Local storage backup
@@ -215,8 +267,19 @@ const PricingScreen = ({ navigation }) => {
                 
                 // Final safety check to avoid "property open of null"
                 Alert.alert(
-                    'Environment Not Supported', 
-                    'Native payments are not available in this environment (likely Expo Go). Please use our website or the standalone APK to use this feature.'
+                    'In-App Payment Unavailable', 
+                    'Would you like to securely open our website to complete the payment?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { 
+                            text: 'Open Website', 
+                            onPress: () => {
+                                Linking.openURL('https://alloteme.in/pricing').catch(() => {
+                                    Alert.alert('Error', 'Could not open browser. Please visit https://alloteme.in');
+                                });
+                            }
+                        }
+                    ]
                 );
                 return;
             }
@@ -288,7 +351,7 @@ const PricingScreen = ({ navigation }) => {
                 )}
                 scrollEnabled={!showSuccess}
             >
-                {PLANS.map((plan) => (
+                {dynamicPlans.map((plan) => (
                     <View key={plan.id} style={styles.slide}>
                         <View style={[
                             styles.planCard,
@@ -338,48 +401,61 @@ const PricingScreen = ({ navigation }) => {
                                 )}
                             </View>
 
-                            <TouchableOpacity
-                                activeOpacity={0.8}
-                                onPress={() => {
-                                    if (user?.subscription?.type === plan.id) return;
-                                    handleSelectPlan(plan);
-                                }}
-                                style={[
-                                    styles.actionBtn,
-                                    { backgroundColor: plan.color },
-                                    (plan.isPremium || plan.isMid) && Shadows.md,
-                                    user?.subscription?.type === plan.id && { opacity: 0.7 }
-                                ]}>
-                                {plan.isPremium ? (
-                                    <LinearGradient
-                                        colors={['#F59E0B', '#D97706']}
-                                        style={styles.gradientBtn}
-                                    >
-                                        <Text style={styles.btnText}>{user?.subscription?.type === plan.id ? 'Currently Active' : plan.buttonText}</Text>
-                                        {user?.subscription?.type === plan.id ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
-                                    </LinearGradient>
-                                ) : plan.isMid ? (
-                                    <LinearGradient
-                                        colors={[Colors.primary, '#4338CA']}
-                                        style={styles.gradientBtn}
-                                    >
-                                        <Text style={styles.btnText}>{user?.subscription?.type === plan.id ? 'Currently Active' : plan.buttonText}</Text>
-                                        {user?.subscription?.type === plan.id ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
-                                    </LinearGradient>
-                                ) : (
-                                    <View style={styles.normalBtn}>
-                                        <Text style={styles.btnText}>{user?.subscription?.type === plan.id ? 'Activated' : plan.buttonText}</Text>
-                                        {user?.subscription?.type === plan.id ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
-                                    </View>
-                                )}
-                            </TouchableOpacity>
+                            {(() => {
+                                const planHierarchy = { free: 0, standard: 1, advance: 2 };
+                                const userLevel = planHierarchy[user?.subscription?.type] || 0;
+                                const currentPlanLevel = planHierarchy[plan.id] || 0;
+                                
+                                const isActive = user?.subscription?.type === plan.id;
+                                const isIncluded = userLevel > currentPlanLevel;
+                                const btnText = isActive ? 'Currently Active' : isIncluded ? 'Included in Plan' : plan.buttonText;
+                                const isDisabled = isActive || isIncluded;
+
+                                return (
+                                    <TouchableOpacity
+                                        activeOpacity={0.8}
+                                        onPress={() => {
+                                            if (isDisabled) return;
+                                            handleSelectPlan(plan);
+                                        }}
+                                        style={[
+                                            styles.actionBtn,
+                                            { backgroundColor: plan.color },
+                                            (plan.isPremium || plan.isMid) && Shadows.md,
+                                            isDisabled && { opacity: 0.7 }
+                                        ]}>
+                                        {plan.isPremium ? (
+                                            <LinearGradient
+                                                colors={['#F59E0B', '#D97706']}
+                                                style={styles.gradientBtn}
+                                            >
+                                                <Text style={styles.btnText}>{btnText}</Text>
+                                                {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
+                                            </LinearGradient>
+                                        ) : plan.isMid ? (
+                                            <LinearGradient
+                                                colors={[Colors.primary, '#4338CA']}
+                                                style={styles.gradientBtn}
+                                            >
+                                                <Text style={styles.btnText}>{btnText}</Text>
+                                                {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
+                                            </LinearGradient>
+                                        ) : (
+                                            <View style={styles.normalBtn}>
+                                                <Text style={styles.btnText}>{isActive ? 'Activated' : btnText}</Text>
+                                                {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })()}
                         </View>
                     </View>
                 ))}
             </ScrollView>
 
             <View style={styles.indicatorContainer}>
-                {PLANS.map((_, i) => {
+                {dynamicPlans.map((_, i) => {
                     const opacity = scrollX.interpolate({
                         inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
                         outputRange: [0.3, 1, 0.3],
@@ -393,6 +469,28 @@ const PricingScreen = ({ navigation }) => {
                     return <Animated.View key={i} style={[styles.dot, { opacity, transform: [{ scale }] }]} />;
                 })}
             </View>
+
+            <View style={styles.couponContainer}>
+                <TextInput
+                    style={styles.couponInput}
+                    placeholder="Have a coupon code?"
+                    value={couponCode}
+                    onChangeText={(text) => {
+                        setCouponCode(text);
+                        setAppliedCoupon(null);
+                        setCouponMessage('');
+                    }}
+                    autoCapitalize="characters"
+                />
+                <TouchableOpacity style={styles.couponBtn} onPress={handleApplyCoupon}>
+                    <Text style={styles.couponBtnText}>Apply</Text>
+                </TouchableOpacity>
+            </View>
+            {couponMessage ? (
+                <Text style={[styles.couponMessage, appliedCoupon && { color: '#10b981' }]}>
+                    {couponMessage}
+                </Text>
+            ) : null}
 
             <View style={styles.trustBox}>
                 <ShieldCheck size={16} color="#64748B" />
@@ -514,7 +612,13 @@ const styles = StyleSheet.create({
     successBadgeText: { color: 'white', fontSize: 12, fontWeight: '900' },
 
     trustBox: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingBottom: 20 },
-    trustText: { fontSize: 12, color: '#64748B', fontWeight: '500' }
+    trustText: { fontSize: 12, color: '#64748B', fontWeight: '500' },
+    
+    couponContainer: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 5, marginTop: -20 },
+    couponInput: { flex: 1, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 12, height: 44, borderTopRightRadius: 0, borderBottomRightRadius: 0 },
+    couponBtn: { backgroundColor: Colors.primary, height: 44, justifyContent: 'center', paddingHorizontal: 16, borderTopRightRadius: 8, borderBottomRightRadius: 8 },
+    couponBtnText: { color: 'white', fontWeight: 'bold' },
+    couponMessage: { textAlign: 'center', fontSize: 12, color: Colors.error, marginBottom: 15, fontWeight: 'bold' }
 });
 
 export default PricingScreen;

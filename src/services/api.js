@@ -125,6 +125,16 @@ export const customFormsAPI = {
     deleteResponse: (id) => api.delete(`forms/response/${id}`),
 };
 
+export const systemAPI = {
+    getSettings: () => api.get('system/settings'),
+    updateSetting: (data) => api.post('system/settings', data),
+    getCoupons: () => api.get('system/coupons'),
+    createCoupon: (data) => api.post('system/coupons', data),
+    toggleCoupon: (id) => api.put(`system/coupons/${id}/toggle`),
+    deleteCoupon: (id) => api.delete(`system/coupons/${id}`),
+    validateCoupon: (code) => api.post('system/coupons/validate', { code })
+};
+
 export default {
     authAPI,
     institutionAPI,
@@ -134,5 +144,6 @@ export default {
     counselorAPI,
     uploadAPI,
     reviewAPI,
-    customFormsAPI
+    customFormsAPI,
+    systemAPI
 };

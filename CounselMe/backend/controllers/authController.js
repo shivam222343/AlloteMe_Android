@@ -105,6 +105,7 @@ const loginUser = async (req, res) => {
             preferences: user.preferences,
             savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
             savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
+            subscription: user.subscription,
             token: generateToken(user._id),
             groqApiKey: user.groqApiKey,
             showAvatarPopup: !user.preferences?.hasConfirmedAvatar
@@ -179,6 +180,7 @@ const getUserProfile = async (req, res) => {
                 preferences: user.preferences,
                 savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
                 savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
+                subscription: user.subscription,
                 groqApiKey: user.groqApiKey,
                 isVerified: user.isVerified,
                 phoneNumber: user.phoneNumber
@@ -244,6 +246,7 @@ const updateUserProfile = async (req, res) => {
         if (req.body.bannerUrl !== undefined) user.bannerUrl = req.body.bannerUrl;
         if (req.body.preferences) user.preferences = req.body.preferences;
         if (req.body.savedPredictions) user.savedPredictions = req.body.savedPredictions;
+        if (req.body.subscription) user.subscription = req.body.subscription;
 
         // Handle Groq API Key (can be null if removed)
         if (req.body.groqApiKey !== undefined) {
@@ -279,6 +282,7 @@ const updateUserProfile = async (req, res) => {
             preferences: finalUser.preferences,
             savedColleges: finalUser.savedColleges,
             savedPredictions: finalUser.savedPredictions,
+            subscription: finalUser.subscription,
             groqApiKey: finalUser.groqApiKey,
             isVerified: finalUser.isVerified,
             phoneNumber: finalUser.phoneNumber,

@@ -89,7 +89,7 @@ router.put('/:id', async (req, res) => {
         const counselor = await Counselor.findByIdAndUpdate(
             req.params.id,
             { $set: updateData },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         );
 
         if (!counselor) return res.status(404).json({ message: "Counselor not found" });
