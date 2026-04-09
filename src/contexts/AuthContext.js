@@ -258,6 +258,12 @@ export const AuthProvider = ({ children }) => {
         // Optimistic update
         setUser(prev => ({ ...prev, subscription: updatedSubscription }));
         
+        // Local storage backup
+        const cacheKey = `user_usage_${user._id}`;
+        try {
+            await AsyncStorage.setItem(cacheKey, JSON.stringify(newUsage));
+        } catch (e) { }
+
         try {
             await authAPI.updateProfile({ subscription: updatedSubscription });
         } catch (error) {
@@ -281,7 +287,19 @@ export const AuthProvider = ({ children }) => {
                 } else if (!userData.subscription.usage) {
                     userData.subscription.usage = { aiPrompts: 0, predictions: 0, exports: 0 };
                 }
-                
+                // Check local cache for usage if server says zero (resiliency)
+                const cacheKey = `user_usage_${userData._id}`;
+                const cachedUsage = await AsyncStorage.getItem(cacheKey);
+                if (cachedUsage) {
+                    const parsed = JSON.parse(cachedUsage);
+                    // Only trust cache if it has HIGHER values (meaning server sync missed something)
+                    if (userData.subscription.usage) {
+                        userData.subscription.usage.aiPrompts = Math.max(userData.subscription.usage.aiPrompts || 0, parsed.aiPrompts || 0);
+                        userData.subscription.usage.predictions = Math.max(userData.subscription.usage.predictions || 0, parsed.predictions || 0);
+                        userData.subscription.usage.exports = Math.max(userData.subscription.usage.exports || 0, parsed.exports || 0);
+                    }
+                }
+
                 setUser(userData);
             }
         } catch (error) {

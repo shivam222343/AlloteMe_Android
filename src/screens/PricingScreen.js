@@ -88,6 +88,12 @@ const PricingScreen = ({ navigation }) => {
                 usage: user?.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }
             };
 
+            // Local storage backup
+            const cacheKey = `user_usage_${user._id}`;
+            try {
+                await AsyncStorage.setItem(cacheKey, JSON.stringify(updatedSubscription.usage));
+            } catch (e) { }
+
             const res = await updateProfile({ subscription: updatedSubscription });
             if (res.success) {
                 const message = plan.id === 'free' 
@@ -317,32 +323,36 @@ const PricingScreen = ({ navigation }) => {
 
                             <TouchableOpacity
                                 activeOpacity={0.8}
-                                onPress={() => handleSelectPlan(plan)}
+                                onPress={() => {
+                                    if (user?.subscription?.type === plan.id) return;
+                                    handleSelectPlan(plan);
+                                }}
                                 style={[
                                     styles.actionBtn,
                                     { backgroundColor: plan.color },
-                                    (plan.isPremium || plan.isMid) && Shadows.md
+                                    (plan.isPremium || plan.isMid) && Shadows.md,
+                                    user?.subscription?.type === plan.id && { opacity: 0.7 }
                                 ]}>
                                 {plan.isPremium ? (
                                     <LinearGradient
                                         colors={['#F59E0B', '#D97706']}
                                         style={styles.gradientBtn}
                                     >
-                                        <Text style={styles.btnText}>{plan.buttonText}</Text>
-                                        <Zap size={16} color="white" fill="white" />
+                                        <Text style={styles.btnText}>{user?.subscription?.type === plan.id ? 'Currently Active' : plan.buttonText}</Text>
+                                        {user?.subscription?.type === plan.id ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
                                     </LinearGradient>
                                 ) : plan.isMid ? (
                                     <LinearGradient
                                         colors={[Colors.primary, '#4338CA']}
                                         style={styles.gradientBtn}
                                     >
-                                        <Text style={styles.btnText}>{plan.buttonText}</Text>
-                                        <Zap size={16} color="white" fill="white" />
+                                        <Text style={styles.btnText}>{user?.subscription?.type === plan.id ? 'Currently Active' : plan.buttonText}</Text>
+                                        {user?.subscription?.type === plan.id ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
                                     </LinearGradient>
                                 ) : (
                                     <View style={styles.normalBtn}>
-                                        <Text style={styles.btnText}>{plan.buttonText}</Text>
-                                        <Zap size={16} color="white" fill="white" />
+                                        <Text style={styles.btnText}>{user?.subscription?.type === plan.id ? 'Activated' : plan.buttonText}</Text>
+                                        {user?.subscription?.type === plan.id ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
                                     </View>
                                 )}
                             </TouchableOpacity>
