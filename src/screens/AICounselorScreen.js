@@ -402,7 +402,7 @@ const AICounselorScreen = ({ navigation }) => {
 
     const loadHistory = async () => {
         try {
-            const localData = await AsyncStorage.getItem('ALLOTEME_LOCAL_CHATS');
+            const localData = await AsyncStorage.getItem('ALLOTEME_LOCAL_CHATS').catch(() => null);
             if (localData) {
                 setPastChats(JSON.parse(localData));
             }
@@ -423,7 +423,7 @@ const AICounselorScreen = ({ navigation }) => {
             const currentChatId = chatId || `local_${Date.now()}`;
             if (!chatId) setChatId(currentChatId);
 
-            const localData = await AsyncStorage.getItem('ALLOTEME_LOCAL_CHATS');
+            const localData = await AsyncStorage.getItem('ALLOTEME_LOCAL_CHATS').catch(() => null);
             let chats = localData ? JSON.parse(localData) : [];
 
             const existingIdx = chats.findIndex(c => c.id === currentChatId);
@@ -441,7 +441,7 @@ const AICounselorScreen = ({ navigation }) => {
                 chats.unshift(chatObj);
             }
 
-            await AsyncStorage.setItem('ALLOTEME_LOCAL_CHATS', JSON.stringify(chats));
+            await AsyncStorage.setItem('ALLOTEME_LOCAL_CHATS', JSON.stringify(chats)).catch(() => null);
             setPastChats(chats);
         } catch (e) {
             console.error('Local save error', e);
@@ -579,17 +579,18 @@ const AICounselorScreen = ({ navigation }) => {
         }
 
         console.log('[AICounselor] Sending message:', textToSend);
-
         try {
-            const history = messages.slice(1).map(m => ({
+            // Include message in history for context
+            const historyMessages = messages.map(m => ({
                 role: m.sender === 'user' ? 'user' : 'assistant',
                 content: m.text
-            }));
+            })).filter(h => h.role && h.content);
 
             const res = await aiAPI.counsel({
                 message: textToSend,
-                chatId,
-                history,
+                history: historyMessages,
+                isDeepQuery: isDeepQuery,
+                admissionPath: user?.admissionPath || 'MHTCET PCM',
                 userProfile: {
                     examType: user?.examType,
                     percentile: user?.percentile,
@@ -599,15 +600,16 @@ const AICounselorScreen = ({ navigation }) => {
                 }
             });
 
-            if (!res.data || !res.data.message) {
+            if (!res.data || !(res.data.message || res.data.reply)) {
                 throw new Error('Eta AI returned an empty response. Please try again.');
             }
 
             const botMsg = {
                 id: Date.now().toString(),
-                text: res.data.message,
+                text: res.data.reply || res.data.message,
                 sender: 'bot',
                 timestamp: new Date().toISOString(),
+                isNew: true
             };
 
             setMessages(prev => [...prev, botMsg]);
@@ -629,10 +631,10 @@ const AICounselorScreen = ({ navigation }) => {
             } else if (error.code === 'ECONNABORTED' || serverMsg.toLowerCase().includes('timeout')) {
                 friendlyMessage = `🕐 **Response Timed Out**\n\nEta took too long to respond — this can happen when searching through a large amount of college data.\n\n**Try rephrasing your question** or ask about a specific college or branch.`;
             } else if (!error.response || error.message?.toLowerCase().includes('network')) {
-                friendlyMessage = `📶 **No Internet Connection**\n\nPlease check your internet connection and try again. Eta needs to be online to answer your questions.`;
+                friendlyMessage = `📶 **Network Error**\n\nEta couldn't reach the server. Please check your internet connection.\n\n*Error Detail: ${error.message || 'No internet or backend unreachable'}*`;
             } else {
                 // Generic server error — show key popup too, might be API key issue
-                friendlyMessage = `😕 **Something went wrong**\n\nEta ran into an unexpected issue while processing your question. Please try again in a moment.\n\n*If the problem persists, try updating your API key or starting a new chat.*`;
+                friendlyMessage = `😕 **Something went wrong**\n\nEta ran into an issue: ${serverMsg || error.message || 'Unknown error'}\n\n*If the problem persists, try updating your API key or starting a new chat.*`;
                 setPopupType('error');
                 setShowKeyPopup(true);
             }

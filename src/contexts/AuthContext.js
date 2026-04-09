@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
 
     const loadAdmissionPath = async () => {
         try {
-            const path = await AsyncStorage.getItem('admissionPath');
+            const path = await AsyncStorage.getItem('admissionPath').catch(() => null);
             if (path) setAdmissionPathState(path);
         } catch (e) {
             console.error('Failed to load admission path', e);
@@ -273,7 +273,7 @@ export const AuthProvider = ({ children }) => {
 
     const loadUser = async () => {
         try {
-            const token = await AsyncStorage.getItem('userToken');
+            const token = await AsyncStorage.getItem('userToken').catch(() => null);
             if (token) {
                 const response = await authAPI.getProfile();
                 const userData = response.data;

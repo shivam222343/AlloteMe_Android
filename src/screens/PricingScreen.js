@@ -209,7 +209,8 @@ const PricingScreen = ({ navigation }) => {
             }
 
             // Fallback for Android/iOS if native module is missing (e.g. Expo Go)
-            if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
+            // Safeguard against property access on null/undefined
+            if (!RazorpayCheckout || typeof RazorpayCheckout?.open !== 'function') {
                 console.log('Native Razorpay not found');
                 
                 // Final safety check to avoid "property open of null"
@@ -228,19 +229,23 @@ const PricingScreen = ({ navigation }) => {
                 amount: amount,
                 name: 'AlloteMe',
                 prefill: {
-                    email: user?.email || '',
+                    email: user?.email || 'customer@example.com',
                     contact: user?.phone || '',
-                    name: user?.displayName || ''
+                    name: user?.displayName || 'Customer'
                 },
                 theme: { color: Colors.primary }
             };
 
-            RazorpayCheckout.open(options).then(async (data) => {
-                successHandler(data.razorpay_payment_id);
-            }).catch((error) => {
-                console.log(error);
-                alert(`Payment failed: ${error.description || 'Unknown error'}`);
-            });
+            // Deeply safe call
+            if (RazorpayCheckout?.open) {
+                RazorpayCheckout.open(options).then(async (data) => {
+                    successHandler(data.razorpay_payment_id);
+                }).catch((error) => {
+                    console.error('[Razorpay] Checkout Error:', error);
+                    const detail = typeof error === 'object' ? (error.description || error.message || JSON.stringify(error)) : String(error);
+                    Alert.alert('Payment Error', `Failed to open gateway: ${detail}`);
+                });
+            }
         }
     };
 

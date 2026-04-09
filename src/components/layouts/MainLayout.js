@@ -89,7 +89,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 </TouchableOpacity>
                             ) : (
                                 <TouchableOpacity
-                                    onPress={() => (navigation.openDrawer ? navigation.openDrawer() : null)}
+                                    onPress={() => navigation?.openDrawer?.()}
                                     style={styles.iconBtn}
                                     activeOpacity={0.7}
                                 >
