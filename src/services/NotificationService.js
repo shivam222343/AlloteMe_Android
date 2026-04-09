@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import api from './api';
+import { api } from './api';
 import { GENERAL_MESSAGES, NOTIFICATION_TIMES, getRandomMessage } from '../constants/notificationMessages';
 
 // Configure how notifications should be handled when app is in foreground
@@ -173,6 +173,7 @@ export const scheduleDailyRandomReminders = async () => {
                 data: { type: 'reminder' }
             },
             trigger: {
+                type: 'calendar',
                 hour: t1,
                 minute: 0,
                 repeats: true,
@@ -188,6 +189,7 @@ export const scheduleDailyRandomReminders = async () => {
                 data: { type: 'reminder' }
             },
             trigger: {
+                type: 'calendar',
                 hour: t2,
                 minute: 30, // Offset a bit for variety
                 repeats: true,

@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 
 // Safe way to access env in Expo
-const RAZORPAY_KEY_ID = 'rzp_test_your_key_id';
+const RAZORPAY_KEY_ID = 'rzp_live_SbVLw7f5p7qeQN';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -79,8 +79,102 @@ const PricingScreen = ({ navigation }) => {
     const successAnim = useRef(new Animated.Value(0)).current;
 
     const handleSelectPlan = async (plan) => {
+        const amount = parseInt(plan.price.replace('₹', '')) * 100;
+        
+        const successHandler = async (paymentId) => {
+            const updatedSubscription = {
+                type: plan.id,
+                paymentId: paymentId,
+                usage: user?.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }
+            };
+
+            const res = await updateProfile({ subscription: updatedSubscription });
+            if (res.success) {
+                setSuccessMessage(`You've successfully upgraded to the ${plan.name} Plan! ✨`);
+                setShowSuccess(true);
+                Animated.spring(successAnim, {
+                    toValue: 1,
+                    useNativeDriver: true,
+                    tension: 40,
+                    friction: 7
+                }).start();
+
+                setTimeout(() => {
+                    Animated.timing(successAnim, {
+                        toValue: 0,
+                        duration: 400,
+                        useNativeDriver: true
+                    }).start(() => {
+                        setShowSuccess(false);
+                        navigation.navigate('Dashboard');
+                    });
+                }, 4000);
+            }
+        };
+
         if (Platform.OS === 'web') {
-            alert('Payments are currently only supported on our mobile app. Please use the app to upgrade! ✨');
+            console.log('Initiating Web Payment for plan:', plan.name);
+            // Load Razorpay Script Dynamically
+            const loaded = await new Promise((resolve) => {
+                if (window.Razorpay) {
+                    console.log('Razorpay already loaded');
+                    resolve(true);
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+                script.id = 'razorpay-checkout-js';
+                script.onload = () => {
+                    console.log('Razorpay script loaded successfully');
+                    resolve(true);
+                };
+                script.onerror = () => {
+                    console.error('Razorpay script failed to load');
+                    resolve(false);
+                };
+                document.body.appendChild(script);
+            });
+
+            if (!loaded || !window.Razorpay) {
+                alert('Failed to load payment gateway. Please check your internet connection.');
+                return;
+            }
+
+            const options = {
+                key: RAZORPAY_KEY_ID,
+                amount: amount,
+                currency: 'INR',
+                name: 'AlloteMe',
+                description: `AlloteMe ${plan.name} Subscription`,
+                image: 'https://alloteme.in/logo.png',
+                handler: function (response) {
+                    console.log('Web Payment Success:', response.razorpay_payment_id);
+                    successHandler(response.razorpay_payment_id);
+                },
+                prefill: {
+                    name: user?.displayName || '',
+                    email: user?.email || '',
+                    contact: user?.phone || ''
+                },
+                theme: { color: Colors.primary },
+                modal: {
+                    ondismiss: function() {
+                        console.log('Payment modal closed by user');
+                    }
+                }
+            };
+
+            try {
+                const rzp = new window.Razorpay(options);
+                if (rzp) {
+                    rzp.open();
+                } else {
+                    throw new Error('Razorpay instance is null');
+                }
+            } catch (err) {
+                console.error('Razorpay Web Open Error:', err);
+                alert('Payment window could not be opened. Please try again.');
+            }
             return;
         }
 
@@ -91,8 +185,19 @@ const PricingScreen = ({ navigation }) => {
             }
             // Logic to switch back to free if allowed
         } else {
-            const RazorpayCheckout = require('react-native-razorpay').default || require('react-native-razorpay');
-            const amount = parseInt(plan.price.replace('₹', '')) * 100;
+            let RazorpayCheckout;
+            try {
+                const Razorpay = require('react-native-razorpay');
+                RazorpayCheckout = Razorpay.default || Razorpay;
+            } catch (e) {
+                console.log('Razorpay load error:', e);
+            }
+
+            if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
+                alert('Razorpay is not supported in this environment (likely Expo Go). Please use the standalone app.');
+                return;
+            }
+
             const options = {
                 description: `AlloteMe ${plan.name} Subscription`,
                 image: 'https://alloteme.in/logo.png',
@@ -109,37 +214,8 @@ const PricingScreen = ({ navigation }) => {
             };
 
             RazorpayCheckout.open(options).then(async (data) => {
-                // handle success
-                const updatedSubscription = {
-                    type: plan.id,
-                    paymentId: data.razorpay_payment_id,
-                    usage: user?.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }
-                };
-
-                const res = await updateProfile({ subscription: updatedSubscription });
-                if (res.success) {
-                    setSuccessMessage(`You've successfully upgraded to the ${plan.name} Plan! ✨`);
-                    setShowSuccess(true);
-                    Animated.spring(successAnim, {
-                        toValue: 1,
-                        useNativeDriver: true,
-                        tension: 40,
-                        friction: 7
-                    }).start();
-
-                    setTimeout(() => {
-                        Animated.timing(successAnim, {
-                            toValue: 0,
-                            duration: 400,
-                            useNativeDriver: true
-                        }).start(() => {
-                            setShowSuccess(false);
-                            navigation.navigate('Dashboard');
-                        });
-                    }, 4000);
-                }
+                successHandler(data.razorpay_payment_id);
             }).catch((error) => {
-                // handle failure
                 console.log(error);
                 alert(`Payment failed: ${error.description || 'Unknown error'}`);
             });

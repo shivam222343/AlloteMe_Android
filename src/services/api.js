@@ -7,7 +7,7 @@ const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
 // Switch to LOCAL_URL for development, RENDER_URL for production
 const API_BASE_URL = RENDER_URL;
 
-const api = axios.create({
+export const api = axios.create({
     baseURL: API_BASE_URL,
 });
 
