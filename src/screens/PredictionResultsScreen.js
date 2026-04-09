@@ -4,6 +4,7 @@ import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
 import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck, Star, Bookmark } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { authAPI } from '../services/api';
 import OptimizedImage from '../components/ui/OptimizedImage';
 import DraggableFlatList from 'react-native-draggable-flatlist';
@@ -25,7 +26,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
         }
     }, [resultsParam]);
 
-    const { user, refreshUser, toggleSaveOptimistic, toggleSavePredictionOptimistic } = useAuth();
+    const { user, refreshUser, toggleSaveOptimistic, toggleSavePredictionOptimistic, checkLimit, incrementUsage } = useAuth();
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
     const [searchText, setSearchText] = useState('');
@@ -172,6 +173,10 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const exportToPDF = async () => {
         if (processedResults.length === 0) return;
+
+        // Check Subscription Limit
+        if (!checkLimit('exports')) return;
+
         setExportingPDF(true);
         try {
             const html = `
@@ -348,6 +353,9 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
             }
+
+            // Increment Usage
+            incrementUsage('exports');
         } catch (error) {
             console.error('PDF Export Error:', error);
             Alert.alert('PDF Export Failed');
@@ -358,6 +366,10 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
     const exportToCSV = async () => {
         if (processedResults.length === 0) return;
+
+        // Check Subscription Limit
+        if (!checkLimit('exports')) return;
+
         setExportingCSV(true);
         try {
             let csv = '\uFEFFNo,DTE Code,College,Branch,Category,Quota,Cutoff%,Rank,Chance\n';
@@ -381,6 +393,9 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
                 await Sharing.shareAsync(fileUri);
             }
+
+            // Increment Usage
+            incrementUsage('exports');
         } catch (error) {
             console.error('CSV Export Error:', error);
             Alert.alert('CSV Export Failed');
@@ -528,7 +543,13 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><ChevronLeft size={24} color={Colors.text.primary} /></TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.title}>Prediction Results</Text>
-                    <Text style={styles.subtitle}>{processedResults.length} colleges found</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.subtitle}>{processedResults.length} colleges found</Text>
+                        <View style={styles.sep} />
+                        <Text style={styles.usageSmall}>
+                            Exports: {user?.subscription?.usage?.exports || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports}
+                        </Text>
+                    </View>
                 </View>
                 <View style={styles.headerActions}>
                     <TouchableOpacity onPress={() => setIsSearchVisible(!isSearchVisible)} style={styles.actionIcon}><Search size={20} color={Colors.text.secondary} /></TouchableOpacity>
@@ -663,7 +684,15 @@ const styles = StyleSheet.create({
     riskText: { color: "#ef4444" },
     centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 300, paddingHorizontal: 40 },
     emptyTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text.secondary, marginTop: 16 },
-    emptyText: { marginTop: 8, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 }
+    usageSmall: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: Colors.primary,
+        backgroundColor: Colors.primary + '10',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4
+    }
 });
 
 export default PredictionResultsScreen;

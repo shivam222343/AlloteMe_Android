@@ -2,13 +2,14 @@ import React, { createContext, useState, useContext, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI, notificationsAPI } from '../services/api';
 import { io } from 'socket.io-client';
+import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleLocalNotification } from '../services/NotificationService';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
 // ⚠️ Keep in sync with src/services/api.js — switch together
-const API_BASE_URL = LOCAL_URL;
+const API_BASE_URL = RENDER_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -20,6 +21,7 @@ export const AuthProvider = ({ children }) => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [showAvatarPopup, setShowAvatarPopupState] = useState(false);
     const [admissionPath, setAdmissionPathState] = useState('MHTCET PCM');
+    const [subscriptionModal, setSubscriptionModal] = useState({ visible: false, feature: '' });
 
     useEffect(() => {
         loadAdmissionPath();
@@ -205,9 +207,57 @@ export const AuthProvider = ({ children }) => {
     const refreshUser = async () => {
         try {
             const response = await authAPI.getProfile();
-            setUser(response.data);
+            const userData = response.data;
+            
+            // Initialize subscription if missing
+            if (!userData.subscription) {
+                userData.subscription = {
+                    type: 'free',
+                    usage: { aiPrompts: 0, predictions: 0, exports: 0 }
+                };
+            }
+            setUser(userData);
         } catch (error) {
             console.error('Failed to refresh user', error);
+        }
+    };
+
+    const checkLimit = (type) => {
+        if (!user) return true;
+        
+        const sub = user.subscription || { type: 'free', usage: { aiPrompts: 0, predictions: 0, exports: 0 }};
+        const plan = SUBSCRIPTION_PLANS[sub.type.toUpperCase()] || SUBSCRIPTION_PLANS.FREE;
+        
+        const currentUsage = sub.usage?.[type] || 0;
+        const limit = plan.limits[type];
+        
+        if (currentUsage >= limit) {
+            setSubscriptionModal({ visible: true, feature: type });
+            return false;
+        }
+        return true;
+    };
+
+    const incrementUsage = async (type) => {
+        if (!user) return;
+        
+        const newUsage = { 
+            ...(user.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }) 
+        };
+        newUsage[type] = (newUsage[type] || 0) + 1;
+        
+        const updatedSubscription = {
+            ...(user.subscription || { type: 'free' }),
+            usage: newUsage
+        };
+        
+        // Optimistic update
+        setUser(prev => ({ ...prev, subscription: updatedSubscription }));
+        
+        try {
+            await authAPI.updateProfile({ subscription: updatedSubscription });
+        } catch (error) {
+            console.error('[AuthContext] Failed to sync usage', error);
         }
     };
 
@@ -377,7 +427,11 @@ export const AuthProvider = ({ children }) => {
             refreshUnreadCount: async () => {
                 // Now handled locally from notifications array
                 setUnreadCount(notifications.filter(n => !n.read).length);
-            }
+            },
+            subscriptionModal,
+            setSubscriptionModal,
+            checkLimit,
+            incrementUsage
         }}>
             {children}
         </AuthContext.Provider>

@@ -9,13 +9,15 @@ import { Colors, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Search, LayoutGrid, Cpu, MapPin,
-    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings, Bot, Info, Pencil, Target
+    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings, Bot, Info, Pencil, Target, Crown, Sparkles, Zap
 } from 'lucide-react-native';
+import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { institutionAPI } from '../services/api';
 import VerificationBanner from '../components/ui/VerificationBanner';
 import VerificationModal from '../components/ui/VerificationModal';
 import RatingSection from '../components/ui/RatingSection';
 import TestimonialSlider from '../components/ui/TestimonialSlider';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDER_WIDTH = SCREEN_WIDTH - 32;
@@ -257,6 +259,45 @@ const StudentDashboard = ({ navigation }) => {
                     <Text style={styles.welcomeText}>Welcome back,</Text>
                     <Text style={styles.nameText}>{user?.displayName} 👋</Text>
                 </View>
+
+                {/* Subscription Status Card */}
+                <TouchableOpacity 
+                    style={styles.subCard} 
+                    onPress={() => navigation.navigate('Pricing')}
+                    activeOpacity={0.9}
+                >
+                    <LinearGradient
+                        colors={[Colors.primary, '#4338CA']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.subGradient}
+                    >
+                        <View style={styles.subInfo}>
+                            <View style={styles.subBadge}>
+                                <Crown size={12} color="white" fill="white" />
+                                <Text style={styles.subBadgeText}>
+                                    {(user?.subscription?.type || 'Free').toUpperCase()} PLAN
+                                </Text>
+                            </View>
+                            <Text style={styles.subTitle}>Ready for your dream college?</Text>
+                            <Text style={styles.subDesc}>Track your counseling resources</Text>
+                        </View>
+                        <View style={styles.perkContainer}>
+                            <View style={styles.perkItem}>
+                                <Sparkles size={14} color="white" />
+                                <Text style={styles.perkVal}>
+                                    {user?.subscription?.usage?.aiPrompts || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts}
+                                </Text>
+                            </View>
+                            <View style={styles.perkItem}>
+                                <Target size={14} color="white" />
+                                <Text style={styles.perkVal}>
+                                    {user?.subscription?.usage?.predictions || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions}
+                                </Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </TouchableOpacity>
 
                 {/* Admission Path Selector */}
                 <View style={styles.pathSelectorContainer}>
@@ -529,7 +570,47 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: Colors.white
-    }
+    },
+    subCard: {
+        marginHorizontal: 16,
+        borderRadius: 24,
+        overflow: 'hidden',
+        marginBottom: 24,
+        ...Shadows.md
+    },
+    subGradient: {
+        padding: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    subInfo: { flex: 1 },
+    subBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+        marginBottom: 8
+    },
+    subBadgeText: { color: 'white', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+    subTitle: { fontSize: 17, fontWeight: 'bold', color: 'white' },
+    subDesc: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+    perkContainer: { gap: 8 },
+    perkItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        minWidth: 70
+    },
+    perkVal: { color: 'white', fontSize: 12, fontWeight: 'bold' }
 });
 
 export default StudentDashboard;

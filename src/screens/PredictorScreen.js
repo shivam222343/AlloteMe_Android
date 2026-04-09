@@ -6,6 +6,7 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import { cutoffAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { Colors, Shadows } from '../constants/theme';
 import { Sparkles, Settings2, ChevronDown, ChevronUp, CheckCircle2, MapPin, GitBranch, Calendar, ShieldCheck, LucideShieldCheck, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -82,7 +83,7 @@ const YEARS = [2025, 2024, 2023, 2022];
 const ROUNDS = [1, 2, 3];
 
 const PredictorScreen = ({ navigation }) => {
-    const { user, socket, admissionPath } = useAuth();
+    const { user, socket, admissionPath, checkLimit, incrementUsage } = useAuth();
     const [percentile, setPercentile] = useState(user?.percentile?.toString() || '');
     const [rank, setRank] = useState(user?.rank?.toString() || '');
     const [category, setCategory] = useState(user?.category || 'OPEN');
@@ -173,6 +174,10 @@ const PredictorScreen = ({ navigation }) => {
             Alert.alert('Input Required', 'Please enter your Percentile or Rank.');
             return;
         }
+
+        // Check Subscription Limit
+        if (!checkLimit('predictions')) return;
+
         setLoading(true);
         try {
             const res = await cutoffAPI.predict({
@@ -208,6 +213,9 @@ const PredictorScreen = ({ navigation }) => {
                 category,
                 examType: user?.examType || 'MHTCET'
             });
+
+            // Increment Usage
+            incrementUsage('predictions');
 
         } catch (error) {
             const errorMsg = error.response?.data?.message || 'Failed to fetch prediction data. Please try again.';
@@ -266,6 +274,13 @@ const PredictorScreen = ({ navigation }) => {
                     <View>
                         <Text style={styles.title}>College Predictor</Text>
                         <Text style={styles.subtitle}>Analyzing {user?.examType} Real Data • 2025 Edition</Text>
+                    </View>
+                    <View style={styles.usageChip}>
+                        <Text style={styles.usageText}>
+                            Predictions: <Text style={styles.usageBold}>
+                                {user?.subscription?.usage?.predictions || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions}
+                            </Text>
+                        </Text>
                     </View>
                 </View>
 
@@ -619,8 +634,23 @@ const styles = StyleSheet.create({
     loadingIconOuter: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
     loadingIconInner: { width: 100, height: 100, borderRadius: 50, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadows.lg },
     loadingTitle: { fontSize: 24, fontWeight: '900', color: Colors.white, marginTop: 30, letterSpacing: 1 },
-    msgContainer: { marginTop: 15, paddingHorizontal: 40, height: 40, justifyContent: 'center' },
-    loadingStepText: { fontSize: 16, color: 'rgba(255,255,255,0.8)', textAlign: 'center', fontWeight: '500' },
+    usageChip: {
+        backgroundColor: Colors.primary + '10',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.primary + '20'
+    },
+    usageText: {
+        fontSize: 11,
+        color: Colors.text.secondary,
+        fontWeight: '600'
+    },
+    usageBold: {
+        color: Colors.primary,
+        fontWeight: '800'
+    }
 });
 
 export default PredictorScreen;

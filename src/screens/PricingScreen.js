@@ -1,45 +1,50 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, SafeAreaView, Platform } from 'react-native';
 import { Colors, Shadows, Spacing } from '../constants/theme';
-import { Gem, Check, X, ChevronLeft, Zap, Crown, ShieldCheck, Video, Headset, PartyPopper } from 'lucide-react-native';
+import { Gem, Check, X, ChevronLeft, Zap, Crown, ShieldCheck, Video, Headset, PartyPopper, Flame } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { useAuth } from '../contexts/AuthContext';
+
+// Safe way to access env in Expo
+const RAZORPAY_KEY_ID = 'rzp_test_your_key_id';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const PLANS = [
     {
-        id: 'basic',
-        name: 'Basic',
+        id: 'free',
+        name: 'Free',
         subtitle: 'Start exploring now',
         price: 'Free',
         priceLabel: 'Forever',
         features: [
+            { text: '3 AI Counseling Prompts', included: true },
+            { text: '5 College Predictions', included: true },
+            { text: '1 PDF or CSV Export', included: true },
             { text: 'Browse All Colleges', included: true },
             { text: 'Admission Notifications', included: true },
-            { text: 'College Comparison', included: true },
-            { text: 'Live Guidance Sessions', included: false },
-            { text: 'Realtime Predictions', included: false },
-            { text: 'PDF List Export', included: false },
-            { text: 'End-to-End Support', included: false },
+            { text: 'Standard Chat Support', included: true },
+            { text: 'Personal API Key', included: false },
         ],
-        buttonText: 'Start Free',
+        buttonText: 'Current Plan',
         color: '#94A3B8'
     },
     {
         id: 'standard',
         name: 'Standard',
-        subtitle: 'Great for planning',
+        subtitle: 'Most Popular Choice',
         price: '₹99',
         priceLabel: 'One time',
         isMid: true,
         features: [
-            { text: 'Browse All Colleges', included: true },
-            { text: '5 College Predictions', included: true },
+            { text: 'Unlimited AI Prompts', included: true },
+            { text: 'Personal API Key Support', included: true },
+            { text: '15 College Predictions', included: true },
             { text: '5 PDF & CSV Exports', included: true },
             { text: '1 Live Zoom Consultation', included: true },
             { text: 'Standard Chat Support', included: true },
             { text: 'End-to-End Support', included: false },
-            { text: '24/7 Call Support', included: false },
         ],
         buttonText: 'Get Standard',
         color: Colors.primary
@@ -47,62 +52,97 @@ const PLANS = [
     {
         id: 'advance',
         name: 'Advance',
-        subtitle: 'The Ultimate Specialist',
-        price: '₹249',
+        subtitle: 'For the Serious Ones',
+        price: '₹149',
         priceLabel: 'One time',
         isPremium: true,
         features: [
-            { text: 'Unlimited Predictions', included: true },
+            { text: 'Unlimited AI Prompts', included: true },
+            { text: 'Personal API Key Support', included: true },
+            { text: '25 College Predictions', included: true },
             { text: '12 PDF & CSV Exports', included: true },
             { text: 'Weekly Live Zoom Meet', included: true },
-            { text: '24/7 WhatsApp & Chat', included: true },
-            { text: '24/7 Call Support', included: true },
-            { text: 'End-to-End Support', included: true },
             { text: 'Personal Counselor Chat', included: true },
+            { text: '24/7 Call & WhatsApp', included: true },
         ],
-        buttonText: 'Unlock Premium',
+        buttonText: 'Get Advance',
         color: '#F59E0B'
     }
 ];
 
 const PricingScreen = ({ navigation }) => {
+    const { user, updateProfile } = useAuth();
     const scrollViewRef = useRef(null);
     const scrollX = useRef(new Animated.Value(0)).current;
     const [showSuccess, setShowSuccess] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
     const successAnim = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-        let index = 0;
-        const interval = setInterval(() => {
-            if (showSuccess) return;
-            index = (index + 1) % PLANS.length;
-            scrollViewRef.current?.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
-        }, 5000);
-        return () => clearInterval(interval);
-    }, [showSuccess]);
+    const handleSelectPlan = async (plan) => {
+        if (Platform.OS === 'web') {
+            alert('Payments are currently only supported on our mobile app. Please use the app to upgrade! ✨');
+            return;
+        }
 
-    const handleSelectPlan = (plan) => {
-        if (plan.id === 'basic') {
-            setShowSuccess(true);
-            Animated.spring(successAnim, {
-                toValue: 1,
-                useNativeDriver: true,
-                tension: 40,
-                friction: 7
-            }).start();
-
-            setTimeout(() => {
-                Animated.timing(successAnim, {
-                    toValue: 0,
-                    duration: 400,
-                    useNativeDriver: true
-                }).start(() => {
-                    setShowSuccess(false);
-                    navigation.navigate('Dashboard');
-                });
-            }, 3000);
+        if (plan.id === 'free' || plan.price === 'Free') {
+            if (user?.subscription?.type === 'free') {
+                alert('You are already on the Free plan!');
+                return;
+            }
+            // Logic to switch back to free if allowed
         } else {
-            alert(`Premium plans (Standard & Advance) will be active soon! You can use the Basic plan for now. ✨`);
+            const RazorpayCheckout = require('react-native-razorpay').default || require('react-native-razorpay');
+            const amount = parseInt(plan.price.replace('₹', '')) * 100;
+            const options = {
+                description: `AlloteMe ${plan.name} Subscription`,
+                image: 'https://alloteme.in/logo.png',
+                currency: 'INR',
+                key: RAZORPAY_KEY_ID,
+                amount: amount,
+                name: 'AlloteMe',
+                prefill: {
+                    email: user?.email || '',
+                    contact: user?.phone || '',
+                    name: user?.displayName || ''
+                },
+                theme: { color: Colors.primary }
+            };
+
+            RazorpayCheckout.open(options).then(async (data) => {
+                // handle success
+                const updatedSubscription = {
+                    type: plan.id,
+                    paymentId: data.razorpay_payment_id,
+                    usage: user?.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }
+                };
+
+                const res = await updateProfile({ subscription: updatedSubscription });
+                if (res.success) {
+                    setSuccessMessage(`You've successfully upgraded to the ${plan.name} Plan! ✨`);
+                    setShowSuccess(true);
+                    Animated.spring(successAnim, {
+                        toValue: 1,
+                        useNativeDriver: true,
+                        tension: 40,
+                        friction: 7
+                    }).start();
+
+                    setTimeout(() => {
+                        Animated.timing(successAnim, {
+                            toValue: 0,
+                            duration: 400,
+                            useNativeDriver: true
+                        }).start(() => {
+                            setShowSuccess(false);
+                            navigation.navigate('Dashboard');
+                        });
+                    }, 4000);
+                }
+            }).catch((error) => {
+                // handle failure
+                console.log(error);
+                alert(`Payment failed: ${error.description || 'Unknown error'}`);
+            });
         }
     };
 
@@ -271,7 +311,7 @@ const PricingScreen = ({ navigation }) => {
                             <PartyPopper size={40} color="white" />
                         </LinearGradient>
                         <Text style={styles.successTitle}>Congratulations!</Text>
-                        <Text style={styles.successMsg}>You've unlocked the Basic Plan. Start exploring colleges now! ✨</Text>
+                        <Text style={styles.successMsg}>{successMessage}</Text>
                         <View style={styles.successBadge}>
                             <Check size={14} color="white" strokeWidth={3} />
                             <Text style={styles.successBadgeText}>ACTIVATED</Text>

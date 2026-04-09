@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MainLayout from '../components/layouts/MainLayout';
 import { aiAPI, authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { Send, User, Bot, Mic, MicOff, X, Sparkles, Key, Image as ImageIcon } from 'lucide-react-native';
 import Voice from '@react-native-voice/voice';
@@ -123,17 +124,32 @@ const markdownStyles = {
 
 const MessageItem = React.memo(({ item, user, onDelete }) => {
     const isUser = item.sender === 'user';
-    const time = item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    
+    // Safety check for timestamp which could be an ISO string or a formatted time string
+    let time = '';
+    try {
+        if (item.timestamp) {
+            const date = new Date(item.timestamp);
+            if (!isNaN(date.getTime())) {
+                time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+                time = item.timestamp; // Already formatted?
+            }
+        }
+    } catch (e) {
+        time = String(item.timestamp || '');
+    }
 
-    const [displayedText, setDisplayedText] = useState(isUser || !item.isNew ? item.text : '');
+    const [displayedText, setDisplayedText] = useState(isUser || !item.isNew ? String(item.text || '') : '');
 
     React.useEffect(() => {
         if (!isUser && item.isNew) {
             let index = 0;
-            const text = item.text;
+            const text = String(item.text || '');
+            const totalLength = text.length;
             const timer = setInterval(() => {
                 index += 5; // Type faster for long messages
-                if (index >= text.length) {
+                if (index >= totalLength) {
                     setDisplayedText(text);
                     clearInterval(timer);
                 } else {
@@ -247,6 +263,12 @@ const ChatHeader = React.memo(({ navigation, startNewChat, openHistory }) => (
     </View>
 ));
 
+const UsageCounter = React.memo(({ current, limit }) => (
+    <View style={styles.usageCounter}>
+        <Text style={styles.usageText}>Prompts: <Text style={styles.usageBold}>{current}/{limit === Infinity ? '∞' : limit}</Text></Text>
+    </View>
+));
+
 const FAQMarquee = React.memo(({ data, handleSend, tagListRef, setTagContentWidth, tagContentWidth }) => (
     <View style={styles.tagsWrapper}>
         <FlatList
@@ -310,7 +332,7 @@ const ChatInput = React.memo(({ loading, isListening, startListening, stopListen
 ));
 
 const AICounselorScreen = ({ navigation }) => {
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, checkLimit, incrementUsage } = useAuth();
 
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -513,6 +535,9 @@ const AICounselorScreen = ({ navigation }) => {
         const textToSend = typeof overrideInput === 'string' ? overrideInput : inputRef.current;
         if (!textToSend || !textToSend.trim() || loading) return;
 
+        // Check Subscription Limit
+        if (!checkLimit('aiPrompts')) return;
+
         const userMsg = {
             id: Date.now().toString(),
             text: textToSend,
@@ -573,13 +598,16 @@ const AICounselorScreen = ({ navigation }) => {
             });
 
             const botMsg = {
-                id: (Date.now() + 1).toString(),
-                text: res.data.reply,
+                id: Date.now().toString(),
+                text: res.data.message,
                 sender: 'bot',
                 timestamp: new Date().toISOString(),
-                isNew: true
             };
+
             setMessages(prev => [...prev, botMsg]);
+            
+            // Increment Usage on success
+            incrementUsage('aiPrompts');
         } catch (error) {
             const status = error.response?.status;
             const serverMsg = error.response?.data?.message || '';
@@ -711,6 +739,11 @@ const AICounselorScreen = ({ navigation }) => {
                     navigation={navigation}
                     startNewChat={startNewChat}
                     openHistory={() => setShowHistoryModal(true)}
+                />
+
+                <UsageCounter 
+                    current={user?.subscription?.usage?.aiPrompts || 0} 
+                    limit={SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts} 
                 />
 
                 <FlatList
@@ -1292,7 +1325,26 @@ const styles = StyleSheet.create({
         marginTop: 12,
         fontSize: 14,
         color: Colors.text.tertiary,
-    }
+    },
+    usageCounter: {
+        backgroundColor: Colors.primary + '10',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        alignSelf: 'center',
+        marginTop: 10,
+        borderWidth: 1,
+        borderColor: Colors.primary + '20'
+    },
+    usageText: {
+        fontSize: 12,
+        color: Colors.text.secondary,
+        fontWeight: '500'
+    },
+    usageBold: {
+        color: Colors.primary,
+        fontWeight: '700'
+    },
 });
 
 export default AICounselorScreen;
