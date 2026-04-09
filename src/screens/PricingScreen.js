@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, SafeAreaView, Platform, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Shadows, Spacing } from '../constants/theme';
 import { Gem, Check, X, ChevronLeft, Zap, Crown, ShieldCheck, Video, Headset, PartyPopper, Flame } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -175,15 +176,19 @@ const PricingScreen = ({ navigation }) => {
             };
 
             try {
-                const rzp = new window.Razorpay(options);
-                if (rzp) {
-                    rzp.open();
+                if (typeof window !== 'undefined' && window.Razorpay) {
+                    const rzp = new window.Razorpay(options);
+                    if (rzp && typeof rzp.open === 'function') {
+                        rzp.open();
+                    } else {
+                        throw new Error('Razorpay instance is null or open is not a function');
+                    }
                 } else {
-                    throw new Error('Razorpay instance is null');
+                    throw new Error('window.Razorpay is not defined. Script might not have loaded.');
                 }
             } catch (err) {
                 console.error('Razorpay Web Open Error:', err);
-                alert('Payment window could not be opened. Please try again.');
+                Alert.alert('Payment Error', 'Payment window could not be opened. Please check your internet or try again later.');
             }
             return;
         }
@@ -198,13 +203,20 @@ const PricingScreen = ({ navigation }) => {
             let RazorpayCheckout;
             try {
                 const Razorpay = require('react-native-razorpay');
-                RazorpayCheckout = Razorpay.default || Razorpay;
+                RazorpayCheckout = Razorpay?.default || Razorpay;
             } catch (e) {
-                console.log('Razorpay load error:', e);
+                console.log('Razorpay module load failed:', e.message);
             }
 
+            // Fallback for Android/iOS if native module is missing (e.g. Expo Go)
             if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
-                alert('Razorpay is not supported in this environment (likely Expo Go). Please use the standalone app.');
+                console.log('Native Razorpay not found');
+                
+                // Final safety check to avoid "property open of null"
+                Alert.alert(
+                    'Environment Not Supported', 
+                    'Native payments are not available in this environment (likely Expo Go). Please use our website or the standalone APK to use this feature.'
+                );
                 return;
             }
 

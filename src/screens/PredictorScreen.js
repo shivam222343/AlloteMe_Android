@@ -150,11 +150,11 @@ const PredictorScreen = ({ navigation }) => {
 
     const [loadingMessage, setLoadingMessage] = useState('Searching best options...');
     const loadingMessages = [
-        'Searching best options...',
-        'Analyzing cutoff trends...',
-        'Calculating admission chances...',
-        'Comparing with 2024 results...',
-        'Finalizing top choices for you...'
+        'Searching database...',
+        'Retrieving cutoffs...',
+        'Analyzing college trends...',
+        'Formatting best matches...',
+        'Finalizing response for you...'
     ];
 
     React.useEffect(() => {
@@ -634,6 +634,7 @@ const styles = StyleSheet.create({
     loadingIconOuter: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
     loadingIconInner: { width: 100, height: 100, borderRadius: 50, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadows.lg },
     loadingTitle: { fontSize: 24, fontWeight: '900', color: Colors.white, marginTop: 30, letterSpacing: 1 },
+    loadingStepText: { fontSize: 14, fontWeight: '600', color: Colors.white, marginTop: 10, textAlign: 'center' },
     usageChip: {
         backgroundColor: Colors.primary + '10',
         paddingHorizontal: 12,

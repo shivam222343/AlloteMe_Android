@@ -238,7 +238,7 @@ const MessageItem = React.memo(({ item, user, onDelete }) => {
 
 const ChatHeader = React.memo(({ navigation, startNewChat, openHistory }) => (
     <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.openDrawer()} style={styles.headerIcon}>
+        <TouchableOpacity onPress={() => navigation?.openDrawer?.()} style={styles.headerIcon}>
             <GradientBorder size={44} borderWidth={2}>
                 <View style={styles.botIconCircle}>
                     <Bot size={22} color={Colors.primary} />
@@ -578,6 +578,8 @@ const AICounselorScreen = ({ navigation }) => {
             setLoadingStatus('Eta is thinking...');
         }
 
+        console.log('[AICounselor] Sending message:', textToSend);
+
         try {
             const history = messages.slice(1).map(m => ({
                 role: m.sender === 'user' ? 'user' : 'assistant',
@@ -596,6 +598,10 @@ const AICounselorScreen = ({ navigation }) => {
                     expectedRegion: user?.expectedRegion
                 }
             });
+
+            if (!res.data || !res.data.message) {
+                throw new Error('Eta AI returned an empty response. Please try again.');
+            }
 
             const botMsg = {
                 id: Date.now().toString(),
@@ -763,7 +769,7 @@ const AICounselorScreen = ({ navigation }) => {
                             <View style={[styles.bubble, styles.botBubble, { padding: 15, width: 220, alignItems: 'flex-start' }]}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                     <ActivityIndicator size="small" color={Colors.primary} />
-                                    <Text style={[styles.loadingText, { color: Colors.primary, fontSize: 13, fontWeight: '500' }]}>
+                                    <Text style={[styles.loadingText, { color: Colors.primary, fontSize: 13, fontWeight: 'bold' }]}>
                                         {loadingStatus}
                                     </Text>
                                 </View>
