@@ -20,10 +20,12 @@ api.interceptors.request.use(
         }
         
         // Prevent aggressive browser caching across logouts for GET requests
+        // Using timestamp param instead of headers to avoid CORS preflight issues with remote backends
         if (config.method && config.method.toLowerCase() === 'get') {
-            config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-            config.headers['Pragma'] = 'no-cache';
-            config.headers['Expires'] = '0';
+            config.params = {
+                ...config.params,
+                _t: Date.now()
+            };
         }
         
         return config;
