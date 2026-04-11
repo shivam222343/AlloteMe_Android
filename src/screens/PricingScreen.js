@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../contexts/AuthContext';
 import { systemAPI } from '../services/api';
+import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 
 // Safe way to access env in Expo
 const RAZORPAY_KEY_ID = 'rzp_live_SbVLw7f5p7qeQN';
@@ -123,6 +124,28 @@ const PricingScreen = ({ navigation }) => {
 
     const handleSelectPlan = async (plan) => {
         let amount = parseInt(plan.price.replace('₹', '')) || 0;
+        
+        // Define if it is a renewal
+        const isActive = user?.subscription?.type === plan.id;
+        let isRenewable = false;
+        if (isActive && plan.id !== 'free') {
+            const activePlanDetails = SUBSCRIPTION_PLANS[plan.id.toUpperCase()];
+            const currentUsage = user?.subscription?.usage || {};
+            if (activePlanDetails) {
+                Object.keys(activePlanDetails.limits).forEach(key => {
+                    const limit = activePlanDetails.limits[key];
+                    if (limit !== Infinity && (currentUsage[key] || 0) >= limit) {
+                        isRenewable = true;
+                    }
+                });
+            }
+        }
+
+        // Apply renewal discount 30%
+        if (isRenewable && amount > 0) {
+            amount = Math.round(amount * 0.7);
+        }
+
         if (appliedCoupon && amount > 0) {
             const discount = (amount * appliedCoupon.discountPercentage) / 100;
             amount = Math.max(0, Math.round(amount - discount));
@@ -340,10 +363,11 @@ const PricingScreen = ({ navigation }) => {
                 <View style={{ width: 44 }} />
             </View>
 
-            <ScrollView
-                ref={scrollViewRef}
-                horizontal
-                pagingEnabled
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}>
+                <ScrollView
+                    ref={scrollViewRef}
+                    horizontal
+                    pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onScroll={Animated.event(
                     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -351,8 +375,34 @@ const PricingScreen = ({ navigation }) => {
                 )}
                 scrollEnabled={!showSuccess}
             >
-                {dynamicPlans.map((plan) => (
-                    <View key={plan.id} style={styles.slide}>
+                {dynamicPlans.map((plan) => {
+                    const isActive = user?.subscription?.type === plan.id;
+                    let isRenewable = false;
+                    if (isActive && plan.id !== 'free') {
+                        const activePlanDetails = SUBSCRIPTION_PLANS[plan.id.toUpperCase()];
+                        const currentUsage = user?.subscription?.usage || {};
+                        if (activePlanDetails) {
+                            Object.keys(activePlanDetails.limits).forEach(key => {
+                                const limit = activePlanDetails.limits[key];
+                                if (limit !== Infinity && (currentUsage[key] || 0) >= limit) {
+                                    isRenewable = true;
+                                }
+                            });
+                        }
+                    }
+
+                    let displayPrice = plan.price;
+                    let originalPrice = null;
+                    if (isRenewable && plan.price !== 'Free') {
+                        const rawAmount = parseInt(plan.price.replace('₹', '')) || 0;
+                        if (rawAmount > 0) {
+                            originalPrice = plan.price;
+                            displayPrice = `₹${Math.round(rawAmount * 0.7)}`;
+                        }
+                    }
+
+                    return (
+                        <View key={plan.id} style={styles.slide}>
                         <View style={[
                             styles.planCard,
                             plan.isPremium && styles.premiumCard,
@@ -379,7 +429,8 @@ const PricingScreen = ({ navigation }) => {
                                 <Text style={styles.planName}>{plan.name}</Text>
                                 <Text style={styles.planSub}>{plan.subtitle}</Text>
                                 <View style={styles.priceContainer}>
-                                    <Text style={styles.priceValue}>{plan.price}</Text>
+                                    {originalPrice && <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>{originalPrice}</Text>}
+                                    <Text style={styles.priceValue}>{displayPrice}</Text>
                                     <Text style={styles.priceLabel}>/ {plan.priceLabel}</Text>
                                 </View>
                             </View>
@@ -406,10 +457,9 @@ const PricingScreen = ({ navigation }) => {
                                 const userLevel = planHierarchy[user?.subscription?.type] || 0;
                                 const currentPlanLevel = planHierarchy[plan.id] || 0;
                                 
-                                const isActive = user?.subscription?.type === plan.id;
                                 const isIncluded = userLevel > currentPlanLevel;
-                                const btnText = isActive ? 'Currently Active' : isIncluded ? 'Included in Plan' : plan.buttonText;
-                                const isDisabled = isActive || isIncluded;
+                                const btnText = isRenewable ? 'Renew Plan (30% Off)' : isActive ? 'Currently Active' : isIncluded ? 'Included in Plan' : plan.buttonText;
+                                const isDisabled = (isActive && !isRenewable) || isIncluded;
 
                                 return (
                                     <TouchableOpacity
@@ -442,7 +492,7 @@ const PricingScreen = ({ navigation }) => {
                                             </LinearGradient>
                                         ) : (
                                             <View style={styles.normalBtn}>
-                                                <Text style={styles.btnText}>{isActive ? 'Activated' : btnText}</Text>
+                                                <Text style={styles.btnText}>{isActive && !isRenewable ? 'Activated' : btnText}</Text>
                                                 {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
                                             </View>
                                         )}
@@ -451,7 +501,8 @@ const PricingScreen = ({ navigation }) => {
                             })()}
                         </View>
                     </View>
-                ))}
+                    );
+                })}
             </ScrollView>
 
             <View style={styles.indicatorContainer}>
@@ -496,6 +547,7 @@ const PricingScreen = ({ navigation }) => {
                 <ShieldCheck size={16} color="#64748B" />
                 <Text style={styles.trustText}>Secured Payment Infrastructure</Text>
             </View>
+            </ScrollView>
 
             {showSuccess && (
                 <View style={styles.overlay}>
@@ -547,6 +599,7 @@ const styles = StyleSheet.create({
     slide: { width: SCREEN_WIDTH, padding: 24, alignItems: 'center', justifyContent: 'center' },
     planCard: {
         width: '100%',
+        maxWidth: 400,
         backgroundColor: 'white',
         borderRadius: 32,
         padding: 30,

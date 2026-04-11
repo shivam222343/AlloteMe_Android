@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
         fontWeight: '600'
     },
     upgradeBtn: {
-        width: width * 0.7,
+        width: '100%',
         paddingVertical: 16,
         borderRadius: 16,
         flexDirection: 'row',

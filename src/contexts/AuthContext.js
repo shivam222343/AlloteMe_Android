@@ -17,6 +17,19 @@ export const AuthProvider = ({ children }) => {
     
     // Custom setUser that also handles initialization
     const setUser = (data) => {
+        if (typeof data === 'function') {
+            setUserState(prev => {
+                let newData = data(prev);
+                if (newData && !newData.subscription) {
+                    newData.subscription = { type: 'free', usage: { aiPrompts: 0, predictions: 0, exports: 0 } };
+                } else if (newData && newData.subscription && !newData.subscription.usage) {
+                    newData.subscription.usage = { aiPrompts: 0, predictions: 0, exports: 0 };
+                }
+                return newData;
+            });
+            return;
+        }
+
         if (data && !data.subscription) {
             data.subscription = {
                 type: 'free',
