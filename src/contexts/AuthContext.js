@@ -9,7 +9,7 @@ import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleL
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
 // ⚠️ Keep in sync with src/services/api.js — switch together
-const API_BASE_URL = LOCAL_URL;
+const API_BASE_URL = RENDER_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
