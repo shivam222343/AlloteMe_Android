@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Institution = require('../models/Institution');
+const OTP = require('../models/OTP');
 const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
 const { client: redis } = require('../config/redis');
@@ -650,8 +651,12 @@ const sendForgotPasswordOTP = async (req, res) => {
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
 
-        // Save OTP to Redis for 10 minutes
-        await redis.set(`forgot_password_otp_${email}`, otp, { EX: 600 });
+        // Save OTP to DB for 10 minutes (TTL index handles expiration)
+        await OTP.findOneAndUpdate(
+            { email, purpose: 'forgot_password' },
+            { otp, createdAt: new Date() },
+            { upsert: true, new: true }
+        );
 
         await sendEmail({
             email,
@@ -683,7 +688,8 @@ const resetPassword = async (req, res) => {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
-        const storedOtp = await redis.get(`forgot_password_otp_${email}`);
+        const otpDoc = await OTP.findOne({ email, purpose: 'forgot_password' });
+        const storedOtp = otpDoc ? otpDoc.otp : null;
         
         if (!storedOtp || String(storedOtp) !== String(otp)) {
             console.log(`Reset failed: Stored OTP ${storedOtp} vs Received OTP ${otp} for ${email}`);
@@ -696,7 +702,7 @@ const resetPassword = async (req, res) => {
         user.password = newPassword;
         await user.save();
 
-        await redis.del(`forgot_password_otp_${email}`);
+        await OTP.deleteOne({ email, purpose: 'forgot_password' });
 
         res.json({ success: true, message: 'Password reset successfully. You can now login.' });
     } catch (error) {
@@ -717,8 +723,12 @@ const sendSignupOTP = async (req, res) => {
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
 
-        // Save OTP to Redis for 10 minutes
-        await redis.set(`signup_otp_${email}`, otp, { EX: 600 });
+        // Save OTP to DB for 10 minutes
+        await OTP.findOneAndUpdate(
+            { email, purpose: 'signup' },
+            { otp, createdAt: new Date() },
+            { upsert: true, new: true }
+        );
 
         await sendEmail({
             email,
@@ -749,7 +759,9 @@ const sendSignupOTP = async (req, res) => {
 const verifyOnlyOTP = async (req, res) => {
     try {
         const { email, otp } = req.body;
-        const storedOtp = await redis.get(`signup_otp_${email}`);
+        const otpDoc = await OTP.findOne({ email, purpose: 'signup' });
+        const storedOtp = otpDoc ? otpDoc.otp : null;
+
         if (!storedOtp || storedOtp !== otp) {
             return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
         }
@@ -766,7 +778,9 @@ const verifyOTPAndRegister = async (req, res) => {
     try {
         const { displayName, email, password, phoneNumber, otp, role, examType } = req.body;
         
-        const storedOtp = await redis.get(`signup_otp_${email}`);
+        const otpDoc = await OTP.findOne({ email, purpose: 'signup' });
+        const storedOtp = otpDoc ? otpDoc.otp : null;
+
         if (!storedOtp || storedOtp !== otp) {
             return res.status(400).json({ message: 'Invalid or expired OTP' });
         }
@@ -788,7 +802,7 @@ const verifyOTPAndRegister = async (req, res) => {
         });
 
         if (user) {
-            await redis.del(`signup_otp_${email}`);
+            await OTP.deleteOne({ email, purpose: 'signup' });
             
             // Send welcome notification
             setTimeout(() => {
