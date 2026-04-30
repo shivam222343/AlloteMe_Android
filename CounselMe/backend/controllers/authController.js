@@ -655,8 +655,9 @@ const sendForgotPasswordOTP = async (req, res) => {
         await OTP.findOneAndUpdate(
             { email, purpose: 'forgot_password' },
             { otp, createdAt: new Date() },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
+        console.log(`[Auth] Forgot Password OTP created/updated in DB for ${email}`);
 
         await sendEmail({
             email,
@@ -727,8 +728,9 @@ const sendSignupOTP = async (req, res) => {
         await OTP.findOneAndUpdate(
             { email, purpose: 'signup' },
             { otp, createdAt: new Date() },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
+        console.log(`[Auth] Signup OTP created/updated in DB for ${email}`);
 
         await sendEmail({
             email,
