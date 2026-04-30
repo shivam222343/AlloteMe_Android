@@ -16,9 +16,12 @@ const sendEmail = async (options) => {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
         },
-        connectionTimeout: 10000, // 10 seconds
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
+        tls: {
+            rejectUnauthorized: false // Helps with self-signed certs or cloud network issues
+        },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
     });
 
     const mailOptions = {
