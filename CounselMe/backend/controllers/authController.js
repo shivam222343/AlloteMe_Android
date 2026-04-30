@@ -676,8 +676,8 @@ const sendForgotPasswordOTP = async (req, res) => {
 
         res.json({ success: true, message: 'Reset code sent to email' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to send reset code' });
+        console.error('sendForgotPasswordOTP Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send reset code', error: error.message });
     }
 };
 
@@ -748,8 +748,8 @@ const sendSignupOTP = async (req, res) => {
 
         res.json({ success: true, message: 'OTP sent to email' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to send OTP' });
+        console.error('sendSignupOTP Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send OTP', error: error.message });
     }
 };
 
