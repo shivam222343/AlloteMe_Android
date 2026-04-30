@@ -69,7 +69,7 @@ export const registerForPushNotifications = async () => {
  */
 export const saveFCMTokenToBackend = async (token) => {
     try {
-        await api.put('/users/fcm-token', { fcmToken: token });
+        await api.put('/auth/fcm-token', { fcmToken: token });
         console.log('✅ FCM token saved to backend');
         return true;
     } catch (error) {
@@ -83,7 +83,7 @@ export const saveFCMTokenToBackend = async (token) => {
  */
 export const removeFCMTokenFromBackend = async () => {
     try {
-        await api.delete('/users/fcm-token');
+        await api.delete('/auth/fcm-token');
         console.log('✅ FCM token removed from backend');
         return true;
     } catch (error) {
@@ -147,6 +147,7 @@ export const scheduleLocalNotification = async (notification) => {
  * Works offline as it only schedules local notifications
  */
 export const scheduleDailyRandomReminders = async () => {
+    if (Platform.OS === 'web') return;
     try {
         // 1. Cancel all previous scheduled local notifications to avoid overlap/duplication
         await Notifications.cancelAllScheduledNotificationsAsync();
@@ -206,6 +207,7 @@ export const scheduleDailyRandomReminders = async () => {
  * Wrapper for AuthContext initialization
  */
 export const registerForPushNotificationsAsync = async (userId) => {
+    if (Platform.OS === 'web') return null;
     try {
         // Also setup local random notifications whenever this is triggered (offline + online support)
         await scheduleDailyRandomReminders();

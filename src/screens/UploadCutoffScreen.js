@@ -30,22 +30,10 @@ const UploadCutoffScreen = ({ navigation }) => {
         round: '1'
     });
 
-    useEffect(() => {
-        fetchInstitutions();
-    }, [admissionPath]);
-
-    const fetchInstitutions = async () => {
-        try {
-            const res = await institutionAPI.getAll(admissionPath);
-            setInstitutions(res.data);
-        } catch (error) {
-            Alert.alert('Error', 'Failed to fetch institutions');
-        }
-    };
-
     const filteredInstitutions = institutions.filter(inst => {
         const matchesQuery = inst.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            inst.location?.city?.toLowerCase().includes(searchQuery.toLowerCase());
+            inst.location?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            inst.dteCode?.toString().includes(searchQuery.toLowerCase());
 
         if (!matchesQuery) return false;
 
@@ -67,6 +55,48 @@ const UploadCutoffScreen = ({ navigation }) => {
 
         return instCat === admissionPath;
     });
+
+    const currentIndex = filteredInstitutions.findIndex(inst => inst._id === selectedInst?._id);
+    const hasNext = currentIndex < filteredInstitutions.length - 1;
+    const hasPrev = currentIndex > 0;
+
+    const goToNextInst = () => {
+        if (hasNext) {
+            const nextInst = filteredInstitutions[currentIndex + 1];
+            setSelectedInst(nextInst);
+            setStep(2);
+            setSelectedBranch(null);
+            setRawText('');
+            setJsonText('');
+        } else {
+            Alert.alert('Finished', 'You have reached the end of the college list.');
+            navigation.goBack();
+        }
+    };
+
+    const goToPrevInst = () => {
+        if (hasPrev) {
+            const prevInst = filteredInstitutions[currentIndex - 1];
+            setSelectedInst(prevInst);
+            setStep(2);
+            setSelectedBranch(null);
+            setRawText('');
+            setJsonText('');
+        }
+    };
+
+    useEffect(() => {
+        fetchInstitutions();
+    }, [admissionPath]);
+
+    const fetchInstitutions = async () => {
+        try {
+            const res = await institutionAPI.getAll(admissionPath);
+            setInstitutions(res.data);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to fetch institutions');
+        }
+    };
 
     const handleAiParse = async () => {
         if (!rawText.trim()) return Alert.alert('Empty', 'Paste some text first');
@@ -182,8 +212,11 @@ const UploadCutoffScreen = ({ navigation }) => {
                     cutoffData: cleanData
                 });
             }
-            Alert.alert('Success', 'Cutoff data uploaded successfully (Previous data replaced)!');
-            navigation.goBack();
+            Alert.alert(
+                'Success', 
+                'Cutoff data uploaded successfully! Moving to next college...',
+                [{ text: 'OK', onPress: () => goToNextInst() }]
+            );
         } catch (error) {
             console.error('Upload Error:', error.response?.data || error.message);
             Alert.alert('Error', 'Upload failed: ' + (error.response?.data?.message || 'Check JSON format or connection.'));
@@ -191,19 +224,6 @@ const UploadCutoffScreen = ({ navigation }) => {
             setLoading(false);
         }
     };
-
-    const renderStepIndicator = () => (
-        <View style={styles.stepContainer}>
-            {[1, 2, 3, 4].map(s => (
-                <View key={s} style={styles.stepRow}>
-                    <View style={[styles.stepCircle, step >= s && styles.stepCircleActive]}>
-                        {step > s ? <CheckCircle2 size={16} color={Colors.white} /> : <Text style={[styles.stepNum, step >= s && styles.stepNumActive]}>{s}</Text>}
-                    </View>
-                    {s < 4 && <View style={[styles.stepLine, step > s && styles.stepLineActive]} />}
-                </View>
-            ))}
-        </View>
-    );
 
     const renderStepContent = () => {
         switch (step) {
@@ -237,7 +257,14 @@ const UploadCutoffScreen = ({ navigation }) => {
                                         <Building2 size={20} color={Colors.primary} />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.instName}>{inst.name}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                                            <Text style={styles.instName}>{inst.name}</Text>
+                                            {inst.dteCode && (
+                                                <View style={styles.dteBadge}>
+                                                    <Text style={styles.dteBadgeText}>{inst.dteCode}</Text>
+                                                </View>
+                                            )}
+                                        </View>
                                         <Text style={styles.instLoc}>{inst.location?.city || 'Location N/A'}</Text>
                                     </View>
                                     <ChevronRight size={20} color={Colors.divider} />
@@ -356,6 +383,27 @@ const UploadCutoffScreen = ({ navigation }) => {
             case 4: // Data Input
                 return (
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                        <View style={styles.navHeader}>
+                            <TouchableOpacity 
+                                onPress={goToPrevInst} 
+                                disabled={!hasPrev}
+                                style={[styles.navBtn, !hasPrev && { opacity: 0.3 }]}
+                            >
+                                <Text style={styles.navBtnText}>← Previous College</Text>
+                            </TouchableOpacity>
+                            <View style={styles.navInfo}>
+                                <Text style={styles.navInstName} numberOfLines={1}>{selectedInst?.name}</Text>
+                                <Text style={styles.navCount}>{selectedInst?.dteCode ? `DTE: ${selectedInst.dteCode} | ` : ''}#{currentIndex + 1} of {filteredInstitutions.length}</Text>
+                            </View>
+                            <TouchableOpacity 
+                                onPress={goToNextInst} 
+                                disabled={!hasNext}
+                                style={[styles.navBtn, !hasNext && { opacity: 0.3 }]}
+                            >
+                                <Text style={styles.navBtnText}>Next College →</Text>
+                            </TouchableOpacity>
+                        </View>
+
                         <View style={styles.tabHeader}>
                             <TouchableOpacity
                                 style={[styles.tab, inputMode === 'AI' && styles.activeTab]}
@@ -423,7 +471,6 @@ const UploadCutoffScreen = ({ navigation }) => {
     return (
         <MainLayout style={styles.container} title="Upload Cutoffs">
             <View style={{ flex: 1 }}>
-                {renderStepIndicator()}
                 <View style={{ flex: 1, paddingVertical: 10 }}>
                     {renderStepContent()}
                 </View>
@@ -473,6 +520,16 @@ const styles = StyleSheet.create({
     modeTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text.primary },
     modeSub: { fontSize: 12, color: Colors.text.tertiary, marginTop: 2 },
     branchItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottomWidth: 1, borderBottomColor: Colors.divider, backgroundColor: Colors.white },
+
+    navHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.white, padding: 12, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: Colors.border, ...Shadows.sm },
+    navBtn: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, backgroundColor: Colors.primary + '10' },
+    navBtnText: { color: Colors.primary, fontSize: 12, fontWeight: 'bold' },
+    navInfo: { flex: 1, alignItems: 'center', paddingHorizontal: 10 },
+    navInstName: { fontSize: 13, fontWeight: 'bold', color: Colors.text.primary, textAlign: 'center' },
+    navCount: { fontSize: 10, color: Colors.text.tertiary, marginTop: 2 },
+
+    dteBadge: { backgroundColor: Colors.primary + '10', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: Colors.primary + '30' },
+    dteBadgeText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
 });
 
 export default UploadCutoffScreen;

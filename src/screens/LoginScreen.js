@@ -5,13 +5,30 @@ import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Typography, Spacing } from '../constants/theme';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { useWebGoogleLogin } from '../utils/webAuthHelper';
 
 const LoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const { login } = useAuth();
+    const { login, googleLogin } = useAuth();
+
+    const loginWeb = useWebGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            console.log('Web Google Success:', tokenResponse);
+            const idToken = tokenResponse.credential;
+            const accessToken = tokenResponse.access_token;
+            
+            if (idToken || accessToken) {
+                const result = await googleLogin({ idToken, accessToken });
+                if (!result.success) setError(result.message);
+            }
+        },
+        onError: () => setError('Google Login failed on Web'),
+        flow: 'implicit'
+    });
 
     const handleLogin = async () => {
         console.log('Login attempt started:', { email, Platform: Platform.OS });
@@ -37,6 +54,35 @@ const LoginScreen = ({ navigation }) => {
             console.error('Login screen execution error:', err);
             setLoading(false);
             setError('Network issue! check your connection');
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        if (Platform.OS === 'web') {
+            loginWeb();
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError('');
+            await GoogleSignin.hasPlayServices();
+            const userInfo = await GoogleSignin.signIn();
+            const idToken = userInfo.data?.idToken || userInfo.idToken;
+            
+            if (!idToken) {
+                throw new Error('No ID token received from Google');
+            }
+
+            const result = await googleLogin({ idToken });
+            if (!result.success) {
+                setError(result.message);
+            }
+        } catch (err) {
+            console.error('Google Login Error:', err);
+            setError('Google sign-in failed');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -70,7 +116,10 @@ const LoginScreen = ({ navigation }) => {
                     secureTextEntry
                 />
 
-                <TouchableOpacity style={styles.forgotPassword}>
+                <TouchableOpacity 
+                    style={styles.forgotPassword}
+                    onPress={() => navigation.navigate('ForgotPassword')}
+                >
                     <Text style={styles.forgotText}>Forgot Password?</Text>
                 </TouchableOpacity>
 
@@ -80,6 +129,21 @@ const LoginScreen = ({ navigation }) => {
                     loading={loading}
                     style={styles.loginBtn}
                 />
+
+                <View style={styles.divider}>
+                    <View style={styles.line} />
+                    <Text style={styles.dividerText}>OR</Text>
+                    <View style={styles.line} />
+                </View>
+
+                <TouchableOpacity 
+                    style={styles.googleBtn} 
+                    onPress={handleGoogleLogin}
+                    disabled={loading}
+                >
+                    <Image source={require('../../imgs/google.png')} style={styles.googleIcon} />
+                    <Text style={styles.googleBtnText}>Continue with Google</Text>
+                </TouchableOpacity>
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>Don't have an account? </Text>
@@ -151,6 +215,42 @@ const styles = StyleSheet.create({
         color: Colors.error,
         textAlign: 'center',
         marginBottom: 16,
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 24,
+    },
+    line: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E2E8F0',
+    },
+    dividerText: {
+        marginHorizontal: 16,
+        color: Colors.text.tertiary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    googleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
+        paddingVertical: 12,
+        gap: 12,
+    },
+    googleIcon: {
+        width: 28,
+        height: 28,
+    },
+    googleBtnText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
     },
 });
 

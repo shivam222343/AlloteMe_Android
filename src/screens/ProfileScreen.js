@@ -18,9 +18,6 @@ const ProfileScreen = ({ navigation, route }) => {
     const [avatarLoading, setAvatarLoading] = useState(false);
     const [showGallery, setShowGallery] = useState(false);
     const [galleryAvatars, setGalleryAvatars] = useState([]);
-    const [showKeyModal, setShowKeyModal] = useState(false);
-    const [newGroqKey, setNewGroqKey] = useState(user?.groqApiKey || '');
-    const [keyUpdating, setKeyUpdating] = useState(false);
     const [bannerPreview, setBannerPreview] = useState(null);
     const [profilePreview, setProfilePreview] = useState(null);
 
@@ -244,14 +241,6 @@ const ProfileScreen = ({ navigation, route }) => {
                         <InfoRow icon={MapPin} label="Location" value={user?.location} />
                         <InfoRow icon={Phone} label="Contact Number" value={user?.phoneNumber} />
                         <InfoRow icon={BookOpen} label="Expected Region" value={user?.expectedRegion} />
-                        <TouchableOpacity style={styles.apiKeyRow} onPress={() => setShowKeyModal(true)}>
-                            <InfoRow
-                                icon={Bot}
-                                label="Groq API Key"
-                                value={user?.groqApiKey ? '••••••••' + user.groqApiKey.slice(-4) : 'Not Configured (Using System)'}
-                            />
-                            <Edit2 size={14} color={Colors.primary} />
-                        </TouchableOpacity>
                     </Card>
                 </View>
 
@@ -359,82 +348,6 @@ const ProfileScreen = ({ navigation, route }) => {
                     </View>
                 </View>
             </Modal>
-
-            {/* API Key Modal */}
-            <Modal
-                visible={showKeyModal}
-                animationType="fade"
-                transparent={true}
-                onRequestClose={() => setShowKeyModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.centeredModal}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Update Groq API Key</Text>
-                            <TouchableOpacity onPress={() => setShowKeyModal(false)}>
-                                <X size={20} color={Colors.text.tertiary} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text style={styles.keyInfoText}>
-                            Your personal key avoids service interruptions. Keys are stored securely and never shared.
-                        </Text>
-
-                        <View style={styles.guideBox}>
-                            <Text style={styles.guideTitle}>How to get your key:</Text>
-                            <Text style={styles.guideStep}>1. Visit Groq Console</Text>
-                            <Text style={styles.guideStep}>2. Click "API Keys" in sidebar</Text>
-                            <Text style={styles.guideStep}>3. Create and Copy a new key</Text>
-
-                            <TouchableOpacity
-                                style={styles.webLink}
-                                onPress={() => Linking.openURL('https://console.groq.com/keys')}
-                            >
-                                <Text style={styles.webLinkText}>Go to Groq Console</Text>
-                                <ImageIcon size={14} color={Colors.primary} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.inputWrapper}>
-                            <Bot size={18} color={Colors.primary} style={styles.inputIcon} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.miniLabel}>Groq API Key</Text>
-                                <Input
-                                    value={newGroqKey}
-                                    onChangeText={setNewGroqKey}
-                                    placeholder="gsk_..."
-                                    secureTextEntry={true}
-                                    containerStyle={{ marginBottom: 0 }}
-                                />
-                            </View>
-                        </View>
-
-                        <Button
-                            title="Save API Key"
-                            onPress={handleUpdateApiKey}
-                            loading={keyUpdating}
-                            style={styles.saveKeyBtn}
-                        />
-
-                        <TouchableOpacity
-                            style={styles.removeBtn}
-                            onPress={async () => {
-                                setNewGroqKey('');
-                                try {
-                                    await authAPI.updateProfile({ groqApiKey: null });
-                                    await refreshUser();
-                                    setShowKeyModal(false);
-                                    Alert.alert('Success', 'Personal API key removed.');
-                                } catch (e) {
-                                    Alert.alert('Error', 'Failed to remove key');
-                                }
-                            }}
-                        >
-                            <Text style={styles.removeText}>Remove Key (Use System Default)</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
         </MainLayout>
     );
 };
@@ -531,53 +444,6 @@ const styles = StyleSheet.create({
     loaderBox: { padding: 40, alignItems: 'center', gap: 16 },
     loaderText: { fontSize: 14, color: Colors.text.secondary },
     refreshModalBtn: { marginBottom: 12 },
-    apiKeyRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 12 },
-    centeredModal: {
-        backgroundColor: Colors.white,
-        margin: 20,
-        borderRadius: 24,
-        padding: 24,
-        width: '90%',
-        alignSelf: 'center',
-        marginBottom: 'auto',
-        marginTop: 'auto'
-    },
-    keyInfoText: { fontSize: 13, color: Colors.text.tertiary, marginBottom: 20, lineHeight: 18 },
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.background,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        marginBottom: 20
-    },
-    inputIcon: { marginRight: 12 },
-    miniLabel: { fontSize: 10, fontWeight: 'bold', color: Colors.primary, marginBottom: 2, textTransform: 'uppercase' },
-    saveKeyBtn: { marginTop: 8 },
-    removeBtn: { marginTop: 16, alignItems: 'center' },
-    removeText: { color: Colors.error, fontSize: 12, fontWeight: '600' },
-
-    // Guide Styles
-    guideBox: {
-        backgroundColor: Colors.background,
-        padding: 16,
-        borderRadius: 16,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: Colors.divider
-    },
-    guideTitle: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 10 },
-    guideStep: { fontSize: 12, color: Colors.text.secondary, marginBottom: 4 },
-    webLink: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 12,
-        paddingVertical: 8,
-        borderTopWidth: 1,
-        borderTopColor: Colors.divider
-    },
     webLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary }
 });
 

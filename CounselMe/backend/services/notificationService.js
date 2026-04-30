@@ -1,6 +1,11 @@
 const Notification = require('../models/Notification');
 const GlobalNotification = require('../models/GlobalNotification');
+const User = require('../models/User');
 const { getIO } = require('../utils/socket');
+const { Expo } = require('expo-server-sdk');
+
+// Create a new Expo SDK client
+const expo = new Expo();
 
 const sendNotification = async (userId, title, message, type = 'info') => {
     try {
@@ -32,13 +37,56 @@ const sendNotification = async (userId, title, message, type = 'info') => {
             read: false
         };
 
+        // 1. Send via Socket (Real-time if app is open)
         if (userId === 'all') {
             io.emit('notification:received', { ...notificationData, isGlobal: true });
-            return { success: true };
         } else {
             io.to(userId.toString()).emit('notification:received', notificationData);
-            return { success: true, notification: notificationData };
         }
+
+        // 2. Send via Push Notification (Even if app is closed)
+        const sendPush = async (targetUserId, token) => {
+            if (!Expo.isExpoPushToken(token)) {
+                console.error(`[Push] Invalid Expo push token: ${token}`);
+                return;
+            }
+
+            const messages = [{
+                to: token,
+                sound: 'default',
+                title: title,
+                body: message,
+                data: { ...notificationData, userId: targetUserId },
+                priority: 'high',
+                channelId: 'default',
+            }];
+
+            try {
+                const chunks = expo.chunkPushNotifications(messages);
+                for (let chunk of chunks) {
+                    await expo.sendPushNotificationsAsync(chunk);
+                }
+                console.log(`[Push] Sent to user: ${targetUserId}`);
+            } catch (error) {
+                console.error(`[Push] Error sending push to ${targetUserId}:`, error);
+            }
+        };
+
+        if (userId === 'all') {
+            // Get all users with push tokens
+            const users = await User.find({ fcmToken: { $ne: null } }).select('fcmToken');
+            console.log(`[Push] Sending global to ${users.length} users`);
+            for (const u of users) {
+                sendPush(u._id, u.fcmToken);
+            }
+        } else {
+            const user = await User.findById(userId).select('fcmToken');
+            if (user && user.fcmToken) {
+                sendPush(user._id, user.fcmToken);
+            }
+        }
+
+        return { success: true, notification: notificationData };
     } catch (error) {
         console.error('[NotificationService] Error:', error);
         return { success: false, error: error.message };

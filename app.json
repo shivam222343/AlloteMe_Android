@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.alloteme0077.app",
+      "bundleIdentifier": "com.alloteme.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,7 +24,7 @@
         "foregroundImage": "./imgs/logo.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.alloteme0077.app",
+      "package": "com.alloteme.mobile",
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "intentFilters": [
@@ -111,7 +111,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "6407d77e-1a3a-4c10-922c-ea18e6bca7b2"
+        "projectId": "3f4b8fb1-5b7e-48b4-9388-31718f3ff000"
       }
     }
   }

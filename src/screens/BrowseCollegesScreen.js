@@ -220,6 +220,35 @@ const BrowseCollegesScreen = ({ navigation }) => {
     return (
         <MainLayout scrollable={false} noPadding>
             <View style={styles.container}>
+                <View style={styles.topSection}>
+                    <Text style={styles.title}>Explore Colleges</Text>
+                    <View style={styles.searchBar}>
+                        <Search size={20} color={Colors.text.tertiary} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search colleges..."
+                            value={search}
+                            onChangeText={(t) => handleFilter(t, activeTab)}
+                        />
+                    </View>
+
+                    <View style={styles.filterOptions}>
+                        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowSortModal(true)}>
+                            <ArrowUpDown size={14} color={Colors.primary} />
+                            <Text style={styles.filterBtnText}>
+                                {sortOptions.find(o => o.id === sortBy)?.label.split(':')[0] || 'Sort'}
+                            </Text>
+                            <ChevronDown size={14} color={Colors.text.tertiary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowCityModal(true)}>
+                            <MapPin size={14} color={Colors.primary} />
+                            <Text style={styles.filterBtnText} numberOfLines={1}>{activeCity}</Text>
+                            <ChevronDown size={14} color={Colors.text.tertiary} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 <View style={styles.tabBar}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
                         {tabs.map((tab) => {
@@ -242,36 +271,6 @@ const BrowseCollegesScreen = ({ navigation }) => {
                     sections={filtered && filtered.length > 0 ? [{ title: 'Colleges', data: filtered }] : []}
                     keyExtractor={(item) => item._id}
                     renderItem={({ item }) => <InstitutionCard item={item} />}
-                    ListHeaderComponent={() => (
-                        <View style={styles.topSection}>
-                            <Text style={styles.title}>Explore Colleges</Text>
-                            <View style={styles.searchBar}>
-                                <Search size={20} color={Colors.text.tertiary} />
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder="Search colleges..."
-                                    value={search}
-                                    onChangeText={(t) => handleFilter(t, activeTab)}
-                                />
-                            </View>
-
-                            <View style={styles.filterOptions}>
-                                <TouchableOpacity style={styles.filterBtn} onPress={() => setShowSortModal(true)}>
-                                    <ArrowUpDown size={14} color={Colors.primary} />
-                                    <Text style={styles.filterBtnText}>
-                                        {sortOptions.find(o => o.id === sortBy)?.label.split(':')[0] || 'Sort'}
-                                    </Text>
-                                    <ChevronDown size={14} color={Colors.text.tertiary} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity style={styles.filterBtn} onPress={() => setShowCityModal(true)}>
-                                    <MapPin size={14} color={Colors.primary} />
-                                    <Text style={styles.filterBtnText} numberOfLines={1}>{activeCity}</Text>
-                                    <ChevronDown size={14} color={Colors.text.tertiary} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                     stickySectionHeadersEnabled={true}

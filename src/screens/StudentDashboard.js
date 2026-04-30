@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    Dimensions, FlatList, Image, ActivityIndicator
+    Dimensions, FlatList, Image, ActivityIndicator, Platform
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import MainLayout from '../components/layouts/MainLayout';
@@ -18,6 +18,11 @@ import VerificationModal from '../components/ui/VerificationModal';
 import RatingSection from '../components/ui/RatingSection';
 import TestimonialSlider from '../components/ui/TestimonialSlider';
 import { LinearGradient } from 'expo-linear-gradient';
+import SubscriptionPopup from '../components/ui/SubscriptionPopup';
+import { videoAPI } from '../services/api';
+import YoutubePlayer from 'react-native-youtube-iframe';
+import { PlayCircle, X, Youtube } from 'lucide-react-native';
+import { Modal as RNModal } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SLIDER_WIDTH = SCREEN_WIDTH - 32;
@@ -35,6 +40,9 @@ const StudentDashboard = ({ navigation }) => {
     const [loadingFeatured, setLoadingFeatured] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showVerificationModal, setShowVerificationModal] = useState(false);
+    const [showSubscriptionPopup, setShowSubscriptionPopup] = useState(false);
+    const [videos, setVideos] = useState([]);
+    const [selectedVideo, setSelectedVideo] = useState(null);
     const flatListRef = React.useRef(null);
     const pathScrollRef = React.useRef(null);
 
@@ -54,17 +62,28 @@ const StudentDashboard = ({ navigation }) => {
         }
     }, [socket, admissionPath]);
 
-    useEffect(() => {
-        if (user && !user.isVerified && !user.phoneNumber) {
-            setShowVerificationModal(true);
-        }
-    }, [user?.isVerified, user?.phoneNumber]);
+    // Removed WhatsApp verification popup trigger as per user request
+
+    const [hasShownSubscription, setHasShownSubscription] = useState(false);
 
     useEffect(() => {
-        if (user?.role === 'student' && !user?.preferences?.isProfileComplete && !hasSkippedProfile) {
+        // Show subscription popup if user is a student and on Free plan
+        if (!hasShownSubscription && user?.role === 'student' && (!user?.subscription?.type || user.subscription.type.toUpperCase() === 'FREE')) {
+            const timer = setTimeout(() => {
+                setShowSubscriptionPopup(true);
+                setHasShownSubscription(true);
+            }, 2000); // Small delay for better UX
+            return () => clearTimeout(timer);
+        }
+    }, [user, hasShownSubscription]);
+
+    useEffect(() => {
+        // Only redirect if user is fully loaded and specifically has isProfileComplete as FALSE
+        // This prevents redirects during partial state updates
+        if (user && user.role === 'student' && user.preferences && user.preferences.isProfileComplete === false && !hasSkippedProfile) {
             navigation.navigate('CompleteProfile');
         }
-    }, [user, hasSkippedProfile]);
+    }, [user?.preferences?.isProfileComplete, hasSkippedProfile]);
 
     useFocusEffect(
         useCallback(() => {
@@ -114,6 +133,37 @@ const StudentDashboard = ({ navigation }) => {
         }
     };
 
+    const { logout } = useAuth();
+    const isAdmin = user?.role === 'admin';
+    const [stats, setStats] = useState({ savedColleges: 0, predictions: 0 });
+
+    useEffect(() => {
+        fetchVideos();
+    }, [admissionPath, user?.examType, user?.role]);
+
+    const fetchVideos = async () => {
+        try {
+            // Admin sees everything
+            if (isAdmin) {
+                const res = await videoAPI.getAll();
+                setVideos(res.data.data);
+                return;
+            }
+
+            // Prioritize current selected admissionPath pill, fallback to profile examType
+            const targetTag = admissionPath || user?.examType;
+
+            if (targetTag) {
+                const res = await videoAPI.getAll({ tag: targetTag });
+                setVideos(res.data.data);
+            } else {
+                setVideos([]);
+            }
+        } catch (error) {
+            console.error('Fetch dashboard videos error:', error);
+        }
+    };
+
     const handleScroll = (event) => {
         const slideSize = SLIDER_WIDTH - 20 + 16; // Card width + marginRight
         const index = Math.floor(event.nativeEvent.contentOffset.x / slideSize);
@@ -156,7 +206,7 @@ const StudentDashboard = ({ navigation }) => {
         return 'Not Set';
     };
 
-    const stats = [
+    const quickStats = [
         { label: `${admissionPath} Percentile`, value: getPathScore(), icon: TrendingUp, color: Colors.primary, isEditable: getPathScore() === 'Not Set' },
         { label: `${admissionPath} Rank`, value: getPathRank(), icon: GraduationCap, color: '#10B981', isEditable: getPathRank() === 'Not Set' },
         { label: 'Saved', value: user?.savedColleges?.length || 0, icon: Bookmark, color: '#F59E0B', route: 'BrowseColleges' },
@@ -333,7 +383,7 @@ const StudentDashboard = ({ navigation }) => {
                 )}
 
                 <View style={styles.statsRow}>
-                    {stats.map((s, i) => <StatCard key={i} item={s} />)}
+                    {quickStats.map((s, i) => <StatCard key={i} item={s} />)}
                 </View>
 
                 {/* Subscription Status Card - Premium Feel */}
@@ -397,6 +447,39 @@ const StudentDashboard = ({ navigation }) => {
                     <GraduationCap size={60} color={Colors.white} style={styles.promoIcon} />
                 </View>
 
+                {videos.length > 0 && (
+                    <View style={styles.videoSection}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Latest Guidance</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('Videos')}>
+                                <Text style={styles.seeAll}>See All</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView 
+                            horizontal 
+                            showsHorizontalScrollIndicator={false} 
+                            contentContainerStyle={styles.videoList}
+                        >
+                            {videos.map((video) => (
+                                <TouchableOpacity 
+                                    key={video._id} 
+                                    style={styles.videoChip}
+                                    activeOpacity={0.8}
+                                    onPress={() => setSelectedVideo(video)}
+                                >
+                                    <View style={styles.videoThumbWrapper}>
+                                        <Image source={{ uri: video.thumbnail }} style={styles.videoThumb} />
+                                        <View style={styles.videoPlayOverlay}>
+                                            <PlayCircle size={24} color={Colors.white} />
+                                        </View>
+                                    </View>
+                                    <Text style={styles.videoChipTitle} numberOfLines={2}>{video.title}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
                 <View style={{ marginTop: 24 }}>
                     <TestimonialSlider />
                 </View>
@@ -408,11 +491,59 @@ const StudentDashboard = ({ navigation }) => {
                 <View style={{ height: 40 }} />
             </ScrollView>
 
+            {/* In-App Full Screen Video Player Modal */}
+            <RNModal
+                visible={!!selectedVideo}
+                transparent={true}
+                animationType="fade"
+                statusBarTranslucent
+                onRequestClose={() => setSelectedVideo(null)}
+            >
+                <View style={styles.fullScreenOverlay}>
+                    <TouchableOpacity 
+                        style={styles.fullScreenClose} 
+                        onPress={() => setSelectedVideo(null)}
+                    >
+                        <X size={28} color={Colors.white} />
+                    </TouchableOpacity>
+                    
+                    <View style={styles.fullScreenPlayer}>
+                        {selectedVideo && (
+                            Platform.OS === 'web' ? (
+                                <iframe
+                                    width="100%"
+                                    height={SCREEN_WIDTH * (9/16)}
+                                    src={`https://www.youtube.com/embed/${selectedVideo.videoId}?autoplay=1`}
+                                    frameBorder="0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                />
+                            ) : (
+                                <YoutubePlayer
+                                    height={SCREEN_WIDTH * (9/16)}
+                                    width={SCREEN_WIDTH}
+                                    play={true}
+                                    videoId={selectedVideo.videoId}
+                                />
+                            )
+                        )}
+                    </View>
+                </View>
+            </RNModal>
+
             <VerificationModal
                 visible={showVerificationModal}
                 user={user}
                 onVerified={refreshUser}
                 onClose={() => setShowVerificationModal(false)}
+            />
+            <SubscriptionPopup
+                visible={showSubscriptionPopup}
+                onClose={() => setShowSubscriptionPopup(false)}
+                onSubscribe={(planId) => {
+                    setShowSubscriptionPopup(false);
+                    navigation.navigate('Pricing', { selectedPlan: planId });
+                }}
             />
         </MainLayout>
     );
@@ -646,6 +777,63 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold',
         color: Colors.text.primary,
+    },
+    videoSection: {
+        marginTop: 32,
+        paddingHorizontal: 0
+    },
+    videoList: {
+        paddingHorizontal: 16,
+        gap: 16,
+        paddingBottom: 8
+    },
+    videoChip: {
+        width: 200,
+    },
+    videoThumbWrapper: {
+        width: 200,
+        height: 112,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#F1F5F9',
+        marginBottom: 10,
+        ...Shadows.sm
+    },
+    videoThumb: {
+        width: '100%',
+        height: '100%'
+    },
+    videoPlayOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    videoChipTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: Colors.text.primary,
+        lineHeight: 18
+    },
+    fullScreenOverlay: { 
+        flex: 1, 
+        backgroundColor: '#000', 
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    fullScreenClose: { 
+        position: 'absolute', 
+        top: 50, 
+        right: 20, 
+        zIndex: 100,
+        padding: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 25
+    },
+    fullScreenPlayer: { 
+        width: '100%',
+        aspectRatio: 16/9,
+        justifyContent: 'center'
     },
 });
 

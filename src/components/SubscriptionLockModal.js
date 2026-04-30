@@ -34,8 +34,8 @@ const SubscriptionLockModal = () => {
         >
             <View style={styles.overlay}>
                 <View style={styles.card}>
-                    <TouchableOpacity 
-                        style={styles.closeBtn} 
+                    <TouchableOpacity
+                        style={styles.closeBtn}
                         onPress={() => setSubscriptionModal({ visible: false, feature: '' })}
                     >
                         <X size={20} color={Colors.text.tertiary} />
@@ -65,7 +65,7 @@ const SubscriptionLockModal = () => {
                         </View>
                     </View>
 
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={handleUpgrade}
                     >
@@ -80,7 +80,7 @@ const SubscriptionLockModal = () => {
                         </LinearGradient>
                     </TouchableOpacity>
 
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         onPress={() => setSubscriptionModal({ visible: false, feature: '' })}
                         style={styles.maybeLater}
                     >
@@ -161,6 +161,7 @@ const styles = StyleSheet.create({
     upgradeBtn: {
         width: '100%',
         paddingVertical: 16,
+        paddingHorizontal: 56,
         borderRadius: 16,
         flexDirection: 'row',
         justifyContent: 'center',

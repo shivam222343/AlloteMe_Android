@@ -58,6 +58,7 @@ const NearbyCollegesScreen = ({ navigation }) => {
     const [location, setLocation] = useState(null);
     const [loading, setLoading] = useState(true);
     const [colleges, setColleges] = useState([]);
+    const [allInstitutions, setAllInstitutions] = useState([]);
     const [maxDistance, setMaxDistance] = useState(500);
     const [showRadius, setShowRadius] = useState(true);
     const [errorMsg, setErrorMsg] = useState(null);
@@ -150,7 +151,7 @@ const NearbyCollegesScreen = ({ navigation }) => {
     const fetchNearbyColleges = async (coords) => {
         try {
             const res = await institutionAPI.getAll(admissionPath);
-            if (!res.data || res.data.length === 0) { setColleges([]); setLoading(false); return; }
+            if (!res.data || res.data.length === 0) { setColleges([]); setAllInstitutions([]); setLoading(false); return; }
             const allColleges = res.data.filter(c => c.location?.coordinates?.lat && c.location?.coordinates?.lng);
 
             // Initial Haversine sort
@@ -159,7 +160,8 @@ const NearbyCollegesScreen = ({ navigation }) => {
                 distanceKm: calculateDistance(coords.latitude, coords.longitude, c.location.coordinates.lat, c.location.coordinates.lng)
             })).sort((a, b) => a.distanceKm - b.distanceKm);
 
-            setColleges(processed.slice(0, 20));
+            setAllInstitutions(processed);
+            setColleges(processed);
             setLoading(false);
 
             // Fetch EXACT Road Distances for top 10 using OSRM Table API
@@ -179,6 +181,14 @@ const NearbyCollegesScreen = ({ navigation }) => {
             if (data.distances?.[0]) {
                 const distances = data.distances[0];
                 const durations = data.durations[0];
+
+                setAllInstitutions(prev => prev.map(c => {
+                    const index = topColleges.findIndex(tc => tc._id === c._id);
+                    if (index !== -1 && distances[index + 1] !== null) {
+                        return { ...c, realDist: (distances[index + 1] / 1000).toFixed(1), duration: Math.round(durations[index + 1] / 60) };
+                    }
+                    return c;
+                }));
 
                 setColleges(prevColleges => {
                     return prevColleges.map(c => {
@@ -219,7 +229,7 @@ const NearbyCollegesScreen = ({ navigation }) => {
 
     const getMapHTML = () => {
         if (!location) return '';
-        const collegeMarkers = colleges.map(c => ({ lat: c.location.coordinates.lat, lng: c.location.coordinates.lng, name: c.name, id: c._id }));
+        const collegeMarkers = allInstitutions.map(c => ({ lat: c.location.coordinates.lat, lng: c.location.coordinates.lng, name: c.name, id: c._id }));
         return `
             <!DOCTYPE html>
             <html>
@@ -294,7 +304,10 @@ const NearbyCollegesScreen = ({ navigation }) => {
                 const msg = JSON.stringify({ type: 'DRAW', pts });
                 if (Platform.OS === 'web') webViewRef.current?.contentWindow?.postMessage(msg, "*");
                 else webViewRef.current?.postMessage(msg);
-                setColleges(colleges.map(c => c._id === college._id ? { ...c, realDist: (rt.distance / 1000).toFixed(1), duration: Math.round(rt.duration / 60) } : c));
+                
+                const updatedCollege = { ...college, realDist: (rt.distance / 1000).toFixed(1), duration: Math.round(rt.duration / 60) };
+                setAllInstitutions(allInstitutions.map(c => c._id === college._id ? updatedCollege : c));
+                setColleges(colleges.map(c => c._id === college._id ? updatedCollege : c));
             }
         } catch (e) { }
     };

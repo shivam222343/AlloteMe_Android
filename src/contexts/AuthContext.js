@@ -4,7 +4,7 @@ import { authAPI, notificationsAPI } from '../services/api';
 import { io } from 'socket.io-client';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { Platform } from 'react-native';
-import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleLocalNotification } from '../services/NotificationService';
+import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleLocalNotification, setupNotificationListeners, cleanupNotificationListeners } from '../services/NotificationService';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
@@ -124,10 +124,24 @@ export const AuthProvider = ({ children }) => {
         }
     }, [user?._id]);
 
-    // Socket setup
+    // Socket & Push Notifications setup
     useEffect(() => {
-        // Trigger notification registration
-        registerForPushNotificationsAsync();
+        let listeners = null;
+
+        // Trigger notification registration (Mobile Only) - ONLY if user is logged in
+        if (Platform.OS !== 'web' && user?._id) {
+            registerForPushNotificationsAsync(user._id);
+            // Setup native notification listeners
+            listeners = setupNotificationListeners(
+                (notification) => {
+                    console.log('[Push] Notification received in foreground:', notification);
+                },
+                (response) => {
+                    console.log('[Push] Notification tapped:', response);
+                    // You can add navigation logic here if notification contains data.url or similar
+                }
+            );
+        }
 
         // Initialize socket
         const newSocket = io(API_BASE_URL, {
@@ -142,12 +156,16 @@ export const AuthProvider = ({ children }) => {
         newSocket.on('notification:received', async (data) => {
             console.log('[Socket] New notification:', data);
 
-            // Trigger actual system notification if app is active
-            scheduleLocalNotification({
-                title: data.title || 'New Notification',
-                body: data.message,
-                data: data
-            });
+            // Trigger actual system notification if app is active (Mobile Only)
+            // Note: Native push notifications (Expo Push) already handle CLOSED/BACKGROUND state.
+            // This socket event is for real-time UI updates while the app is OPEN.
+            if (Platform.OS !== 'web') {
+                scheduleLocalNotification({
+                    title: data.title || 'New Notification',
+                    body: data.message,
+                    data: data
+                });
+            }
 
             const newNotif = {
                 _id: data._id || Date.now().toString(),
@@ -169,7 +187,6 @@ export const AuthProvider = ({ children }) => {
         newSocket.on('user:updated', (data) => {
             console.log('[Socket] User profile updated remotely:', data?._id);
             if (data) {
-                // Ensure we don't accidentally wipe notifications or token if the payload is partial
                 setUser(prev => ({ ...prev, ...data }));
             }
         });
@@ -178,8 +195,11 @@ export const AuthProvider = ({ children }) => {
 
         return () => {
             newSocket.disconnect();
+            if (listeners && Platform.OS !== 'web') {
+                cleanupNotificationListeners(listeners);
+            }
         };
-    }, []);
+    }, [user?._id]);
 
     // Notification Helpers
     const loadLocalNotifications = async () => {
@@ -258,26 +278,42 @@ export const AuthProvider = ({ children }) => {
     const incrementUsage = async (type) => {
         if (!user) return;
         
-        const newUsage = { 
-            ...(user.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }) 
-        };
-        newUsage[type] = (newUsage[type] || 0) + 1;
-        
-        const updatedSubscription = {
-            ...(user.subscription || { type: 'free' }),
-            usage: newUsage
-        };
-        
-        // Optimistic update
-        setUser(prev => ({ ...prev, subscription: updatedSubscription }));
+        // Use a functional update to ensure we have the absolute latest state
+        setUser(prev => {
+            if (!prev) return prev;
+
+            const newUsage = { 
+                ...(prev.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }) 
+            };
+            newUsage[type] = (newUsage[type] || 0) + 1;
+            
+            const updatedSubscription = {
+                ...(prev.subscription || { type: 'free' }),
+                usage: newUsage
+            };
+
+            return {
+                ...prev,
+                subscription: updatedSubscription
+            };
+        });
         
         // Local storage backup
         const cacheKey = `user_usage_${user._id}`;
         try {
+            const currentUsage = user.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 };
+            const newUsage = { ...currentUsage, [type]: (currentUsage[type] || 0) + 1 };
             await AsyncStorage.setItem(cacheKey, JSON.stringify(newUsage));
         } catch (e) { }
 
         try {
+            const updatedSubscription = {
+                ...(user.subscription || { type: 'free' }),
+                usage: {
+                    ...(user.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }),
+                    [type]: (user.subscription?.usage?.[type] || 0) + 1
+                }
+            };
             await authAPI.updateProfile({ subscription: updatedSubscription });
         } catch (error) {
             console.error('[AuthContext] Failed to sync usage', error);
@@ -345,6 +381,57 @@ export const AuthProvider = ({ children }) => {
             return { success: true };
         } catch (error) {
             return { success: false, message: error.response?.data?.message || 'Registration failed' };
+        }
+    };
+
+    const sendSignupOtp = async (email) => {
+        try {
+            const response = await authAPI.sendSignupOtp(email);
+            return { success: true, message: response.data.message };
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Failed to send OTP' };
+        }
+    };
+
+    const verifyOnlyOtp = async (email, otp) => {
+        try {
+            const response = await authAPI.verifyOnlyOtp(email, otp);
+            return { success: true, message: response.data.message };
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Invalid OTP' };
+        }
+    };
+
+    const verifySignupOtp = async (data) => {
+        try {
+            const response = await authAPI.verifySignupOtp(data);
+            const { token, showAvatarPopup, ...userData } = response.data;
+            await AsyncStorage.setItem('userToken', token);
+            setUser(userData);
+            if (showAvatarPopup) setShowAvatarPopupState(true);
+            return { success: true };
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Verification failed' };
+        }
+    };
+
+    const googleLogin = async (tokenData) => {
+        try {
+            const res = await authAPI.googleLogin(tokenData);
+            if (res.data.token) {
+                const userData = res.data;
+                await AsyncStorage.setItem('userToken', userData.token);
+                await AsyncStorage.setItem('userData', JSON.stringify(userData));
+                setUser(userData);
+                return { success: true };
+            }
+            return { success: false, message: res.data.message || 'Google Login failed' };
+        } catch (error) {
+            console.error('Google Login Error:', error.response?.data || error);
+            return { 
+                success: false, 
+                message: error.response?.data?.message || 'Google authentication failed' 
+            };
         }
     };
 
@@ -450,7 +537,11 @@ export const AuthProvider = ({ children }) => {
             loading,
             setLoading,
             login,
+            googleLogin,
             register,
+            sendSignupOtp,
+            verifyOnlyOtp,
+            verifySignupOtp,
             logout,
             refreshUser,
             updateProfile,

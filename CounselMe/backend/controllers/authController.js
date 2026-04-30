@@ -4,6 +4,9 @@ const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
 const { client: redis } = require('../config/redis');
 const { triggerDailyNotifications } = require('../services/notificationService');
+const sendEmail = require('../utils/mailer');
+const { OAuth2Client } = require('google-auth-library');
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const getRandomAvatar = (name) => {
     const seeds = ['Felix', 'Max', 'Luna', 'Jack', 'Daisy', 'Zoe', 'Milo', 'Coco', 'Oliver', 'Toby'];
@@ -595,6 +598,37 @@ const setVerifiedPhone = async (req, res) => {
     }
 };
 
+const updateFCMToken = async (req, res) => {
+    try {
+        const { fcmToken } = req.body;
+        const user = await User.findById(req.user._id);
+        if (user) {
+            user.fcmToken = fcmToken;
+            await user.save();
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const removeFCMToken = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (user) {
+            user.fcmToken = null;
+            await user.save();
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 const getAdmins = async (req, res) => {
     try {
         const admins = await User.find({ role: { $in: ['admin', 'staff'] } })
@@ -603,6 +637,246 @@ const getAdmins = async (req, res) => {
         res.json({ success: true, data: admins });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch admins' });
+    }
+};
+
+const sendForgotPasswordOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: 'Email is required' });
+
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: 'User with this email not found' });
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+
+        // Save OTP to Redis for 10 minutes
+        await redis.set(`forgot_password_otp_${email}`, otp, { EX: 600 });
+
+        await sendEmail({
+            email,
+            subject: 'Password Reset Code for AlloteMe',
+            message: `Your password reset code is ${otp}. It will expire in 10 minutes.`,
+            html: `
+                <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #2563eb;">Password Reset Request</h2>
+                    <p>We received a request to reset your password. Use the following code to continue:</p>
+                    <div style="background: #f1f5f9; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1e293b; border-radius: 8px; margin: 20px 0;">
+                        ${otp}
+                    </div>
+                    <p style="color: #64748b; font-size: 14px;">This code will expire in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
+                </div>
+            `
+        });
+
+        res.json({ success: true, message: 'Reset code sent to email' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to send reset code' });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+
+        const storedOtp = await redis.get(`forgot_password_otp_${email}`);
+        
+        if (!storedOtp || String(storedOtp) !== String(otp)) {
+            console.log(`Reset failed: Stored OTP ${storedOtp} vs Received OTP ${otp} for ${email}`);
+            return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        user.password = newPassword;
+        await user.save();
+
+        await redis.del(`forgot_password_otp_${email}`);
+
+        res.json({ success: true, message: 'Password reset successfully. You can now login.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to reset password' });
+    }
+};
+
+// @desc    Send OTP for new signup
+// @route   POST /api/auth/send-signup-otp
+// @access  Public
+const sendSignupOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: 'Email is required' });
+
+        const userExists = await User.findOne({ email });
+        if (userExists) return res.status(400).json({ message: 'User already registered' });
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+
+        // Save OTP to Redis for 10 minutes
+        await redis.set(`signup_otp_${email}`, otp, { EX: 600 });
+
+        await sendEmail({
+            email,
+            subject: 'Verification Code for AlloteMe',
+            message: `Your verification code is ${otp}. It will expire in 10 minutes.`,
+            html: `
+                <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #2563eb;">Welcome to AlloteMe!</h2>
+                    <p>To complete your registration, please use the following verification code:</p>
+                    <div style="background: #f1f5f9; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1e293b; border-radius: 8px; margin: 20px 0;">
+                        ${otp}
+                    </div>
+                    <p style="color: #64748b; font-size: 14px;">This code will expire in 10 minutes. If you didn't request this, please ignore this email.</p>
+                </div>
+            `
+        });
+
+        res.json({ success: true, message: 'OTP sent to email' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to send OTP' });
+    }
+};
+
+// @desc    Verify OTP only (without registering)
+// @route   POST /api/auth/verify-only-otp
+// @access  Public
+const verifyOnlyOTP = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const storedOtp = await redis.get(`signup_otp_${email}`);
+        if (!storedOtp || storedOtp !== otp) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+        }
+        res.json({ success: true, message: 'OTP verified' });
+    } catch (error) {
+        res.status(500).json({ message: 'Verification failed' });
+    }
+};
+
+// @desc    Verify OTP and register user
+// @route   POST /api/auth/verify-signup-otp
+// @access  Public
+const verifyOTPAndRegister = async (req, res) => {
+    try {
+        const { displayName, email, password, phoneNumber, otp, role, examType } = req.body;
+        
+        const storedOtp = await redis.get(`signup_otp_${email}`);
+        if (!storedOtp || storedOtp !== otp) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        // OTP verified, create user
+        const avatar = getRandomAvatar(displayName);
+        const user = await User.create({
+            displayName,
+            email,
+            password,
+            phoneNumber,
+            role: role || 'student',
+            examType,
+            preferences: {
+                avatarUrl: avatar.url,
+                avatarSeed: avatar.seed,
+                hasConfirmedAvatar: false
+            }
+        });
+
+        if (user) {
+            await redis.del(`signup_otp_${email}`);
+            
+            // Send welcome notification
+            setTimeout(() => {
+                const { sendNotification } = require('../services/notificationService');
+                sendNotification(user._id, `Welcome to AlloteMe! 🎉`, "Your account is verified and ready.", "success");
+            }, 2000);
+
+            res.status(201).json({
+                token: generateToken(user._id),
+                _id: user._id,
+                displayName: user.displayName,
+                email: user.email,
+                role: user.role,
+                preferences: user.preferences,
+                showAvatarPopup: true
+            });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Google Login
+// @route   POST /api/auth/google
+// @access  Public
+const googleLogin = async (req, res) => {
+    try {
+        const { idToken, accessToken } = req.body;
+        let googleId, email, name, picture;
+
+        if (idToken) {
+            const ticket = await googleClient.verifyIdToken({
+                idToken,
+                audience: process.env.GOOGLE_CLIENT_ID
+            });
+            const payload = ticket.getPayload();
+            googleId = payload.sub;
+            email = payload.email;
+            name = payload.name;
+            picture = payload.picture;
+        } else if (accessToken) {
+            const axios = require('axios');
+            const response = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            googleId = response.data.sub;
+            email = response.data.email;
+            name = response.data.name;
+            picture = response.data.picture;
+        } else {
+            return res.status(400).json({ message: 'No Google token provided' });
+        }
+
+        let user = await User.findOne({ $or: [{ googleId }, { email }] });
+
+        if (!user) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No account found with this email. Please create an account first.' 
+            });
+        } else if (!user.googleId) {
+            // Link Google account to existing email user
+            user.googleId = googleId;
+            if (!user.preferences?.avatarUrl) user.preferences.avatarUrl = picture;
+            await user.save();
+        }
+
+        res.json({
+            _id: user._id,
+            displayName: user.displayName,
+            email: user.email,
+            role: user.role,
+            examType: user.examType,
+            percentile: user.percentile,
+            rank: user.rank,
+            location: user.location,
+            expectedRegion: user.expectedRegion,
+            bannerUrl: user.bannerUrl,
+            preferences: user.preferences,
+            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
+            savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
+            subscription: user.subscription,
+            token: generateToken(user._id),
+            showAvatarPopup: !user.preferences?.hasConfirmedAvatar
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(401).json({ message: 'Google authentication failed' });
     }
 };
 
@@ -624,5 +898,13 @@ module.exports = {
     deleteAccount,
     deleteUser,
     updateAvatarPreference,
-    toggleSavePrediction
+    toggleSavePrediction,
+    sendSignupOTP,
+    verifyOnlyOTP,
+    verifyOTPAndRegister,
+    googleLogin,
+    updateFCMToken,
+    removeFCMToken,
+    sendForgotPasswordOTP,
+    resetPassword
 };

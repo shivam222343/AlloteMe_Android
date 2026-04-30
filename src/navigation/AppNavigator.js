@@ -9,6 +9,7 @@ import { Colors } from '../constants/theme';
 // Fixed imports - removing the broken counselor references
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import StudentDashboard from '../screens/StudentDashboard';
 import AdminDashboard from '../screens/AdminDashboard';
 import CreateInstitutionScreen from '../screens/CreateInstitutionScreen';
@@ -47,6 +48,8 @@ import AdminFormBuilderScreen from '../screens/AdminFormBuilderScreen';
 import FormListScreen from '../screens/FormListScreen';
 import FormResponsesScreen from '../screens/FormResponsesScreen';
 import SavedPredictionsScreen from '../screens/SavedPredictionsScreen';
+import VideosScreen from '../screens/VideosScreen';
+import AdminVideosScreen from '../screens/AdminVideosScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -110,6 +113,8 @@ const TabNavigator = () => {
             <Tab.Screen name="FormList" component={FormListScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="FormBuilder" component={AdminFormBuilderScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="FormResponses" component={FormResponsesScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="Videos" component={VideosScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="AdminVideos" component={AdminVideosScreen} options={{ tabBarButton: () => null }} />
         </Tab.Navigator>
     );
 };
@@ -159,6 +164,7 @@ const AppNavigator = () => {
                 <>
                     <Stack.Screen name="Login" component={LoginScreen} />
                     <Stack.Screen name="Signup" component={SignupScreen} />
+                    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                 </>
             ) : (
                 <>

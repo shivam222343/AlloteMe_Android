@@ -35,8 +35,12 @@ api.interceptors.request.use(
 
 export const authAPI = {
     login: (credentials) => api.post('auth/login', credentials),
+    googleLogin: (data) => api.post('auth/google', data),
     signup: (userData) => api.post('auth/register', userData),
     register: (userData) => api.post('auth/register', userData), // Alias used by AuthContext
+    sendSignupOtp: (email) => api.post('auth/send-signup-otp', { email }),
+    verifyOnlyOtp: (email, otp) => api.post('auth/verify-only-otp', { email, otp }),
+    verifySignupOtp: (data) => api.post('auth/verify-signup-otp', data),
     verifyOtp: (data) => api.post('auth/verify-otp', data),
     getProfile: () => api.get('auth/profile'),
     updateProfile: (data) => api.put('auth/profile', data),
@@ -50,6 +54,9 @@ export const authAPI = {
     updateAvatarPreference: (data) => api.post('auth/update-avatar', data),
     verifyPhone: (phone) => api.put('auth/verify-phone', { phone }),
     getAdmins: () => api.get('auth/admins'),
+    deleteProfile: () => api.delete('auth/profile'),
+    forgotPassword: (email) => api.post('auth/forgot-password', { email }),
+    resetPassword: (data) => api.post('auth/reset-password', data),
 };
 
 export const counselorAPI = {
@@ -145,6 +152,12 @@ export const systemAPI = {
     validateCoupon: (code) => api.post('system/coupons/validate', { code })
 };
 
+export const videoAPI = {
+    getAll: (params) => api.get('videos', { params }),
+    add: (data) => api.post('videos', data),
+    delete: (id) => api.delete(`videos/${id}`)
+};
+
 export default {
     authAPI,
     institutionAPI,
@@ -155,5 +168,6 @@ export default {
     uploadAPI,
     reviewAPI,
     customFormsAPI,
-    systemAPI
+    systemAPI,
+    videoAPI
 };

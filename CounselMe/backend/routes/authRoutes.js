@@ -4,12 +4,18 @@ const {
     registerUser, loginUser, getUserProfile, updateUserProfile,
     changePassword, toggleSaveCollege, getAllUsers, getUserById, updateUserRole,
     sendOTP, verifyOTP, getDashboardStats, getAdmins, deleteAccount, deleteUser, setVerifiedPhone,
-    updateAvatarPreference, toggleSavePrediction
+    updateAvatarPreference, toggleSavePrediction, googleLogin, sendSignupOTP, verifyOTPAndRegister, verifyOnlyOTP,
+    updateFCMToken, removeFCMToken,
+    sendForgotPasswordOTP, resetPassword
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/google', googleLogin);
+router.post('/send-signup-otp', sendSignupOTP);
+router.post('/verify-only-otp', verifyOnlyOTP);
+router.post('/verify-signup-otp', verifyOTPAndRegister);
 router.route('/profile')
     .get(protect, getUserProfile)
     .put(protect, updateUserProfile)
@@ -31,5 +37,11 @@ router.route('/users/:id')
 router.post('/send-otp', protect, sendOTP);
 router.post('/verify-otp', protect, verifyOTP);
 router.put('/verify-phone', protect, setVerifiedPhone);
+
+router.put('/fcm-token', protect, updateFCMToken);
+router.delete('/fcm-token', protect, removeFCMToken);
+
+router.post('/forgot-password', sendForgotPasswordOTP);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;

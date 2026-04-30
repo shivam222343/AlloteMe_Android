@@ -24,9 +24,15 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
     password: {
         type: String,
-        required: true
+        required: function() { return !this.googleId; }, // Only required if not a Google user
+        minlength: 8
     },
     role: {
         type: String,
@@ -116,6 +122,10 @@ const userSchema = new mongoose.Schema({
             predictions: { type: Number, default: 0 },
             exports: { type: Number, default: 0 }
         }
+    },
+    fcmToken: {
+        type: String,
+        default: null
     }
 }, {
     timestamps: true

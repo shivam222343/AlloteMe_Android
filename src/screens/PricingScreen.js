@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, SafeAreaView, Platform, Alert, Linking, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, SafeAreaView, Platform, Alert, Linking, TextInput, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Shadows, Spacing } from '../constants/theme';
-import { Gem, Check, X, ChevronLeft, Zap, Crown, ShieldCheck, Video, Headset, PartyPopper, Flame } from 'lucide-react-native';
+import { Gem, Check, X, ChevronLeft, ChevronRight, Zap, Crown, ShieldCheck, Video, Headset, PartyPopper, Flame, Ticket, ReceiptText, BadgePercent } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -85,6 +85,9 @@ const PricingScreen = ({ navigation }) => {
     const [couponCode, setCouponCode] = useState('');
     const [appliedCoupon, setAppliedCoupon] = useState(null);
     const [couponMessage, setCouponMessage] = useState('');
+    const [availableCoupons, setAvailableCoupons] = useState([]);
+    const [showCheckout, setShowCheckout] = useState(false);
+    const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState(null);
 
     useEffect(() => {
         // Fetch dynamic pricing from backend
@@ -107,6 +110,19 @@ const PricingScreen = ({ navigation }) => {
             }
         };
         fetchPrices();
+
+        // Fetch coupons
+        const fetchCoupons = async () => {
+            try {
+                const res = await systemAPI.getCoupons();
+                // Filter only active coupons
+                const active = res.data.filter(c => c.isActive);
+                setAvailableCoupons(active);
+            } catch (err) {
+                console.log('Failed to fetch coupons');
+            }
+        };
+        fetchCoupons();
     }, []);
 
     const handleApplyCoupon = async () => {
@@ -123,6 +139,13 @@ const PricingScreen = ({ navigation }) => {
     };
 
     const handleSelectPlan = async (plan) => {
+        setSelectedPlanForCheckout(plan);
+        setAppliedCoupon(null);
+        setCouponMessage('');
+        setShowCheckout(true);
+    };
+
+    const handleConfirmPayment = async (plan) => {
         let amount = parseInt(plan.price.replace('₹', '')) || 0;
         
         // Define if it is a renewal
@@ -429,7 +452,13 @@ const PricingScreen = ({ navigation }) => {
                                 <Text style={styles.planName}>{plan.name}</Text>
                                 <Text style={styles.planSub}>{plan.subtitle}</Text>
                                 <View style={styles.priceContainer}>
-                                    {originalPrice && <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>{originalPrice}</Text>}
+                                    {originalPrice ? (
+                                        <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>{originalPrice}</Text>
+                                    ) : plan.price !== 'Free' && (
+                                        <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>
+                                            ₹{parseInt(plan.price.replace('₹', '')) + 100}
+                                        </Text>
+                                    )}
                                     <Text style={styles.priceValue}>{displayPrice}</Text>
                                     <Text style={styles.priceLabel}>/ {plan.priceLabel}</Text>
                                 </View>
@@ -521,61 +550,194 @@ const PricingScreen = ({ navigation }) => {
                 })}
             </View>
 
-            <View style={styles.couponContainer}>
-                <TextInput
-                    style={styles.couponInput}
-                    placeholder="Have a coupon code?"
-                    value={couponCode}
-                    onChangeText={(text) => {
-                        setCouponCode(text);
-                        setAppliedCoupon(null);
-                        setCouponMessage('');
-                    }}
-                    autoCapitalize="characters"
-                />
-                <TouchableOpacity style={styles.couponBtn} onPress={handleApplyCoupon}>
-                    <Text style={styles.couponBtnText}>Apply</Text>
-                </TouchableOpacity>
-            </View>
-            {couponMessage ? (
-                <Text style={[styles.couponMessage, appliedCoupon && { color: '#10b981' }]}>
-                    {couponMessage}
-                </Text>
-            ) : null}
-
             <View style={styles.trustBox}>
                 <ShieldCheck size={16} color="#64748B" />
                 <Text style={styles.trustText}>Secured Payment Infrastructure</Text>
             </View>
             </ScrollView>
 
-            {showSuccess && (
-                <View style={styles.overlay}>
-                    <Animated.View style={[
-                        styles.successCard,
-                        {
-                            transform: [
-                                { scale: successAnim },
-                                { translateY: successAnim.interpolate({ inputRange: [0, 1], outputRange: [50, 0] }) }
-                            ],
-                            opacity: successAnim
-                        }
-                    ]}>
-                        <LinearGradient
-                            colors={['#10B981', '#059669']}
-                            style={styles.successIconBox}
-                        >
-                            <PartyPopper size={40} color="white" />
-                        </LinearGradient>
-                        <Text style={styles.successTitle}>Congratulations!</Text>
-                        <Text style={styles.successMsg}>{successMessage}</Text>
-                        <View style={styles.successBadge}>
-                            <Check size={14} color="white" strokeWidth={3} />
-                            <Text style={styles.successBadgeText}>ACTIVATED</Text>
+            {/* Checkout Modal */}
+            <Modal
+                visible={showCheckout}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowCheckout(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.checkoutContainer}>
+                        <View style={styles.checkoutHeader}>
+                            <View>
+                                <Text style={styles.checkoutTitle}>Checkout</Text>
+                                <Text style={styles.checkoutSub}>Review your plan & apply coupons</Text>
+                            </View>
+                            <TouchableOpacity 
+                                style={styles.closeModalBtn} 
+                                onPress={() => setShowCheckout(false)}
+                            >
+                                <X size={20} color={Colors.text.secondary} />
+                            </TouchableOpacity>
                         </View>
-                    </Animated.View>
+
+                        <ScrollView showsVerticalScrollIndicator={false} style={styles.checkoutScroll}>
+                            {/* Selected Plan Summary */}
+                            {selectedPlanForCheckout && (
+                                <View style={[styles.planSummaryCard, { borderColor: selectedPlanForCheckout.color + '30' }]}>
+                                    <View style={[styles.planSummaryIcon, { backgroundColor: selectedPlanForCheckout.color + '15' }]}>
+                                        {selectedPlanForCheckout.isPremium ? <Crown size={24} color={selectedPlanForCheckout.color} /> : <Zap size={24} color={selectedPlanForCheckout.color} />}
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.summaryPlanName}>{selectedPlanForCheckout.name} Plan</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                                            <Text style={[styles.summaryPlanPrice, { textDecorationLine: 'line-through', marginRight: 8 }]}>
+                                                ₹{parseInt(selectedPlanForCheckout.price.replace('₹', '')) + 100}
+                                            </Text>
+                                            <Text style={[styles.summaryPlanPrice, { fontWeight: 'bold', color: Colors.primary }]}>
+                                                {selectedPlanForCheckout.price}
+                                            </Text>
+                                            <Text style={styles.summaryPlanPrice}> / {selectedPlanForCheckout.priceLabel}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.activeBadge}>
+                                        <Text style={styles.activeBadgeText}>SELECTED</Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Available Coupons Section */}
+                            <View style={styles.checkoutSection}>
+                                <View style={styles.sectionHeader}>
+                                    <Ticket size={18} color={Colors.primary} />
+                                    <Text style={styles.sectionTitle}>Available Coupons</Text>
+                                </View>
+                                
+                                {availableCoupons.length > 0 ? (
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.couponsList}>
+                                        {availableCoupons.map((coupon) => (
+                                            <TouchableOpacity 
+                                                key={coupon._id}
+                                                style={[
+                                                    styles.couponCard,
+                                                    appliedCoupon?._id === coupon._id && styles.appliedCouponCard
+                                                ]}
+                                                onPress={() => {
+                                                    if (appliedCoupon?._id === coupon._id) {
+                                                        setAppliedCoupon(null);
+                                                        setCouponMessage('');
+                                                    } else {
+                                                        setAppliedCoupon(coupon);
+                                                        setCouponMessage(`Discount Applied: ${coupon.discountPercentage}% OFF`);
+                                                    }
+                                                }}
+                                            >
+                                                <View style={styles.couponTop}>
+                                                    <BadgePercent size={14} color={appliedCoupon?._id === coupon._id ? 'white' : Colors.primary} />
+                                                    <Text style={[styles.couponCode, appliedCoupon?._id === coupon._id && { color: 'white' }]}>
+                                                        {coupon.code}
+                                                    </Text>
+                                                </View>
+                                                <Text style={[styles.couponDiscount, appliedCoupon?._id === coupon._id && { color: 'white' }]}>
+                                                    {coupon.discountPercentage}% OFF
+                                                </Text>
+                                                {appliedCoupon?._id === coupon._id && (
+                                                    <View style={styles.appliedCheck}>
+                                                        <Check size={10} color={Colors.primary} strokeWidth={4} />
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                ) : (
+                                    <View style={styles.noCouponBox}>
+                                        <Text style={styles.noCouponText}>No coupons available right now.</Text>
+                                    </View>
+                                )}
+
+                                {/* Manual Coupon Input */}
+                                <View style={styles.manualCouponBox}>
+                                    <TextInput
+                                        style={styles.manualInput}
+                                        placeholder="Enter coupon code manually"
+                                        value={couponCode}
+                                        onChangeText={setCouponCode}
+                                        autoCapitalize="characters"
+                                    />
+                                    <TouchableOpacity style={styles.applyBtn} onPress={handleApplyCoupon}>
+                                        <Text style={styles.applyBtnText}>Apply</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                {couponMessage ? (
+                                    <Text style={[styles.checkoutCouponMsg, appliedCoupon && { color: '#10b981' }]}>
+                                        {couponMessage}
+                                    </Text>
+                                ) : null}
+                            </View>
+
+                            {/* Order Summary / Invoice */}
+                            <View style={styles.checkoutSection}>
+                                <View style={styles.sectionHeader}>
+                                    <ReceiptText size={18} color={Colors.primary} />
+                                    <Text style={styles.sectionTitle}>Order Summary</Text>
+                                </View>
+
+                                <View style={styles.invoiceCard}>
+                                    <View style={styles.invoiceRow}>
+                                        <Text style={styles.invoiceLabel}>Base Price</Text>
+                                        <Text style={styles.invoiceValue}>{selectedPlanForCheckout?.price}</Text>
+                                    </View>
+                                    
+                                    {appliedCoupon && (
+                                        <View style={styles.invoiceRow}>
+                                            <View style={styles.discountRow}>
+                                                <Text style={styles.invoiceLabel}>Coupon Discount</Text>
+                                                <View style={styles.miniCouponTag}>
+                                                    <Text style={styles.miniCouponText}>{appliedCoupon.code}</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.invoiceValue, { color: '#10b981' }]}>
+                                                - ₹{Math.round((parseInt(selectedPlanForCheckout?.price.replace('₹', '')) * appliedCoupon.discountPercentage) / 100)}
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    <View style={styles.invoiceDivider} />
+                                    
+                                    <View style={styles.totalRow}>
+                                        <Text style={styles.totalLabel}>Total Amount</Text>
+                                        <Text style={styles.totalValue}>
+                                            ₹{(() => {
+                                                const base = parseInt(selectedPlanForCheckout?.price.replace('₹', '')) || 0;
+                                                if (appliedCoupon) {
+                                                    const discount = (base * appliedCoupon.discountPercentage) / 100;
+                                                    return Math.max(0, Math.round(base - discount));
+                                                }
+                                                return base;
+                                            })()}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View style={styles.checkoutTrust}>
+                                <ShieldCheck size={14} color="#64748B" />
+                                <Text style={styles.trustText}>Secure checkout powered by Razorpay</Text>
+                            </View>
+                        </ScrollView>
+
+                        <View style={styles.checkoutFooter}>
+                            <TouchableOpacity 
+                                style={[styles.confirmBtn, { backgroundColor: selectedPlanForCheckout?.color || Colors.primary }]}
+                                onPress={() => {
+                                    setShowCheckout(false);
+                                    handleConfirmPayment(selectedPlanForCheckout);
+                                }}
+                            >
+                                <Text style={styles.confirmBtnText}>Confirm & Pay Now</Text>
+                                <ChevronRight size={20} color="white" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
-            )}
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -667,11 +829,52 @@ const styles = StyleSheet.create({
     trustBox: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingBottom: 20 },
     trustText: { fontSize: 12, color: '#64748B', fontWeight: '500' },
     
-    couponContainer: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 5, marginTop: -20 },
-    couponInput: { flex: 1, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 12, height: 44, borderTopRightRadius: 0, borderBottomRightRadius: 0 },
-    couponBtn: { backgroundColor: Colors.primary, height: 44, justifyContent: 'center', paddingHorizontal: 16, borderTopRightRadius: 8, borderBottomRightRadius: 8 },
-    couponBtnText: { color: 'white', fontWeight: 'bold' },
-    couponMessage: { textAlign: 'center', fontSize: 12, color: Colors.error, marginBottom: 15, fontWeight: 'bold' }
+    // Checkout Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    checkoutContainer: { backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: Platform.OS === 'ios' ? 40 : 20, maxHeight: '90%' },
+    checkoutHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+    checkoutTitle: { fontSize: 24, fontWeight: 'bold', color: Colors.text.primary },
+    checkoutSub: { fontSize: 13, color: Colors.text.tertiary, marginTop: 2 },
+    closeModalBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' },
+    checkoutScroll: { padding: 20 },
+    planSummaryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 20, padding: 16, borderWidth: 1.5, gap: 16, marginBottom: 24 },
+    planSummaryIcon: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+    summaryPlanName: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary },
+    summaryPlanPrice: { fontSize: 14, color: Colors.text.tertiary, marginTop: 2 },
+    activeBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    activeBadgeText: { fontSize: 10, fontWeight: 'bold', color: Colors.text.tertiary },
+    checkoutSection: { marginBottom: 24 },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    sectionTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text.primary },
+    couponsList: { paddingBottom: 10 },
+    couponCard: { backgroundColor: 'white', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 16, padding: 12, width: 130, marginRight: 12, position: 'relative' },
+    appliedCouponCard: { borderColor: Colors.primary, backgroundColor: Colors.primary },
+    couponTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+    couponCode: { fontSize: 13, fontWeight: 'bold', color: Colors.text.primary },
+    couponDiscount: { fontSize: 11, color: Colors.text.tertiary, fontWeight: '600' },
+    appliedCheck: { position: 'absolute', top: -8, right: -8, width: 20, height: 20, borderRadius: 10, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', ...Shadows.sm },
+    noCouponBox: { padding: 16, backgroundColor: '#f8fafc', borderRadius: 12, alignItems: 'center' },
+    noCouponText: { fontSize: 12, color: Colors.text.tertiary },
+    manualCouponBox: { flexDirection: 'row', marginTop: 12, gap: 8 },
+    manualInput: { flex: 1, backgroundColor: '#f8fafc', borderRadius: 12, paddingHorizontal: 16, height: 48, fontSize: 14, borderWidth: 1, borderColor: '#e2e8f0' },
+    applyBtn: { backgroundColor: Colors.primary, paddingHorizontal: 20, borderRadius: 12, justifyContent: 'center' },
+    applyBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+    checkoutCouponMsg: { marginTop: 8, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+    invoiceCard: { backgroundColor: '#f8fafc', borderRadius: 20, padding: 20, gap: 12 },
+    invoiceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    discountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    miniCouponTag: { backgroundColor: '#10b98115', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    miniCouponText: { fontSize: 10, fontWeight: 'bold', color: '#10b981' },
+    invoiceLabel: { fontSize: 14, color: Colors.text.tertiary },
+    invoiceValue: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary },
+    invoiceDivider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 4 },
+    totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    totalLabel: { fontSize: 16, fontWeight: 'bold', color: Colors.text.primary },
+    totalValue: { fontSize: 20, fontWeight: '900', color: Colors.primary },
+    checkoutTrust: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
+    checkoutFooter: { padding: 20, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+    confirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, borderRadius: 20, gap: 12, ...Shadows.md },
+    confirmBtnText: { color: 'white', fontSize: 16, fontWeight: 'bold' }
 });
 
 export default PricingScreen;

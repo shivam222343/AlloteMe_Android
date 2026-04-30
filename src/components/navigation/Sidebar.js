@@ -5,7 +5,7 @@ import GradientBorder from '../ui/GradientBorder';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     Home, Search, LayoutGrid, Users, History, Bookmark,
-    Settings, LogOut, X, ChevronRight, User, Star, PlusCircle, FileUp, Bot, Gem, Target
+    Settings, LogOut, X, ChevronRight, User, Star, PlusCircle, FileUp, Bot, Gem, Target, Youtube
 } from 'lucide-react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,11 +29,13 @@ const Sidebar = ({ navigation, state }) => {
         { label: 'Saved Colleges', icon: Star, route: 'SavedColleges' },
         { label: 'Saved Predictions', icon: Bookmark, route: 'SavedPredictions' },
         { label: 'AI Counselor', icon: Bot, route: 'AICounselor' },
+        { label: 'Videos', icon: Youtube, route: 'Videos' },
         { label: 'Settings', icon: Settings, route: 'Settings' },
     ];
 
     const AdminItems = [
         { label: 'System Analytics', icon: LayoutGrid, route: 'SystemAnalytics' },
+        { label: 'Manage Videos', icon: Youtube, route: 'AdminVideos' },
     ];
 
     const StudentItems = [

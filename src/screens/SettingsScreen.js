@@ -11,6 +11,7 @@ import {
     TextInput,
     ActivityIndicator,
     Image,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +21,7 @@ import { authAPI } from '../services/api';
 import { SkeletonBannerItem } from '../components/SkeletonLoader';
 
 const SettingsScreen = ({ navigation, route }) => {
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, logout } = useAuth();
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [darkMode, setDarkMode] = useState(false);
     const [changePasswordVisible, setChangePasswordVisible] = useState(false);
@@ -298,25 +299,37 @@ const SettingsScreen = ({ navigation, route }) => {
                     <TouchableOpacity
                         style={styles.settingItem}
                         onPress={() => {
-                            Alert.alert(
-                                'Delete Account',
-                                'Are you sure you want to permanently delete your account? This action cannot be undone.',
-                                [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    {
-                                        text: 'Delete Permanently',
-                                        style: 'destructive',
-                                        onPress: async () => {
-                                            try {
-                                                await authAPI.deleteProfile();
-                                                logout();
-                                            } catch (e) {
-                                                Alert.alert('Error', 'Failed to delete account');
-                                            }
-                                        }
+                            const handleDelete = async () => {
+                                try {
+                                    await authAPI.deleteProfile();
+                                    logout();
+                                } catch (e) {
+                                    if (Platform.OS === 'web') {
+                                        alert('Error: Failed to delete account');
+                                    } else {
+                                        Alert.alert('Error', 'Failed to delete account');
                                     }
-                                ]
-                            );
+                                }
+                            };
+
+                            if (Platform.OS === 'web') {
+                                if (window.confirm('Are you sure you want to permanently delete your account? This action cannot be undone.')) {
+                                    handleDelete();
+                                }
+                            } else {
+                                Alert.alert(
+                                    'Delete Account',
+                                    'Are you sure you want to permanently delete your account? This action cannot be undone.',
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                            text: 'Delete Permanently',
+                                            style: 'destructive',
+                                            onPress: handleDelete
+                                        }
+                                    ]
+                                );
+                            }
                         }}
                     >
                         <View style={styles.settingLeft}>

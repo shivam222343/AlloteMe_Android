@@ -28,7 +28,6 @@ const CompleteProfileScreen = ({ navigation, route }) => {
         location: user?.location || '',
         expectedRegion: user?.expectedRegion || '',
         examType: initialExam,
-        groqApiKey: user?.groqApiKey || '',
         phoneNumber: user?.phoneNumber || ''
     });
 
@@ -83,7 +82,6 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                 rank: formData.rank,
                 location: formData.location,
                 expectedRegion: formData.expectedRegion,
-                groqApiKey: formData.groqApiKey,
                 phoneNumber: formData.phoneNumber,
                 preferences: {
                     ...(user?.preferences || {}),
@@ -193,15 +191,6 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                             value={formData.expectedRegion}
                             onChangeText={(t) => setFormData({ ...formData, expectedRegion: t })}
                             placeholder="e.g. Pune, Mumbai, National"
-                        />
-
-                        <Input
-                            label="Personal Groq API Key (Optional)"
-                            value={formData.groqApiKey}
-                            onChangeText={(t) => setFormData({ ...formData, groqApiKey: t })}
-                            placeholder="gsk_..."
-                            secureTextEntry={true}
-                            leftIcon={<Bot size={18} color={Colors.text.tertiary} />}
                         />
                     </Card>
 
