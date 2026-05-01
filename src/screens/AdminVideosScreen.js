@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Image, ActivityIndicator, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { videoAPI } from '../services/api';
 import { Colors, Shadows, BorderRadius } from '../constants/theme';
@@ -59,6 +59,20 @@ const AdminVideosScreen = () => {
     };
 
     const handleDelete = (id) => {
+        if (Platform.OS === 'web') {
+            if (window.confirm('Are you sure you want to remove this video?')) {
+                (async () => {
+                    try {
+                        await videoAPI.delete(id);
+                        fetchVideos();
+                    } catch (error) {
+                        alert('Failed to delete video');
+                    }
+                })();
+            }
+            return;
+        }
+
         Alert.alert(
             'Delete Video',
             'Are you sure you want to remove this video?',
