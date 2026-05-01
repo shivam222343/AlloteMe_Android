@@ -46,17 +46,20 @@ const sendEmail = async (options) => {
             try {
                 console.log(`[Mailer] EmailJS Fallback Attempt: ${email}`);
                 
+                const istTime = new Date(Date.now() + 330 * 60000);
+                const timeString = istTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
                 const data = {
                     service_id: process.env.EMAILJS_SERVICE_ID,
                     template_id: process.env.EMAILJS_TEMPLATE_ID,
                     user_id: process.env.EMAILJS_PUBLIC_KEY,
-                    accessToken: process.env.EMAILJS_PRIVATE_KEY, // Optional but recommended
+                    accessToken: process.env.EMAILJS_PRIVATE_KEY,
                     template_params: {
-                        to_email: email,
+                        email: email, // Matches {{email}}
+                        passcode: options.otp || '', // Matches {{passcode}}
+                        time: timeString, // Matches {{time}}
                         subject: subject,
-                        message: message,
-                        otp_code: options.otp || '', // If OTP is passed separately
-                        html_content: html
+                        message: message
                     }
                 };
 

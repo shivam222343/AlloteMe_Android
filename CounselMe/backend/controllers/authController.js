@@ -861,16 +861,33 @@ const googleLogin = async (req, res) => {
         }
 
         let user = await User.findOne({ $or: [{ googleId }, { email }] });
+        let isNewUser = false;
 
         if (!user) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'No account found with this email. Please create an account first.' 
+            // Create new user for Google Signup
+            const avatar = getRandomAvatar(name);
+            user = new User({
+                displayName: name,
+                email: email,
+                googleId: googleId,
+                role: 'student',
+                preferences: {
+                    avatarUrl: picture || avatar.url,
+                    avatarSeed: avatar.seed,
+                    hasConfirmedAvatar: false
+                }
             });
+            await user.save();
+            isNewUser = true;
         } else if (!user.googleId) {
             // Link Google account to existing email user
             user.googleId = googleId;
-            if (!user.preferences?.avatarUrl) user.preferences.avatarUrl = picture;
+            if (!user.preferences?.avatarUrl) {
+                user.preferences = {
+                    ...user.preferences,
+                    avatarUrl: picture
+                };
+            }
             await user.save();
         }
 
@@ -890,7 +907,8 @@ const googleLogin = async (req, res) => {
             savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
             subscription: user.subscription,
             token: generateToken(user._id),
-            showAvatarPopup: !user.preferences?.hasConfirmedAvatar
+            showAvatarPopup: !user.preferences?.hasConfirmedAvatar,
+            isNewUser: isNewUser
         });
     } catch (error) {
         console.error(error);

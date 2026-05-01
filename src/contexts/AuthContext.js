@@ -371,6 +371,25 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const googleLogin = async (tokens) => {
+        try {
+            const response = await authAPI.googleLogin(tokens);
+            const { token, showAvatarPopup, isNewUser, ...userData } = response.data;
+            
+            // Only set token and user if NOT a new user or if we don't care
+            // Actually, we should set it anyway so they are "partially logged in"
+            await AsyncStorage.setItem('userToken', token);
+            setUser(userData);
+            
+            if (showAvatarPopup) setShowAvatarPopupState(true);
+            
+            return { success: true, isNewUser, user: userData };
+        } catch (error) {
+            console.error('Google Auth Error:', error);
+            return { success: false, message: error.response?.data?.message || 'Google Login failed' };
+        }
+    };
+
     const register = async (userData) => {
         try {
             const response = await authAPI.register(userData);
