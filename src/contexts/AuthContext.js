@@ -9,7 +9,7 @@ import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleL
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
 // ⚠️ Keep in sync with src/services/api.js — switch together
-const API_BASE_URL = RENDER_URL;
+const API_BASE_URL = LOCAL_URL;
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -434,25 +434,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const googleLogin = async (tokenData) => {
-        try {
-            const res = await authAPI.googleLogin(tokenData);
-            if (res.data.token) {
-                const userData = res.data;
-                await AsyncStorage.setItem('userToken', userData.token);
-                await AsyncStorage.setItem('userData', JSON.stringify(userData));
-                setUser(userData);
-                return { success: true };
-            }
-            return { success: false, message: res.data.message || 'Google Login failed' };
-        } catch (error) {
-            console.error('Google Login Error:', error.response?.data || error);
-            return { 
-                success: false, 
-                message: error.response?.data?.message || 'Google authentication failed' 
-            };
-        }
-    };
+
 
     const logout = async () => {
         try {

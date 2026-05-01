@@ -2,11 +2,46 @@ const axios = require('axios');
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-    const { email, subject, message, html } = options;
+    const { email, subject, message, html, otp } = options;
 
-    // 1. Try SMTP (Gmail) first
+    // 1. Try EmailJS (REST API) first - Most reliable on Render/Cloud
+    if (process.env.EMAILJS_SERVICE_ID && process.env.EMAILJS_TEMPLATE_ID && process.env.EMAILJS_PUBLIC_KEY) {
+        try {
+            console.log(`[Mailer] EmailJS Attempt: ${email}`);
+            
+            const istTime = new Date(Date.now() + 330 * 60000);
+            const timeString = istTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+            console.log(`[Mailer] Template Variables: email=${email}, passcode=${otp}, time=${timeString}`);
+            
+            const data = {
+                service_id: process.env.EMAILJS_SERVICE_ID,
+                template_id: process.env.EMAILJS_TEMPLATE_ID,
+                user_id: process.env.EMAILJS_PUBLIC_KEY,
+                accessToken: process.env.EMAILJS_PRIVATE_KEY,
+                template_params: {
+                    email: email, // Matches {{email}}
+                    passcode: otp || '', // Matches {{passcode}}
+                    time: timeString, // Matches {{time}}
+                    subject: subject,
+                    message: message
+                }
+            };
+
+            const response = await axios.post('https://api.emailjs.com/api/v1.0/email/send', data);
+            console.log('[Mailer] EmailJS Success:', response.data);
+            return { success: true, method: 'emailjs' };
+        } catch (emailjsError) {
+            console.error('[Mailer] EmailJS Failed:', emailjsError.response?.data || emailjsError.message);
+            // If EmailJS fails, we continue to Nodemailer fallback
+        }
+    } else {
+        console.warn('[Mailer] EmailJS keys missing, skipping to Nodemailer fallback');
+    }
+
+    // 2. Fallback to SMTP (Nodemailer/Gmail)
     try {
-        console.log(`[Mailer] SMTP Attempt: ${email} via smtp.gmail.com:587`);
+        console.log(`[Mailer] Nodemailer Fallback Attempt: ${email} via smtp.gmail.com:587`);
         
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
             throw new Error('SMTP credentials missing');
@@ -23,9 +58,9 @@ const sendEmail = async (options) => {
             tls: {
                 rejectUnauthorized: false
             },
-            connectionTimeout: 15000,
-            greetingTimeout: 15000,
-            socketTimeout: 20000,
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
         });
 
         const info = await transporter.sendMail({
@@ -36,46 +71,13 @@ const sendEmail = async (options) => {
             html: html,
         });
 
-        console.log('[Mailer] SMTP Success:', info.messageId);
-        return { success: true, method: 'smtp', messageId: info.messageId };
+        console.log('[Mailer] Nodemailer Success:', info.messageId);
+        return { success: true, method: 'nodemailer', messageId: info.messageId };
     } catch (smtpError) {
-        console.error('[Mailer] SMTP Failed:', smtpError.message);
-
-        // 2. Fallback to EmailJS (REST API) if keys are provided
-        if (process.env.EMAILJS_SERVICE_ID && process.env.EMAILJS_TEMPLATE_ID && process.env.EMAILJS_PUBLIC_KEY) {
-            try {
-                console.log(`[Mailer] EmailJS Fallback Attempt: ${email}`);
-                
-                const istTime = new Date(Date.now() + 330 * 60000);
-                const timeString = istTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-                const data = {
-                    service_id: process.env.EMAILJS_SERVICE_ID,
-                    template_id: process.env.EMAILJS_TEMPLATE_ID,
-                    user_id: process.env.EMAILJS_PUBLIC_KEY,
-                    accessToken: process.env.EMAILJS_PRIVATE_KEY,
-                    template_params: {
-                        email: email, // Matches {{email}}
-                        passcode: options.otp || '', // Matches {{passcode}}
-                        time: timeString, // Matches {{time}}
-                        subject: subject,
-                        message: message
-                    }
-                };
-
-                const response = await axios.post('https://api.emailjs.com/api/v1.0/email/send', data);
-                console.log('[Mailer] EmailJS Success:', response.data);
-                return { success: true, method: 'emailjs' };
-            } catch (emailjsError) {
-                console.error('[Mailer] EmailJS Failed:', emailjsError.response?.data || emailjsError.message);
-            }
-        }
-
-        // 3. Last Resort: Log to Database for Admin retrieval
-        console.warn(`[Mailer] ALL CHANNELS FAILED for ${email}. Check Render logs or DB otps collection.`);
+        console.error('[Mailer] Nodemailer Failed:', smtpError.message);
         
-        // We throw the error so the controller can handle the 500
-        throw new Error(`Email delivery failed across all channels. Last error: ${smtpError.message}`);
+        // Last Resort: Final Error
+        throw new Error(`Email delivery failed across all channels. EmailJS and Nodemailer both failed.`);
     }
 };
 
