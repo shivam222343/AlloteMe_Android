@@ -661,6 +661,7 @@ const sendForgotPasswordOTP = async (req, res) => {
 
         await sendEmail({
             email,
+            otp, // Pass OTP for template substitution
             subject: 'Password Reset Code for AlloteMe',
             message: `Your password reset code is ${otp}. It will expire in 10 minutes.`,
             html: `
@@ -734,6 +735,7 @@ const sendSignupOTP = async (req, res) => {
 
         await sendEmail({
             email,
+            otp, // Pass OTP for template substitution
             subject: 'Verification Code for AlloteMe',
             message: `Your verification code is ${otp}. It will expire in 10 minutes.`,
             html: `
