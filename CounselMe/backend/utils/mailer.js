@@ -5,6 +5,12 @@ const sendEmail = async (options) => {
     const { email, subject, message, html, otp } = options;
 
     // 1. Try EmailJS (REST API) first - Most reliable on Render/Cloud
+    console.log('[Mailer] Checking EmailJS Config...');
+    console.log(`[Mailer] SERVICE_ID: ${process.env.EMAILJS_SERVICE_ID ? 'Found' : 'Missing'}`);
+    console.log(`[Mailer] TEMPLATE_ID: ${process.env.EMAILJS_TEMPLATE_ID ? 'Found' : 'Missing'}`);
+    console.log(`[Mailer] PUBLIC_KEY: ${process.env.EMAILJS_PUBLIC_KEY ? 'Found' : 'Missing'}`);
+    console.log(`[Mailer] PRIVATE_KEY: ${process.env.EMAILJS_PRIVATE_KEY ? 'Found' : 'Missing'}`);
+
     if (process.env.EMAILJS_SERVICE_ID && process.env.EMAILJS_TEMPLATE_ID && process.env.EMAILJS_PUBLIC_KEY) {
         try {
             console.log(`[Mailer] EmailJS Attempt: ${email}`);

@@ -217,11 +217,10 @@ const BrowseCollegesScreen = ({ navigation }) => {
         );
     };
 
-    return (
-        <MainLayout scrollable={false} noPadding>
-            <View style={styles.container}>
-                <View style={styles.topSection}>
-                    <Text style={styles.title}>Explore Colleges</Text>
+    const renderSectionHeader = ({ section: { title, isSearch } }) => {
+        if (isSearch) {
+            return (
+                <View style={styles.stickySearchContainer}>
                     <View style={styles.searchBar}>
                         <Search size={20} color={Colors.text.tertiary} />
                         <TextInput
@@ -231,46 +230,66 @@ const BrowseCollegesScreen = ({ navigation }) => {
                             onChangeText={(t) => handleFilter(t, activeTab)}
                         />
                     </View>
-
-                    <View style={styles.filterOptions}>
-                        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowSortModal(true)}>
-                            <ArrowUpDown size={14} color={Colors.primary} />
-                            <Text style={styles.filterBtnText}>
-                                {sortOptions.find(o => o.id === sortBy)?.label.split(':')[0] || 'Sort'}
-                            </Text>
-                            <ChevronDown size={14} color={Colors.text.tertiary} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowCityModal(true)}>
-                            <MapPin size={14} color={Colors.primary} />
-                            <Text style={styles.filterBtnText} numberOfLines={1}>{activeCity}</Text>
-                            <ChevronDown size={14} color={Colors.text.tertiary} />
-                        </TouchableOpacity>
-                    </View>
                 </View>
+            );
+        }
+        return null;
+    };
 
-                <View style={styles.tabBar}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-                        {tabs.map((tab) => {
-                            const isActive = activeTab === tab;
-                            return (
-                                <TouchableOpacity
-                                    key={tab}
-                                    style={[styles.tabItem, isActive && styles.activeTabItem]}
-                                    onPress={() => handleFilter(search, tab)}
-                                >
-                                    <Text style={[styles.tabItemText, isActive && styles.activeTabItemText]}>{tab}</Text>
-                                    {isActive && <View style={styles.activeLine} />}
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
+    const ListHeader = () => (
+        <View style={styles.topSection}>
+            <Text style={styles.title}>Explore Colleges</Text>
+            
+            <View style={styles.filterOptions}>
+                <TouchableOpacity style={styles.filterBtn} onPress={() => setShowSortModal(true)}>
+                    <ArrowUpDown size={14} color={Colors.primary} />
+                    <Text style={styles.filterBtnText}>
+                        {sortOptions.find(o => o.id === sortBy)?.label.split(':')[0] || 'Sort'}
+                    </Text>
+                    <ChevronDown size={14} color={Colors.text.tertiary} />
+                </TouchableOpacity>
 
+                <TouchableOpacity style={styles.filterBtn} onPress={() => setShowCityModal(true)}>
+                    <MapPin size={14} color={Colors.primary} />
+                    <Text style={styles.filterBtnText} numberOfLines={1}>{activeCity}</Text>
+                    <ChevronDown size={14} color={Colors.text.tertiary} />
+                </TouchableOpacity>
+            </View>
+
+            <View style={styles.tabBar}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+                    {tabs.map((tab) => {
+                        const isActive = activeTab === tab;
+                        return (
+                            <TouchableOpacity
+                                key={tab}
+                                style={[styles.tabItem, isActive && styles.activeTabItem]}
+                                onPress={() => handleFilter(search, tab)}
+                            >
+                                <Text style={[styles.tabItemText, isActive && styles.activeTabItemText]}>{tab}</Text>
+                                {isActive && <View style={styles.activeLine} />}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+            </View>
+        </View>
+    );
+
+    const sections = [
+        { title: 'Search', isSearch: true, data: [] },
+        { title: 'Colleges', data: filtered || [] }
+    ];
+
+    return (
+        <MainLayout scrollable={false} noPadding>
+            <View style={styles.container}>
                 <SectionList
-                    sections={filtered && filtered.length > 0 ? [{ title: 'Colleges', data: filtered }] : []}
+                    sections={sections}
                     keyExtractor={(item) => item._id}
                     renderItem={({ item }) => <InstitutionCard item={item} />}
+                    renderSectionHeader={renderSectionHeader}
+                    ListHeaderComponent={ListHeader}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                     stickySectionHeadersEnabled={true}
@@ -374,7 +393,13 @@ const BrowseCollegesScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.white },
-    topSection: { paddingVertical: 20, paddingHorizontal: 20, backgroundColor: Colors.white },
+    topSection: { paddingTop: 20, paddingHorizontal: 20, backgroundColor: Colors.white },
+    stickySearchContainer: {
+        backgroundColor: Colors.white,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        zIndex: 10,
+    },
     title: { fontSize: 28, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 16 },
     searchBar: {
         flexDirection: 'row',
