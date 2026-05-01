@@ -41,26 +41,22 @@ const sendEmail = async (options) => {
 
     // 2. Fallback to SMTP (Nodemailer/Gmail)
     try {
-        console.log(`[Mailer] Nodemailer Fallback Attempt: ${email} via smtp.gmail.com:587`);
+        console.log(`[Mailer] Nodemailer Fallback Attempt: ${email}`);
         
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
             throw new Error('SMTP credentials missing');
         }
 
         const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 587,
-            secure: false,
+            service: 'gmail',
+            pool: true,
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS,
             },
             tls: {
                 rejectUnauthorized: false
-            },
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 15000,
+            }
         });
 
         const info = await transporter.sendMail({
@@ -77,7 +73,7 @@ const sendEmail = async (options) => {
         console.error('[Mailer] Nodemailer Failed:', smtpError.message);
         
         // Last Resort: Final Error
-        throw new Error(`Email delivery failed across all channels. EmailJS and Nodemailer both failed.`);
+        throw new Error(`Email delivery failed across all channels. EmailJS and Nodemailer both failed. Last SMTP error: ${smtpError.message}`);
     }
 };
 
