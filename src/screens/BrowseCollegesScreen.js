@@ -284,7 +284,13 @@ const BrowseCollegesScreen = ({ navigation }) => {
     return (
         <MainLayout scrollable={false} noPadding>
             <View style={styles.container}>
-                <SectionList
+                {loading && institutions.length === 0 ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.loadingText}>Searching Colleges...</Text>
+                    </View>
+                ) : (
+                    <SectionList
                     sections={sections}
                     keyExtractor={(item) => item._id}
                     renderItem={({ item }) => <InstitutionCard item={item} />}
@@ -318,6 +324,7 @@ const BrowseCollegesScreen = ({ navigation }) => {
                         </View>
                     }
                 />
+                )}
             </View>
 
             {/* Sort Modal */}
@@ -530,7 +537,9 @@ const styles = StyleSheet.create({
     emptyTitle: { fontSize: 22, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 12 },
     emptySubText: { textAlign: 'center', color: Colors.text.tertiary, fontSize: 14, lineHeight: 22, marginBottom: 24 },
     resetBtn: { backgroundColor: Colors.primary + '10', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.primary + '20' },
-    resetBtnText: { color: Colors.primary, fontWeight: 'bold', fontSize: 14 }
+    resetBtnText: { color: Colors.primary, fontWeight: 'bold', fontSize: 14 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+    loadingText: { fontSize: 16, color: Colors.text.tertiary, fontWeight: '600' }
 });
 
 export default BrowseCollegesScreen;

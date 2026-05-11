@@ -50,6 +50,9 @@ import FormResponsesScreen from '../screens/FormResponsesScreen';
 import SavedPredictionsScreen from '../screens/SavedPredictionsScreen';
 import VideosScreen from '../screens/VideosScreen';
 import AdminVideosScreen from '../screens/AdminVideosScreen';
+import RegisterCollegeAdminScreen from '../screens/RegisterCollegeAdminScreen';
+import DocumentVerificationScreen from '../screens/DocumentVerificationScreen';
+import AdminDocumentManagerScreen from '../screens/AdminDocumentManagerScreen';
 
 // Custom Nav Components
 import Sidebar from '../components/navigation/Sidebar';
@@ -115,6 +118,9 @@ const TabNavigator = () => {
             <Tab.Screen name="FormResponses" component={FormResponsesScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="Videos" component={VideosScreen} options={{ tabBarButton: () => null }} />
             <Tab.Screen name="AdminVideos" component={AdminVideosScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="RegisterCollegeAdmin" component={RegisterCollegeAdminScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="DocumentVerification" component={DocumentVerificationScreen} options={{ tabBarButton: () => null }} />
+            <Tab.Screen name="AdminDocumentManager" component={AdminDocumentManagerScreen} options={{ tabBarButton: () => null }} />
         </Tab.Navigator>
     );
 };

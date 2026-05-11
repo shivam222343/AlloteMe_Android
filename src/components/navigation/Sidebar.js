@@ -30,6 +30,7 @@ const Sidebar = ({ navigation, state }) => {
         { label: 'Saved Predictions', icon: Bookmark, route: 'SavedPredictions' },
         { label: 'AI Counselor', icon: Bot, route: 'AICounselor' },
         { label: 'Videos', icon: Youtube, route: 'Videos' },
+        { label: 'Documents', icon: FileUp, route: 'DocumentVerification' },
         { label: 'Settings', icon: Settings, route: 'Settings' },
     ];
 

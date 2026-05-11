@@ -408,6 +408,53 @@ const getUserById = async (req, res) => {
     }
 };
 
+// @desc    Register a college admin (Admin only)
+// @route   POST /api/auth/register-college-admin
+// @access  Private/Admin
+const registerCollegeAdmin = async (req, res) => {
+    const { displayName, email, password, managedInstitution } = req.body;
+
+    if (!managedInstitution) {
+        return res.status(400).json({ message: 'managedInstitution ID is required' });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+        return res.status(400).json({ message: 'User already exists' });
+    }
+
+    const institution = await Institution.findById(managedInstitution);
+    if (!institution) {
+        return res.status(404).json({ message: 'Institution not found' });
+    }
+
+    const avatar = getRandomAvatar(displayName);
+    const user = await User.create({
+        displayName,
+        email,
+        password,
+        role: 'college_admin',
+        managedInstitution,
+        preferences: {
+            avatarUrl: avatar.url,
+            avatarSeed: avatar.seed,
+            hasConfirmedAvatar: false
+        }
+    });
+
+    if (user) {
+        res.status(201).json({
+            _id: user._id,
+            displayName: user.displayName,
+            email: user.email,
+            role: user.role,
+            managedInstitution: user.managedInstitution
+        });
+    } else {
+        res.status(400).json({ message: 'Invalid user data' });
+    }
+};
+
 // @desc    Update user role (Admin only)
 // @route   PUT /api/auth/users/:id/role
 // @access  Private/Admin
@@ -916,6 +963,18 @@ const googleLogin = async (req, res) => {
     }
 };
 
+const getCollegeAdmins = async (req, res) => {
+    try {
+        const admins = await User.find({ role: 'college_admin' })
+            .populate('managedInstitution', 'name dteCode location')
+            .select('-password')
+            .sort('-createdAt');
+        res.json({ success: true, data: admins });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch college admins' });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -942,5 +1001,7 @@ module.exports = {
     updateFCMToken,
     removeFCMToken,
     sendForgotPasswordOTP,
-    resetPassword
+    resetPassword,
+    registerCollegeAdmin,
+    getCollegeAdmins
 };

@@ -9,7 +9,8 @@ import {
     Globe, MapPin, Info, Award, ShieldCheck, ExternalLink, BookOpen,
     Wifi, Utensils, Library, FlaskConical, Dumbbell, Home, Car, Trees,
     CheckCircle2, LayoutGrid, Image as ImageIcon, BedDouble, GitBranch,
-    ChevronRight, Trash2, Edit, Maximize2, X as CloseIcon, Star
+    ChevronRight, Trash2, Edit, Maximize2, X as CloseIcon, Star,
+    TrendingUp, Award as PlacementIcon
 } from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,7 +24,11 @@ const { width, height: screenHeight } = Dimensions.get('window');
 const TABS = ['Overview', 'Branches', 'Map', 'Hostel', 'Facilities', 'Gallery'];
 
 // Leaflet HTML builder
-const buildLeafletHTML = (lat, lng, name) => `
+const buildLeafletHTML = (lat, lng, name, img) => {
+  const defaultImg = 'https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=200'; // High quality college building
+  const collegeImg = img || defaultImg;
+  
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -38,6 +43,47 @@ body { font-family:sans-serif; background:#f0f4f8; }
 .view-toggle { position:absolute; top:0; left:0; right:0; z-index:1000; display:flex; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.12); height:52px; align-items:stretch; }
 .vbtn { flex:1; border:none; background:#fff; font-size:13px; font-weight:600; color:#64748b; cursor:pointer; transition:all 0.2s; border-bottom:3px solid transparent; }
 .vbtn.active { color:#2563eb; border-bottom-color:#2563eb; background:#eff6ff; }
+
+/* Custom Marker Styles */
+.pin-wrapper { position: relative; width: 50px; height: 65px; display: flex; flex-direction: column; align-items: center; }
+.pin-shape { 
+    width: 48px; height: 48px; 
+    background: #2563eb; 
+    border-radius: 50% 50% 50% 0; 
+    transform: rotate(-45deg); 
+    display: flex; align-items: center; justify-content: center; 
+    border: 3px solid #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    overflow: hidden; /* CRITICAL: Clips the image */
+    z-index: 2;
+}
+.pin-img-container {
+    width: 100%; height: 100%;
+    transform: rotate(45deg);
+    display: flex; align-items: center; justify-content: center;
+    background: #2563eb;
+    border-radius: 50%;
+    overflow: hidden;
+}
+.pin-img { 
+    width: 100%; height: 100%; 
+    object-fit: cover; 
+}
+.pin-label { 
+    position: absolute; top: 68px; 
+    background: #ffffff; padding: 4px 12px; 
+    border-radius: 20px; font-size: 11px; font-weight: 700; color: #1e293b;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
+    white-space: nowrap; 
+    display: none; 
+    border: 1px solid #e2e8f0;
+    z-index: 1;
+}
+.zoom-active .pin-label { display: block; }
+
+/* Dynamic sizing */
+.zoom-out .pin-shape { width: 32px; height: 32px; border-width: 2px; }
+.zoom-out .pin-wrapper { width: 34px; height: 45px; }
 </style>
 </head>
 <body>
@@ -55,7 +101,41 @@ var layers = {
   terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenTopoMap', maxZoom:17 })
 };
 var currentLayer = layers.street.addTo(map);
-L.marker([${lat}, ${lng}]).addTo(map).bindPopup('<b>${name.replace(/'/g, "\\'")}</b>',{maxWidth:200}).openPopup();
+
+var customIcon = L.divIcon({
+    className: 'custom-pin',
+    html: '<div class="pin-wrapper" id="pin-wrapper"><div class="pin-shape"><div class="pin-img-container"><img src="${collegeImg}" class="pin-img" onerror="this.src=\\'${defaultImg}\\'"/></div></div><div class="pin-label">${name.replace(/'/g, "\\'")}</div></div>',
+    iconSize: [50, 65],
+    iconAnchor: [25, 65]
+});
+
+L.marker([${lat}, ${lng}], {icon: customIcon}).addTo(map).bindPopup('<b>${name.replace(/'/g, "\\'")}</b>',{maxWidth:200});
+
+map.on('zoomend', function() {
+    var zoom = map.getZoom();
+    var wrapper = document.getElementById('pin-wrapper');
+    
+    // Toggle Label
+    if (zoom >= 15) {
+        wrapper.classList.add('zoom-active');
+    } else {
+        wrapper.classList.remove('zoom-active');
+    }
+
+    // Dynamic Sizing
+    if (zoom < 14) {
+        wrapper.classList.add('zoom-out');
+    } else {
+        wrapper.classList.remove('zoom-out');
+    }
+});
+
+// Initial check
+var initialZoom = map.getZoom();
+var initialWrapper = document.getElementById('pin-wrapper');
+if (initialZoom >= 15) initialWrapper.classList.add('zoom-active');
+if (initialZoom < 14) initialWrapper.classList.add('zoom-out');
+
 function setLayer(type){
   map.removeLayer(currentLayer);
   currentLayer = layers[type].addTo(map);
@@ -65,12 +145,17 @@ function setLayer(type){
 </script>
 </body>
 </html>`;
+};
 
 const FACILITY_ICONS = { 'WiFi': Wifi, 'Canteen': Utensils, 'Library': Library, 'Labs': FlaskConical, 'Sports': Dumbbell, 'Hostel': Home, 'Parking': Car, 'Garden': Trees };
 
 const CollegeDetailScreen = ({ route, navigation }) => {
-    const { id } = route.params;
+    const { id } = route.params || {};
     const { user, socket, refreshUser, toggleSaveOptimistic } = useAuth();
+    
+    if (!id) {
+        return null; // Or some fallback UI
+    }
     const isAdmin = user?.role === 'admin';
     const [inst, setInst] = useState(null);
     const [cutoffs, setCutoffs] = useState([]);
@@ -83,7 +168,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
     const [submittingReview, setSubmittingReview] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
 
-    const TABS = ['Overview', 'Branches', 'Map', 'Hostel', 'Facilities', 'Gallery', 'Reviews'];
+    const TABS = ['Overview', 'Branches', 'Placements', 'Map', 'Hostel', 'Facilities', 'Gallery', 'Reviews'];
     const [showFullMap, setShowFullMap] = useState(false);
 
     useEffect(() => {
@@ -263,7 +348,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                                 <TouchableOpacity
                                     style={styles.deleteBranchBtn}
                                     onPress={() => {
-                                        Alert.alert("Delete Branch", `Are you sure you want to remove ${b.name}? This will permanently delete the branch AND all associated cutoff data for this institution.`, [
+                                        Alert.alert("Delete Branch", "Are you sure you want to remove " + b.name + "? This will permanently delete the branch AND all associated cutoff data for this institution.", [
                                             { text: "Cancel" },
                                             {
                                                 text: "Delete",
@@ -293,17 +378,31 @@ const CollegeDetailScreen = ({ route, navigation }) => {
     };
 
     const renderMap = () => {
-        if (!hasCoords) {
+        const lat = inst.location.coordinates?.lat;
+        const lng = inst.location.coordinates?.lng;
+        
+        if (!lat || !lng) {
+            if (inst.mapUrl) {
+                return (
+                    <View style={{ width, height: 420 }}>
+                        <WebView 
+                            source={{ uri: inst.mapUrl }} 
+                            style={{ flex: 1 }} 
+                            javaScriptEnabled 
+                            originWhitelist={['*']} 
+                        />
+                    </View>
+                );
+            }
             return (
                 <View style={[styles.tabContent, styles.emptyCard]}>
                     <MapPin size={48} color={Colors.text.tertiary} />
-                    <Text style={styles.emptyText}>No map coordinates provided for this institution.</Text>
+                    <Text style={styles.emptyText}>No map coordinates provided.</Text>
                 </View>
             );
         }
-        const lat = inst.location.coordinates.lat;
-        const lng = inst.location.coordinates.lng;
-        const html = buildLeafletHTML(lat, lng, inst.name);
+
+        const html = buildLeafletHTML(lat, lng, inst.name, inst.galleryImages?.[0]);
 
         if (Platform.OS === 'web') {
             return (
@@ -392,7 +491,93 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                         <View style={styles.hostelStat}><Text style={styles.hostelStatLabel}>Capacity</Text><Text style={styles.hostelStatVal}>{hostel.girls?.capacity || '—'}</Text></View>
                     </View>
                 </View>
-                {hostel.notes ? <View style={styles.hostelNotes}><Text style={styles.sectionTitle}>Notes</Text><Text style={styles.desc}>{hostel.notes}</Text></View> : null}
+
+                {hostel.description ? (
+                    <View style={styles.hostelNotes}>
+                        <Text style={styles.sectionTitle}>About Hostel</Text>
+                        <Text style={styles.desc}>{hostel.description}</Text>
+                    </View>
+                ) : null}
+
+                {hostel.images && hostel.images.length > 0 && (
+                    <View style={{ marginTop: 20 }}>
+                        <Text style={styles.sectionTitle}>Hostel Photos</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+                            {hostel.images.map((img, i) => (
+                                <OptimizedImage key={i} source={{ uri: img }} style={styles.hostelGalleryImg} />
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {hostel.facilities && hostel.facilities.length > 0 && (
+                    <View style={{ marginTop: 20 }}>
+                        <Text style={styles.sectionTitle}>Hostel Facilities</Text>
+                        <View style={styles.facilitiesGrid}>
+                            {hostel.facilities.map((fac, i) => (
+                                <View key={i} style={styles.hostelFacItem}>
+                                    <CheckCircle2 size={14} color={Colors.success} />
+                                    <Text style={styles.hostelFacText}>{fac}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
+                <View style={{ height: 40 }} />
+            </View>
+        );
+    };
+
+    const renderPlacements = () => {
+        const placements = inst.placements || [];
+        if (placements.length === 0) {
+            return (
+                <View style={[styles.tabContent, styles.emptyCard]}>
+                    <PlacementIcon size={48} color={Colors.text.tertiary} />
+                    <Text style={styles.emptyText}>No placement data available.</Text>
+                </View>
+            );
+        }
+        return (
+            <View style={styles.tabContent}>
+                {placements.sort((a, b) => b.year - a.year).map((p, i) => (
+                    <Card key={i} style={styles.placementCard}>
+                        <View style={styles.pYearHeader}>
+                            <TrendingUp size={18} color={Colors.primary} />
+                            <Text style={styles.pYearText}>Batch {p.year}</Text>
+                        </View>
+                        
+                        <View style={styles.pStatsRow}>
+                            <View style={styles.pStatBox}>
+                                <Text style={styles.pStatLabel}>Highest</Text>
+                                <Text style={styles.pStatVal}>{p.highestPackage || '—'}</Text>
+                            </View>
+                            <View style={styles.pStatBox}>
+                                <Text style={styles.pStatLabel}>Average</Text>
+                                <Text style={styles.pStatVal}>{p.averagePackage || '—'}</Text>
+                            </View>
+                            <View style={styles.pStatBox}>
+                                <Text style={styles.pStatLabel}>Placed</Text>
+                                <Text style={styles.pStatVal}>{p.placementPercentage}%</Text>
+                            </View>
+                        </View>
+
+                        {p.topRecruiters && p.topRecruiters.length > 0 && (
+                            <View style={styles.recruiterBox}>
+                                <Text style={styles.recruiterLabel}>Top Recruiters</Text>
+                                <Text style={styles.recruiterText}>{p.topRecruiters.join(', ')}</Text>
+                            </View>
+                        )}
+
+                        {p.images && p.images.length > 0 && (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pImageScroll}>
+                                {p.images.map((img, imgIdx) => (
+                                    <OptimizedImage key={imgIdx} source={{ uri: img }} style={styles.pImage} />
+                                ))}
+                            </ScrollView>
+                        )}
+                    </Card>
+                ))}
                 <View style={{ height: 40 }} />
             </View>
         );
@@ -557,6 +742,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
         switch (activeTab) {
             case 'Overview': return renderOverview();
             case 'Branches': return renderBranches();
+            case 'Placements': return renderPlacements();
             case 'Map': return renderMap();
             case 'Hostel': return renderHostel();
             case 'Facilities': return renderFacilities();
@@ -638,6 +824,7 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                             </TouchableOpacity>
                             <TouchableOpacity style={[styles.adminBtn, styles.deleteBtnSmall]} onPress={handleDelete}>
                                 <Trash2 size={16} color={Colors.error} />
+                                <Text style={styles.adminBtnText}>Delete</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -887,7 +1074,26 @@ const styles = StyleSheet.create({
         ...Shadows.md,
         zIndex: 100
     },
-    reviewFabText: { color: 'white', fontWeight: 'bold', fontSize: 14 }
+    reviewFabText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+    
+    // Placements
+    placementCard: { padding: 16, marginBottom: 16, borderRadius: 16 },
+    pYearHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    pYearText: { fontSize: 16, fontWeight: 'bold', color: Colors.text.primary },
+    pStatsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 16 },
+    pStatBox: { flex: 1, backgroundColor: '#F8FAFC', padding: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+    pStatLabel: { fontSize: 10, color: Colors.text.tertiary, marginBottom: 4, textTransform: 'uppercase' },
+    pStatVal: { fontSize: 13, fontWeight: 'bold', color: Colors.primary },
+    recruiterBox: { backgroundColor: Colors.primary + '08', padding: 12, borderRadius: 12, marginBottom: 16 },
+    recruiterLabel: { fontSize: 11, fontWeight: 'bold', color: Colors.primary, marginBottom: 4 },
+    recruiterText: { fontSize: 13, color: Colors.text.secondary, lineHeight: 18 },
+    pImageScroll: { flexDirection: 'row', gap: 10 },
+    pImage: { width: 120, height: 80, borderRadius: 10, marginRight: 10 },
+
+    // Hostel Enhanced
+    hostelGalleryImg: { width: 200, height: 130, borderRadius: 12, marginRight: 12 },
+    hostelFacItem: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginBottom: 8, marginRight: 8 },
+    hostelFacText: { fontSize: 12, fontWeight: '600', color: Colors.success },
 });
 
 export default CollegeDetailScreen;

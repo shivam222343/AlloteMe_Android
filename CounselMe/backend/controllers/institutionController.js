@@ -398,6 +398,70 @@ const getFeaturedInstitutions = async (req, res) => {
     }
 };
 
+// @desc    Get institution managed by logged in college admin
+// @route   GET /api/institutions/managed
+// @access  Private/CollegeAdmin
+const getManagedInstitution = async (req, res) => {
+    try {
+        if (!req.user.managedInstitution) {
+            return res.status(400).json({ message: 'No institution assigned to this administrator' });
+        }
+        const institution = await Institution.findById(req.user.managedInstitution);
+        if (!institution) {
+            return res.status(404).json({ message: 'Managed institution not found' });
+        }
+        res.json(institution);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Update institution managed by logged in college admin
+// @route   PUT /api/institutions/managed
+// @access  Private/CollegeAdmin
+const updateManagedInstitution = async (req, res) => {
+    try {
+        if (!req.user.managedInstitution) {
+            return res.status(400).json({ message: 'No institution assigned to this administrator' });
+        }
+
+        // Prevent updating branches
+        const updateData = { ...req.body };
+        delete updateData.branches;
+
+        const institution = await Institution.findByIdAndUpdate(
+            req.user.managedInstitution,
+            { $set: updateData },
+            { returnDocument: 'after', runValidators: true }
+        );
+
+        if (!institution) {
+            return res.status(404).json({ message: 'Managed institution not found' });
+        }
+
+        // Invalidate specific and list caches
+        await redis.del(`institution_${institution._id}`);
+        await redis.del('institutions_all');
+        await redis.del('institutions_featured');
+        const categories = ['ENGINEERING', 'PHARMACY', 'BBA', 'NEET', 'JEE', 'MHTCET', 'MHTCET PCM', 'MHTCET PCB'];
+        for (const cat of categories) {
+            let normalized = cat.toUpperCase().replace(' ', '_');
+            if (normalized === 'ENGINEERING' || normalized === 'MHTCET_PCM') {
+                normalized = 'MHTCET';
+            } else if (normalized === 'PHARMACY' || normalized === 'MHTCET_PCB') {
+                normalized = 'MHTCET_PCB';
+            }
+            await redis.del(`institutions_all_${normalized}`);
+            await redis.del(`institutions_featured_${normalized}`);
+        }
+
+        emitUpdate('institution:updated', institution);
+        res.json(institution);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     createInstitution,
     parseInstitutionText,
@@ -407,5 +471,7 @@ module.exports = {
     deleteInstitution,
     deleteBranch,
     toggleFeatureInstitution,
-    getFeaturedInstitutions
+    getFeaturedInstitutions,
+    getManagedInstitution,
+    updateManagedInstitution
 };

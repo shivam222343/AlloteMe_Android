@@ -280,7 +280,7 @@ HTML_TEMPLATE = """
         function copySnippet(id) {
             const codeEl = document.getElementById('code-' + id);
             navigator.clipboard.writeText(codeEl.textContent).then(() => {
-                alert('Copied to clipboard!');
+                
             });
         }
 

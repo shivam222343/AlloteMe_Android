@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import {
     PlusCircle, FileUp, Users, Settings,
-    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare, Bell, TrendingUp
+    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare, Bell, TrendingUp, FileText
 } from 'lucide-react-native';
 
 const AdminDashboard = ({ navigation }) => {
@@ -111,6 +111,20 @@ const AdminDashboard = ({ navigation }) => {
             desc: 'Approve or remove student testimonials',
             icon: MessageSquare,
             route: 'AdminReviews',
+            color: '#10B981'
+        },
+        {
+            title: 'College Admin Portal',
+            desc: 'Register and manage college administrators',
+            icon: ShieldCheck,
+            route: 'RegisterCollegeAdmin',
+            color: '#3B82F6'
+        },
+        {
+            title: 'Manage Documents',
+            desc: 'Edit global document requirements and lists',
+            icon: FileText,
+            route: 'AdminDocumentManager',
             color: '#10B981'
         },
     ];

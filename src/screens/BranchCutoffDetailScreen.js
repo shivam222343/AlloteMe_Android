@@ -10,7 +10,11 @@ import { useAuth } from '../contexts/AuthContext';
 const BranchCutoffDetailScreen = ({ route, navigation }) => {
     const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
-    const { institutionId, branchName, institutionName } = route.params;
+    const { institutionId, branchName, institutionName } = route.params || {};
+    
+    if (!institutionId) {
+        return null;
+    }
     const [loading, setLoading] = useState(true);
     const [allCutoffs, setAllCutoffs] = useState([]);
     const [filteredData, setFilteredData] = useState([]);

@@ -57,6 +57,7 @@ export const authAPI = {
     deleteProfile: () => api.delete('auth/profile'),
     forgotPassword: (email) => api.post('auth/forgot-password', { email }),
     resetPassword: (data) => api.post('auth/reset-password', data),
+    registerCollegeAdmin: (data) => api.post('auth/register-college-admin', data),
 };
 
 export const counselorAPI = {

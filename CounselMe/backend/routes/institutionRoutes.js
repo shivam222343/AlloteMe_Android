@@ -9,7 +9,9 @@ const {
     deleteInstitution,
     deleteBranch,
     toggleFeatureInstitution,
-    getFeaturedInstitutions
+    getFeaturedInstitutions,
+    getManagedInstitution,
+    updateManagedInstitution
 } = require('../controllers/institutionController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -18,6 +20,9 @@ router.route('/')
     .post(protect, authorize('admin'), createInstitution);
 
 router.get('/featured', getFeaturedInstitutions);
+router.route('/managed')
+    .get(protect, authorize('college_admin'), getManagedInstitution)
+    .put(protect, authorize('college_admin'), updateManagedInstitution);
 router.post('/parse', protect, authorize('admin'), parseInstitutionText);
 
 router.delete('/:id/branch', protect, authorize('admin'), deleteBranch);

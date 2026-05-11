@@ -1,0 +1,174 @@
+.premium-footer {
+  background-color: #fff;
+  color: #1a1d23;
+  padding: 80px 0 40px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 60px;
+  margin-bottom: 60px;
+}
+
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.footer-logo img {
+  height: 40px;
+  width: auto;
+}
+
+.footer-logo span {
+  fontSize: 24px;
+  font-weight: 800;
+  color: #1a1d23;
+  letter-spacing: -0.03em;
+}
+
+.footer-desc {
+  color: #5e6b7e;
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 300px;
+}
+
+.footer-heading {
+  color: #1a1d23;
+  margin-bottom: 24px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.footer-list {
+  list-style: disc;
+  /* Support bullet points */
+  padding-left: 20px;
+  margin: 0;
+  display: flex;
+  margin-left: 40px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.footer-list li {
+  display: list-item;
+  /* Ensure bullet shows */
+  color: #5e6b7e;
+  font-size: 15px;
+}
+
+.footer-list a {
+  color: #5e6b7e;
+  font-size: 15px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-list a:hover {
+  color: #245df1;
+}
+
+.footer-contact {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.footer-contact li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #5e6b7e;
+  font-size: 15px;
+}
+
+.footer-contact svg {
+  color: #245df1;
+}
+
+.footer-bottom {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 40px;
+  display: flex;
+  flex-direction: column;
+  /* One below another */
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: #8a96a3;
+  font-size: 14px;
+}
+
+.footer-bottom span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    text-align: left;
+    /* Align text left */
+  }
+
+  .footer-brand {
+    grid-column: span 2;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .footer-logo {
+    justify-content: center;
+  }
+
+  .footer-desc {
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .footer-heading {
+    text-align: center;
+    margin-bottom: 16px;
+    font-size: 16px;
+  }
+
+  .footer-list {
+    align-items: flex-start;
+    padding-left: 20px;
+  }
+
+  .footer-list li {
+    list-style-type: disc;
+    /* Use bullet points */
+    color: #5e6b7e;
+    font-size: 14px;
+    text-align: left;
+  }
+
+  .footer-contact-wrapper {
+    grid-column: span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+    width: 100%;
+  }
+
+  .footer-contact {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    /* Keep icons and text aligned left within centered box */
+    gap: 12px;
+  }
+}

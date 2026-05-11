@@ -2,7 +2,7 @@
   "expo": {
     "name": "AlloteMe",
     "slug": "alloteme0077",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "alloteme0077",
     "orientation": "portrait",
     "icon": "./imgs/logo.png",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.alloteme.mobile",
+      "bundleIdentifier": "com.alloteme0077.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,7 +24,8 @@
         "foregroundImage": "./imgs/logo.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.alloteme.mobile",
+      "package": "com.alloteme0077.app",
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "intentFilters": [
@@ -42,8 +43,6 @@
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "RECORD_AUDIO",
         "NOTIFICATIONS",
         "ACCESS_COARSE_LOCATION",
@@ -69,6 +68,7 @@
       "favicon": "./imgs/logo.png"
     },
     "plugins": [
+      "./withRemovePermissions",
       "./withAndroidXFix",
       "@react-native-community/datetimepicker",
       [

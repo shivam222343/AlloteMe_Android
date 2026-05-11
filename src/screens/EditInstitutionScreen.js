@@ -18,7 +18,11 @@ const FACILITY_OPTIONS = ['WiFi', 'Canteen', 'Library', 'Labs', 'Sports', 'Hoste
 const INST_TYPES = ['Government', 'Government Autonomous', 'Autonomous', 'Private-Autonomous', 'Private', 'Deemed'];
 
 const EditInstitutionScreen = ({ route, navigation }) => {
-    const { id } = route.params;
+    const { id } = route.params || {};
+    
+    if (!id) {
+        return null;
+    }
     const { admissionPath } = useAuth();
     const [loading, setLoading] = useState(false);
     const [fetchLoading, setFetchLoading] = useState(true);

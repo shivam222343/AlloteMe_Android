@@ -1,260 +1,353 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
-    Target, Sparkles, Zap, BarChart, GraduationCap,
-    ChevronRight, AlertCircle, CheckCircle2, Search,
-    Search, Layers, Filter, MousePointer2
+    ChevronRight, ChevronLeft, Search, BarChart2, Zap,
+    ShieldCheck, Headphones, Globe, ArrowRight,
+    CheckCircle, MessageSquare, Briefcase, GraduationCap
 } from 'lucide-react';
-import TestimonialSlider from '../components/TestimonialSlider';
 
 const APP_URL = "https://web.alloteme.online/";
 
+const FloatingElement = ({ children, delay = 0, style }) => (
+    <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay, duration: 0.6, ease: "easeOut" }}
+        className="glass-card"
+        style={{
+            position: 'absolute',
+            padding: '12px 20px',
+            borderRadius: '100px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            zIndex: 5,
+            ...style
+        }}
+    >
+        <CheckCircle size={18} color="#245df1" fill="#245df122" />
+        <span style={{ fontSize: '14px', fontWeight: 600, color: '#1a1d23' }}>{children}</span>
+    </motion.div>
+);
+
+const professions = ["Engineers", "Doctors", "Visionaries", "Innovators", "Architects"];
+
+const founders = [
+    { name: "Shivam Dombe", role: "Founder", img: "/Shivam.webp", bg: "/Bg.webp", github: "https://github.com/shivam222343", accent: "#b38728" },
+    { name: "Rohan Mane", role: "Co-Founder", img: "/Rohan.webp", bg: "/Blue.webp", github: "#", accent: "#245df1" },
+    { name: "Tejas Choudhari", role: "Co-Founder", img: "/Tejas.webp", bg: "/Pink.webp", github: "#", accent: "#ec4899" },
+    { name: "Omkar Kapare", role: "Marketing Lead", img: "/Om.webp", bg: "/Purple.webp", github: "#", accent: "#a855f7" }
+];
+
 const Home = () => {
+    const [index, setIndex] = useState(0);
+    const [founderIndex, setFounderIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setIndex((prev) => (prev + 1) % professions.length);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setFounderIndex((prev) => (prev + 1) % founders.length);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const nextFounder = () => setFounderIndex((prev) => (prev + 1) % founders.length);
+    const prevFounder = () => setFounderIndex((prev) => (prev - 1 + founders.length) % founders.length);
+
     return (
-        <div style={{ background: 'var(--white)' }}>
+        <div style={{ background: '#fff', overflow: 'hidden' }}>
             {/* HERO SECTION */}
-            <section className="section-padding" style={{
-                background: 'radial-gradient(circle at top right, #eff6ff, transparent), radial-gradient(circle at bottom left, #eef2ff, transparent)',
-                minHeight: '85vh', display: 'flex', alignItems: 'center'
+            <section className="hero-section" style={{
+                position: 'relative',
+                paddingTop: '40px',
+                paddingBottom: '60px',
+                background: '#fff'
             }}>
-                <div className="container" style={{ textAlign: 'center' }}>
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5 }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(37, 99, 235, 0.1)', padding: '8px 20px', borderRadius: '100px', marginBottom: '32px' }}
-                    >
-                        <Sparkles color="var(--primary)" size={16} />
-                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                            Trusted predictions • Real cutoff data • Smart strategy
-                        </span>
-                    </motion.div>
+                <div className="hero-bg-glow" style={{ backgroundImage: `url('${founders[founderIndex].bg}')` }} />
+                <div className="container" style={{ position: 'relative', zIndex: 2 }}>
+                    <div className="hero-grid">
+                        <div className="hero-text-content">
+                            <motion.h1
+                                initial={{ opacity: 0, x: -30 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.8 }}
+                                className="hero-title"
+                                style={{ fontSize: '64px', lineHeight: 1.1, marginBottom: '24px', color: '#245df1' }}
+                            >
+                                AI Native Counseling <br />
+                                <span style={{ color: '#1a1d23' }}>for India's Future </span>
+                                <div style={{ display: 'inline-block', position: 'relative', height: '1.2em', verticalAlign: 'bottom', overflow: 'hidden' }}>
+                                    <AnimatePresence mode="wait">
+                                        <motion.span
+                                            key={professions[index]}
+                                            initial={{ y: 20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            exit={{ y: -20, opacity: 0 }}
+                                            transition={{ duration: 0.4 }}
+                                            className="text-golden"
+                                            style={{ display: 'block' }}
+                                        >
+                                            {professions[index]}
+                                        </motion.span>
+                                    </AnimatePresence>
+                                </div>
+                            </motion.h1>
 
-                    <motion.h1
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        style={{ fontSize: 'clamp(42px, 7vw, 84px)', lineHeight: 1.05, marginBottom: '24px', fontWeight: 900 }}
-                    >
-                        Get the <span style={{ color: 'var(--primary)' }}>Right College</span>,<br />Not Just a Random Seat
-                    </motion.h1>
 
-                    <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
-                        style={{ fontSize: '20px', color: 'var(--text-soft)', maxWidth: '800px', margin: '0 auto 48px', fontWeight: 500, lineHeight: 1.6 }}
-                    >
-                        AlloteMe uses AI + real allotment data to predict your best colleges for MHTCET, JEE & NEET — so you can fill your option form with confidence.
-                    </motion.p>
+                            <motion.p
+                                initial={{ opacity: 0, x: -30 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.8, delay: 0.2 }}
+                                style={{ fontSize: '20px', color: '#5e6b7e', marginBottom: '40px', maxWidth: '540px' }}
+                            >
+                                The infrastructure behind your college admissions. Predict, strategy and secure your seat with real data.
+                            </motion.p>
 
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.6 }}
-                        style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}
-                    >
-                        <a href={APP_URL} className="btn-primary" style={{ padding: '1.2rem 3rem', fontSize: '18px' }}>
-                            Predict My Colleges
-                            <ChevronRight size={20} />
-                        </a>
-                        <a href={APP_URL} className="btn-primary" style={{ background: 'white', color: 'var(--dark)', border: '1.5px solid #e2e8f0', boxShadow: 'none' }}>
-                            Explore Colleges
-                        </a>
-                    </motion.div>
-                </div>
-            </section>
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8, delay: 0.4 }}
+                            >
+                                <a href={APP_URL} className="btn-golden" style={{ padding: '16px 32px', fontSize: '18px' }}>
+                                    <span>Sign Up Now</span>
+                                    <ArrowRight size={20} />
+                                </a>
+                            </motion.div>
 
-            {/* PROBLEM SECTION */}
-            <section className="section-padding" style={{ backgroundColor: '#fff' }}>
-                <div className="container">
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '60px', alignItems: 'center' }}>
-                        <div>
-                            <div style={{ color: '#ef4444', marginBottom: '20px' }}><AlertCircle size={40} /></div>
-                            <h2 style={{ fontSize: '42px', marginBottom: '24px', lineHeight: 1.2 }}>Counseling Shouldn’t Feel Like Guesswork</h2>
-                            <p style={{ fontSize: '18px', color: 'var(--text-soft)', marginBottom: '32px' }}>
-                                Every year, thousands of students make wrong choices during counseling — not because they lack marks, but because they lack clarity.
-                            </p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {[
-                                    "Confusing cutoff data from multiple sources",
-                                    "No clear distinction between safe vs dream colleges",
-                                    "Incorrect option form priority setting",
-                                    "Fear of losing a better seat due to bad advice"
-                                ].map((item, i) => (
-                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
-                                        <p style={{ fontWeight: 600, color: 'var(--dark-soft)' }}>{item}</p>
-                                    </div>
-                                ))}
-                            </div>
-                            <p style={{ marginTop: '40px', fontWeight: 800, color: '#ef4444' }}>
-                                One mistake in option filling can cost you your dream college.
-                            </p>
-                        </div>
-                        <div style={{ background: '#fef2f2', borderRadius: '40px', padding: '60px', textAlign: 'center' }}>
-                            <motion.div whileHover={{ scale: 1.05 }} className="float-img">
-                                <AlertCircle size={120} color="#fecaca" />
+                            {/* Soundwave Animation */}
+                            <motion.div
+                                animate={{
+                                    background: `linear-gradient(90deg, ${founders[founderIndex].accent}15 0%, ${founders[founderIndex].accent}05 100%)`,
+                                    borderColor: `${founders[founderIndex].accent}44`,
+                                }}
+                                transition={{ duration: 0.8 }}
+                                className="ai-analysis-box"
+                                style={{
+                                    marginTop: '40px',
+                                    borderStyle: 'solid',
+                                    backdropFilter: 'blur(8px)',
+                                    WebkitBackdropFilter: 'blur(8px)'
+                                }}
+                            >
+                                <div className="soundwave-container">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((i) => (
+                                        <div
+                                            key={i}
+                                            className="soundwave-bar"
+                                            style={{
+                                                animationDelay: `${i * 0.1}s`,
+                                                height: `${Math.random() * 30 + 10}px`,
+                                                background: founders[founderIndex].accent,
+                                                opacity: 0.3
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                                <span style={{ color: founders[founderIndex].accent, fontSize: '14px', fontWeight: 700 }}>AI Analysis Engine Active</span>
                             </motion.div>
                         </div>
-                    </div>
-                </div>
-            </section>
 
-            {/* SOLUTION SECTION */}
-            <section className="section-padding" style={{ background: 'white', borderTop: '1px solid #f1f5f9', marginTop: '40px', color: 'var(--text)' }}>
-                <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-                        <h2 style={{ fontSize: '42px', color: 'var(--dark)', marginBottom: '24px' }}>Meet AlloteMe — Your AI Counseling Assistant</h2>
-                        <p style={{ color: 'var(--text-soft)', fontSize: '18px', maxWidth: '700px', margin: '0 auto' }}>
-                            AlloteMe simplifies the entire admission process by turning complex data into clear, personalized decisions.
-                        </p>
-                    </div>
-                    <div className="grid-3" style={{ gap: '40px' }}>
-                        {[
-                            { title: "AI-powered college prediction", text: "Advanced LLM-driven analysis of your specific profile merits." },
-                            { title: "Real DTE allotment data analysis", text: "Every prediction is backed by official Maharashtra CET Cell data." },
-                            { title: "Personalized cutoff insights", text: "Insights tailored to your category, region, and branch preference." },
-                        ].map((item, i) => (
-                            <div key={i} style={{ padding: '40px', background: 'white', borderRadius: '32px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
-                                <CheckCircle2 color="var(--primary)" size={32} style={{ marginBottom: '20px' }} />
-                                <h3 style={{ color: 'var(--dark)', marginBottom: '12px' }}>{item.title}</h3>
-                                <p style={{ color: 'var(--text-soft)' }}>{item.text}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
+                        <div className="hero-image-container" style={{
+                            position: 'relative',
+                            minHeight: '400px',
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: '20px'
+                        }}>
+                            {/* Founders Carousel */}
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={founderIndex}
+                                    initial={{ opacity: 0, x: 50 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -50 }}
+                                    transition={{ duration: 0.5 }}
+                                    style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                    <img
+                                        src={founders[founderIndex].img}
+                                        alt={founders[founderIndex].name}
+                                        style={{ width: '100%', maxWidth: '550px', height: 'auto', display: 'block', margin: '0 auto', zIndex: 2 }}
+                                    />
 
-            {/* FEATURES SECTION */}
-            <section className="section-padding" style={{ background: '#f8fafc' }}>
-                <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-                        <h2 style={{ fontSize: '42px', marginBottom: '24px' }}>Powerful Tools for Smart Admissions</h2>
-                    </div>
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.4 }}
+                                        className="name-badge-container"
+                                        style={{ position: 'absolute', bottom: '35%', left: '-10%', zIndex: 10 }}
+                                    >
+                                        <div className="name-badge">
+                                            {founders[founderIndex].name} <span>{founders[founderIndex].role}</span>
+                                            <a href={founders[founderIndex].github} target="_blank" rel="noopener noreferrer">
+                                                <ArrowRight size={16} />
+                                            </a>
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            </AnimatePresence>
 
-                    <div className="grid-3" style={{ gap: '30px' }}>
-                        <div style={{ background: 'white', padding: '40px', borderRadius: '32px', gridColumn: 'span 2', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                            <Search size={32} color="var(--primary)" style={{ marginBottom: '20px' }} />
-                            <h3>🔍 Smart College Predictor</h3>
-                            <p style={{ color: 'var(--text-soft)', marginTop: '10px' }}>Get accurate college predictions based on your percentile, rank, category, and preferences.</p>
-                            <div style={{ marginTop: '30px', padding: '20px', background: '#f0f9ff', borderRadius: '20px', display: 'flex', gap: '20px' }}>
-                                <div style={{ flex: 1, height: '10px', background: '#e0f2fe', borderRadius: '5px' }}></div>
-                                <div style={{ flex: 2, height: '10px', background: 'var(--primary)', borderRadius: '5px' }}></div>
-                                <div style={{ flex: 1, height: '10px', background: '#e0f2fe', borderRadius: '5px' }}></div>
-                            </div>
-                        </div>
-                        <div style={{ background: 'white', padding: '40px', borderRadius: '32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                            <BarChart size={32} color="var(--primary)" style={{ marginBottom: '20px' }} />
-                            <h3>📊 Real Cutoff Analysis</h3>
-                            <p style={{ color: 'var(--text-soft)', marginTop: '10px' }}>We analyze thousands of real allotment records to give you realistic chances.</p>
-                        </div>
-                    </div>
+                            <div className="hero-pills-wrapper">
+                                <div className="hero-pills-container">
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 }} className="glass-pill pill-1">
+                                        <strong>98.5%</strong> Accuracy Rate
+                                    </motion.div>
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }} className="glass-pill pill-2">
+                                        <strong>50k+</strong> Students Guided
+                                    </motion.div>
 
-                    <div style={{ marginTop: '30px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
-                        <div style={{ background: 'white', padding: '40px', borderRadius: '32px', textAlign: 'center' }}>
-                            <Layers size={32} color="var(--primary)" style={{ marginBottom: '20px' }} />
-                            <h3>🎯 Safe, Target & Dream</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '24px' }}>
-                                <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '12px', color: '#166534', fontWeight: 700 }}>Safe → High chance</div>
-                                <div style={{ background: '#fffbeb', padding: '12px', borderRadius: '12px', color: '#92400e', fontWeight: 700 }}>Target → Moderate chance</div>
-                                <div style={{ background: '#fef2f2', padding: '12px', borderRadius: '12px', color: '#991b1b', fontWeight: 700 }}>Dream → Low but possible</div>
-                            </div>
-                        </div>
-                        <div style={{ background: 'white', padding: '40px', borderRadius: '32px' }}>
-                            <Filter size={32} color="var(--primary)" style={{ marginBottom: '20px' }} />
-                            <h3>⚡ Advanced Filters</h3>
-                            <ul style={{ color: 'var(--text-soft)', marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                <li>• Branch Specific Search</li>
-                                <li>• Region (Kolhapur, Pune, Mumbai, Nagpur)</li>
-                                <li>• College Type (Govt / Private / Autonomous)</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </section>
+                                    <div className="mobile-pill-row-2">
+                                        <button onClick={prevFounder} className="btn-icon mobile-only">
+                                            <ChevronLeft size={20} color="#245df1" />
+                                        </button>
 
-            {/* HOW IT WORKS */}
-            <section className="section-padding">
-                <div className="container" style={{ textAlign: 'center' }}>
-                    <h2 style={{ fontSize: '42px', marginBottom: '80px' }}>📈 How It Works</h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '40px' }}>
-                        {[
-                            { step: "1", title: "Enter Merits", desc: "Input percentile, rank & category" },
-                            { step: "2", title: "Preferences", desc: "Select branches & regions" },
-                            { step: "3", title: "AI Prediction", desc: "Get smart matches instantly" },
-                            { step: "4", title: "Option Form", desc: "Build your perfect priority list" }
-                        ].map((item, i) => (
-                            <div key={i} style={{ position: 'relative' }}>
-                                <div style={{ width: '60px', height: '60px', background: 'var(--primary)', borderRadius: '50%', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: '24px', fontWeight: 900 }}>
-                                    {item.step}
+                                        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }} className="glass-pill pill-3">
+                                            <strong>200+</strong> Colleges Indexed
+                                        </motion.div>
+
+                                        <button onClick={nextFounder} className="btn-icon mobile-only">
+                                            <ChevronRight size={20} color="#245df1" />
+                                        </button>
+                                    </div>
                                 </div>
-                                <h3 style={{ marginBottom: '10px' }}>{item.title}</h3>
-                                <p style={{ color: 'var(--text-soft)', fontSize: '14px' }}>{item.desc}</p>
+
+                                {/* Carousel Controls (Desktop Only) */}
+                                <div className="carousel-controls desktop-only">
+                                    <button onClick={prevFounder} className="btn-icon">
+                                        <ChevronLeft size={20} color="#245df1" />
+                                    </button>
+                                    <button onClick={nextFounder} className="btn-icon">
+                                        <ChevronRight size={20} color="#245df1" />
+                                    </button>
+                                </div>
                             </div>
-                        ))}
+
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ position: 'relative', zIndex: 10, marginTop: '80px', borderTop: '1px solid #f1f5f9', background: '#fff', padding: '16px 0' }}>
+                    <div className="container product-selector-container" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: '#1a1d23',
+                            fontWeight: 800,
+                            fontSize: '15px',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0
+                        }}>
+                            <Search size={20} color="#245df1" strokeWidth={3} />
+                            Looking for a feature?
+                        </div>
+
+                        <div className="infinite-slider-wrapper" style={{ flexGrow: 1 }}>
+                            <div className="slider-gradient-left" />
+                            <div className="slider-gradient-right" />
+
+                            <div className="product-chips-track">
+                                {[...Array(3)].map((_, groupIdx) => (
+                                    <React.Fragment key={groupIdx}>
+                                        {[
+                                            { icon: <Zap size={16} />, label: "College Predictor", color: "#eef2ff" },
+                                            { icon: <BarChart2 size={16} />, label: "Cutoff Trends", color: "#f0f9ff" },
+                                            { icon: <MessageSquare size={16} />, label: "Expert Help", color: "#f5f3ff" },
+                                            { icon: <GraduationCap size={16} />, label: "Scholarships", color: "#f0fdf4" },
+                                            { icon: <Briefcase size={16} />, label: "Career Path", color: "#fff7ed" },
+                                            { icon: <ChevronRight size={16} />, label: "Something else?", color: "#f8fafc" }
+                                        ].map((item, i) => (
+                                            <a
+                                                key={`${groupIdx}-${i}`}
+                                                href={APP_URL}
+                                                className="product-chip"
+                                                style={{ background: item.color, textDecoration: 'none' }}
+                                            >
+                                                {item.icon}
+                                                {item.label}
+                                            </a>
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            {/* WHY ALLOTEME */}
-            <section className="section-padding" style={{ background: '#f1f5f9', borderRadius: '60px' }}>
+            {/* TRUST SECTION */}
+            <section className="section-padding" style={{ background: '#f8faff' }}>
                 <div className="container">
-                    <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-                        <h2 style={{ fontSize: '42px' }}>🧠 Why Students Choose AlloteMe</h2>
+                    <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+                        <h2 style={{ fontSize: '42px', marginBottom: '16px' }}>The Modern Standard for Counseling</h2>
+                        <p style={{ color: '#5e6b7e', fontSize: '18px' }}>Join 50,000+ students making smarter admission choices every year.</p>
                     </div>
-                    <div className="grid-3">
+
+                    <div className="hero-grid">
                         {[
-                            "Based on real allotment data (not assumptions)",
-                            "AI-driven predictions using state-of-the-art LLMs",
-                            "Saves hours of manual research",
-                            "Reduces risk in option filling tremendously",
-                            "Built specifically for the Indian counseling system"
-                        ].map((item, i) => (
-                            <div key={i} style={{ padding: '30px', background: 'white', borderRadius: '24px', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-                                <CheckCircle2 color="var(--primary)" size={24} style={{ marginTop: '3px' }} />
-                                <p style={{ fontWeight: 600 }}>{item}</p>
+                            { title: "Real-time Data", desc: "Every prediction is based on the latest DTE and NTA allotment records.", icon: <ShieldCheck size={32} color="#245df1" /> },
+                            { title: "Smart Priority", desc: "Our AI helps you build the perfect option form to maximize your chances.", icon: <Zap size={32} color="#245df1" /> },
+                            { title: "Expert Support", desc: "Direct access to counselors who understand your specific needs.", icon: <Headphones size={32} color="#245df1" /> }
+                        ].map((feature, i) => (
+                            <div key={i} className="glass-card" style={{ padding: '40px', borderRadius: '24px', background: '#fff' }}>
+                                <div style={{ marginBottom: '24px' }}>{feature.icon}</div>
+                                <h3 style={{ fontSize: '24px', marginBottom: '12px' }}>{feature.title}</h3>
+                                <p style={{ color: '#5e6b7e' }}>{feature.desc}</p>
+                                <a href="#" style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px', color: '#245df1', fontWeight: 600 }}>
+                                    Learn More <ChevronRight size={16} />
+                                </a>
                             </div>
                         ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* SOCIAL PROOF */}
-            <section className="section-padding" style={{ textAlign: 'center' }}>
-                <div className="container">
-                    <h2 style={{ fontSize: '32px', color: 'var(--text-soft)', marginBottom: '50px' }}>Built to Solve a Real Problem</h2>
-                    <div style={{ display: 'flex', gap: '30px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ background: '#fff', padding: '30px', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', fontStyle: 'italic', border: '1px solid #f1f5f9' }}>
-                            “Finally, a platform that actually helps students decide.”
-                        </div>
-                        <div style={{ background: '#fff', padding: '30px', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', fontStyle: 'italic', border: '1px solid #f1f5f9' }}>
-                            “Much better than scrolling PDFs and cutoff lists.”
-                        </div>
                     </div>
                 </div>
             </section>
 
             {/* FINAL CTA */}
-            <section className="section-padding" style={{ padding: '0 5% 80px' }}>
-                <div className="container" style={{
-                    background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)',
-                    borderRadius: '48px', padding: '100px 40px', textAlign: 'center', color: 'var(--dark)', overflow: 'hidden', position: 'relative', border: '1px solid #dbeafe'
-                }}>
-                    <div style={{ position: 'relative', zIndex: 10 }}>
-                        <h2 style={{ fontSize: '48px', color: 'var(--dark)', marginBottom: '24px', fontWeight: 900 }}>Your Rank Deserves the Right College</h2>
-                        <p style={{ color: 'var(--text-soft)', fontSize: '20px', marginBottom: '48px', maxWidth: '600px', margin: '0 auto 48px' }}>
-                            Don’t leave your future to guesswork. Make smarter decisions with AlloteMe.
-                        </p>
-                        <a href={APP_URL} className="btn-primary" style={{ padding: '1.2rem 4rem', fontSize: '20px', borderRadius: '100px' }}>
-                            👉 Predict My Colleges Now
-                        </a>
+            <section className="section-padding">
+                <div className="container">
+                    <div className="premium-cta-container">
+
+                        {/* Background Waves */}
+                        <div className="cta-wave" />
+                        <div className="cta-wave-2" />
+                        <div className="cta-wave-3" />
+
+                        {/* Content */}
+                        <div className="cta-content">
+                            <h2 className="cta-title">
+                                Ready to <span className="cta-highlight" style={{ color: founders[founderIndex].accent }}>secure</span> your future?
+                            </h2>
+
+                            <p className="cta-desc">
+                                Get started for free and see where your rank can take you.
+                            </p>
+
+                            <div className="cta-buttons">
+                                <a href={APP_URL} className="btn-white-pill">
+                                    Get Started Free →
+                                </a>
+
+                                <Link to="/premium" className="btn-glass-pill">
+                                    Check Premium Plans
+                                </Link>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </section>
-            <TestimonialSlider />
         </div>
     );
 };
 
 export default Home;
+

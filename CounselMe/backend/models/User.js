@@ -36,8 +36,13 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['student', 'admin', 'counselor'],
+        enum: ['student', 'admin', 'counselor', 'college_admin'],
         default: 'student'
+    },
+    managedInstitution: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Institution',
+        default: null
     },
     // Student specific info
     examType: {

@@ -10,6 +10,9 @@ import { configureGoogleSignin } from './src/config/googleConfig';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Platform } from 'react-native';
 
+import linking from './src/navigation/linking';
+import { NetworkProvider } from './src/contexts/NetworkContext';
+
 configureGoogleSignin();
 
 const GOOGLE_WEB_CLIENT_ID = '1015159418208-vip5a2c92nb8rk91gqfqpsis0utpe9vl.apps.googleusercontent.com';
@@ -18,12 +21,14 @@ export default function App() {
   const content = (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <AuthProvider>
-          <NavigationContainer>
-            <AppNavigator />
-            <SubscriptionLockModal />
-          </NavigationContainer>
-        </AuthProvider>
+        <NetworkProvider>
+          <AuthProvider>
+            <NavigationContainer linking={linking}>
+              <AppNavigator />
+              <SubscriptionLockModal />
+            </NavigationContainer>
+          </AuthProvider>
+        </NetworkProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );

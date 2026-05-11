@@ -229,7 +229,14 @@ const NearbyCollegesScreen = ({ navigation }) => {
 
     const getMapHTML = () => {
         if (!location) return '';
-        const collegeMarkers = allInstitutions.map(c => ({ lat: c.location.coordinates.lat, lng: c.location.coordinates.lng, name: c.name, id: c._id }));
+        const collegeMarkers = allInstitutions.map(c => ({ 
+            lat: c.location.coordinates.lat, 
+            lng: c.location.coordinates.lng, 
+            name: c.name, 
+            id: c._id,
+            img: c.galleryImages?.[0] || 'https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=200',
+            images: c.galleryImages && c.galleryImages.length > 0 ? c.galleryImages : ['https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=200']
+        }));
         return `
             <!DOCTYPE html>
             <html>
@@ -238,24 +245,127 @@ const NearbyCollegesScreen = ({ navigation }) => {
                 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
                 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
                 <style>
-                    body { margin: 0; padding: 0; } #map { height: 100vh; width: 100vw; background: #f1f5f9; }
-                    .u-mark { background:#2563eb; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3); }
-                    .inst-m { background:#fff; border:2px solid #2563eb; border-radius:8px; padding:2px 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); white-space:nowrap; font-weight:bold; font-size:10px; display:flex; gap:4px; align-items:center; }
-                    .btns { display:flex; gap:8px; margin-top:8px; }
-                    .btn { flex:1; padding:6px; border-radius:6px; font-size:10px; font-weight:bold; cursor:pointer; text-align:center; border:1px solid; }
-                    .btn-i { background:#f0f9ff; color:#0369a1; border-color:#bae6fd; }
-                    .btn-r { background:#2563eb; color:white; border-color:#2563eb; }
+                    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+                    #map { height: 100vh; width: 100vw; background: #f1f5f9; }
+                    
+                    /* Custom Marker Styles */
+                    .pin-wrapper { position: relative; width: 44px; height: 58px; display: flex; flex-direction: column; align-items: center; }
+                    .pin-shape { 
+                        width: 42px; height: 42px; 
+                        background: #2563eb; 
+                        border-radius: 50% 50% 50% 0; 
+                        transform: rotate(-45deg); 
+                        display: flex; align-items: center; justify-content: center; 
+                        border: 3px solid #ffffff;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+                        overflow: hidden;
+                    }
+                    .pin-img-container {
+                        width: 100%; height: 100%;
+                        transform: rotate(45deg);
+                        display: flex; align-items: center; justify-content: center;
+                        background: #2563eb;
+                        border-radius: 50%;
+                        overflow: hidden;
+                    }
+                    .pin-img { width: 100%; height: 100%; object-fit: cover; }
+                    .pin-label { 
+                        position: absolute; top: 62px; 
+                        background: #ffffff; padding: 3px 10px; 
+                        border-radius: 12px; font-size: 10px; font-weight: 500; color: #1e293b;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.15); 
+                        white-space: nowrap; 
+                        display: none; 
+                        border: 1px solid #e2e8f0;
+                    }
+                    .zoom-active .pin-label { display: block; }
+                    .zoom-out .pin-shape { width: 28px; height: 28px; border-width: 2px; }
+                    .zoom-out .pin-wrapper { width: 30px; height: 40px; }
+
+                    /* Popup Styling - Redesigned for UI/UX Excellence */
+                    .leaflet-popup-content-wrapper { 
+                        border-radius: 20px; 
+                        padding: 0; 
+                        overflow: hidden; 
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+                        border: 1px solid rgba(0,0,0,0.05);
+                    }
+                    .leaflet-popup-content { margin: 0; width: 260px !important; }
+                    .pop-container { display: flex; flex-direction: column; background: #ffffff; }
+                    
+                    /* Image Slider - Psychological Hook */
+                    .pop-slider { 
+                        display: flex; overflow-x: auto; scroll-snap-type: x mandatory; 
+                        height: 140px; background: #f8fafc; -webkit-overflow-scrolling: touch;
+                        position: relative;
+                    }
+                    .pop-slider::-webkit-scrollbar { display: none; }
+                    .pop-img { 
+                        flex: 0 0 100%; width: 100%; height: 140px; object-fit: cover; 
+                        scroll-snap-align: start; 
+                    }
+                    
+                    /* Content Section - Visual Hierarchy */
+                    .pop-info { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+                    .pop-name { 
+                        font-size: 15px; 
+                        font-weight: 500; 
+                        color: #1e293b; 
+                        line-height: 1.5;
+                        letter-spacing: -0.2px;
+                    }
+                    
+                    /* Buttons - Fitts's Law & CTA Psychology */
+                    .pop-btns { display: flex; gap: 10px; align-items: center; }
+                    .pop-btn { 
+                        flex: 1; 
+                        height: 44px; 
+                        border-radius: 12px; 
+                        border: none; 
+                        font-size: 13px; 
+                        font-weight: 500; 
+                        cursor: pointer; 
+                        transition: transform 0.1s;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        text-align: center;
+                    }
+                    .pop-btn:active { transform: scale(0.97); }
+                    
+                    .btn-primary { 
+                        background: #2563eb; 
+                        color: #ffffff; 
+                        box-shadow: 0 4px 12px rgba(37,99,235,0.2);
+                    }
+                    .btn-secondary { 
+                        background: #f1f5f9; 
+                        color: #475569; 
+                        border: 1px solid #e2e8f0;
+                    }
+                    
+                    /* Leaflet UI Cleanups */
+                    .leaflet-popup-tip { box-shadow: none; border: 1px solid rgba(0,0,0,0.05); }
+                    .leaflet-popup-close-button { 
+                        top: 12px !important; right: 12px !important; 
+                        color: #ffffff !important; font-size: 24px !important; 
+                        z-index: 1001; text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        font-weight: 300 !important;
+                    }
                 </style>
             </head>
             <body>
                 <div id="map"></div>
                 <script>
-                    var map = L.map('map').setView([${location.latitude}, ${location.longitude}], 12);
+                    var map = L.map('map', {zoomControl:false}).setView([${location.latitude}, ${location.longitude}], 13);
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                        attribution: '&copy; OpenStreetMap &copy; CARTO'
+                        attribution: '&copy; OpenStreetMap'
                     }).addTo(map);
-                    L.marker([${location.latitude}, ${location.longitude}], { icon: L.divIcon({ className:'u-mark', iconSize:[16,16]}) }).addTo(map);
-                    var markers = ${JSON.stringify(collegeMarkers)};
+
+                    var markersData = ${JSON.stringify(collegeMarkers)};
+                    var markers = [];
+                    var DEFAULT_IMG = 'https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=200';
+
                     function safeSend(msg) { 
                         try { 
                             if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
@@ -265,20 +375,93 @@ const NearbyCollegesScreen = ({ navigation }) => {
                             }
                         } catch(e){} 
                     }
-                    markers.forEach(function(m) {
-                        var icon = L.divIcon({ className:'c-icon', html:'<div class="inst-m">🎓 '+m.name.substring(0,8)+'...</div>', iconSize:[80,24], iconAnchor:[40,24] });
-                        var div = document.createElement('div');
-                        div.style.textAlign = 'center';
-                        var b = document.createElement('b'); b.innerText = m.name;
-                        var btnContainer = document.createElement('div'); btnContainer.className = 'btns';
-                        var bi = document.createElement('div'); bi.className = 'btn btn-i'; bi.innerText = 'INFO';
-                        var br = document.createElement('div'); br.className = 'btn btn-r'; br.innerText = 'ROUTE';
-                        btnContainer.appendChild(bi); btnContainer.appendChild(br);
-                        div.appendChild(b); div.appendChild(btnContainer);
-                        var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map).bindPopup(div);
-                        bi.onclick = function() { marker.closePopup(); safeSend(JSON.stringify({type:'NAV', id:m.id})); };
-                        br.onclick = function() { marker.closePopup(); safeSend(JSON.stringify({type:'ROUTE', id:m.id})); };
+
+                    markersData.forEach(function(m) {
+                        var icon = L.divIcon({
+                            className: 'c-mark',
+                            html: '<div class="pin-wrapper" id="pin-'+m.id+'"><div class="pin-shape"><div class="pin-img-container"><img src="'+m.img+'" class="pin-img" onerror="this.src=\\''+DEFAULT_IMG+'\\'"/></div></div><div class="pin-label">'+m.name+'</div></div>',
+                            iconSize: [44, 58],
+                            iconAnchor: [22, 58]
+                        });
+                        
+                        var container = document.createElement('div');
+                        container.className = 'pop-container';
+                        
+                        // Image Slider
+                        var slider = document.createElement('div');
+                        slider.className = 'pop-slider';
+                        m.images.forEach(function(src) {
+                            var img = document.createElement('img');
+                            img.src = src;
+                            img.className = 'pop-img';
+                            img.onerror = function() { this.src = DEFAULT_IMG; };
+                            slider.appendChild(img);
+                        });
+                        container.appendChild(slider);
+
+                        // Info section
+                        var info = document.createElement('div');
+                        info.className = 'pop-info';
+                        var name = document.createElement('span');
+                        name.className = 'pop-name';
+                        name.innerText = m.name;
+                        info.appendChild(name);
+
+                        // Buttons
+                        var btns = document.createElement('div');
+                        btns.className = 'pop-btns';
+                        
+                        var bDet = document.createElement('button');
+                        bDet.className = 'pop-btn btn-primary';
+                        bDet.innerText = 'View Details';
+                        
+                        var bDir = document.createElement('button');
+                        bDir.className = 'pop-btn btn-secondary';
+                        bDir.innerText = 'Directions';
+                        
+                        btns.appendChild(bDet);
+                        btns.appendChild(bDir);
+                        info.appendChild(btns);
+                        container.appendChild(info);
+                        
+                        var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map).bindPopup(container, { maxWidth: 240, minWidth: 240 });
+                        markers.push({ id: m.id, marker: marker });
+                        
+                        bDet.onclick = function() { marker.closePopup(); safeSend(JSON.stringify({type:'NAV', id:m.id})); };
+                        bDir.onclick = function() { marker.closePopup(); safeSend(JSON.stringify({type:'ROUTE', id:m.id})); };
                     });
+
+                    function updateMarkerStates() {
+                        var zoom = map.getZoom();
+                        markersData.forEach(function(m) {
+                            var el = document.getElementById('pin-'+m.id);
+                            if (!el) return;
+
+                            // Labels
+                            if (zoom >= 15) el.classList.add('zoom-active');
+                            else el.classList.remove('zoom-active');
+
+                            // Sizing
+                            if (zoom < 13) el.classList.add('zoom-out');
+                            else el.classList.remove('zoom-out');
+                        });
+                    }
+
+                    map.on('zoomend', updateMarkerStates);
+                    // Initial run after a small delay to ensure DOM is ready
+                    setTimeout(updateMarkerStates, 500);
+
+                    // Initial zoom check
+                    setTimeout(function() {
+                        var zoom = map.getZoom();
+                        if (zoom >= 14) {
+                            markersData.forEach(function(m) {
+                                var el = document.getElementById('pin-' + m.id);
+                                if (el) el.classList.add('zoom-active');
+                            });
+                        }
+                    }, 500);
+
                     var rLayer = null;
                     function handleMsg(e) { try { var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; if(d.type === 'DRAW') {
                         if(rLayer) map.removeLayer(rLayer);

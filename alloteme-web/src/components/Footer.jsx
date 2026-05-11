@@ -1,52 +1,67 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, Target } from 'lucide-react';
+import { Mail, Phone, MapPin, Globe } from 'lucide-react';
+import './footer.css'; // import this CSS
 
 const Footer = () => {
     return (
-        <footer style={{ backgroundColor: 'white', color: 'var(--text)', padding: '80px 5% 40px', borderTop: '1px solid #f1f5f9' }}>
-            <div className="container grid-3">
-                <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                        <img src="/logo.png" alt="AlloteMe" style={{ height: '35px', width: 'auto' }} />
-                        <span style={{ fontSize: '20px', fontWeight: '900', color: 'var(--dark)' }}>AlloteMe</span>
+        <footer className="premium-footer">
+            <div className="container">
+
+                <div className="footer-grid">
+
+                    {/* Brand */}
+                    <div className="footer-brand">
+                        <div className="footer-logo">
+                            <img src="/splash.png" alt="AlloteMe" />
+                            <span>AlloteMe</span>
+                        </div>
+
+                        <p className="footer-desc">
+                            Empowering students in Maharashtra with AI-driven insights for MHTCET, JEE, and NEET admissions.
+                        </p>
                     </div>
-                    <p style={{ color: 'var(--text-soft)', fontSize: '15px' }}>
-                        Empowering students in Maharashtra with real-time intelligence for MHTCET, JEE, and NEET admissions.
-                    </p>
+
+                    {/* Product */}
+                    <div>
+                        <h4 className="footer-heading">Product</h4>
+                        <ul className="footer-list">
+                            <li><a href="https://web.alloteme.online/">College Predictor</a></li>
+                            <li><a href="https://web.alloteme.online/">Cutoff Analysis</a></li>
+                            <li><a href="https://web.alloteme.online/">Option Builder</a></li>
+                            <li><a href="https://web.alloteme.online/">Counseling</a></li>
+                        </ul>
+                    </div>
+
+                    {/* Company */}
+                    <div>
+                        <h4 className="footer-heading">Company</h4>
+                        <ul className="footer-list">
+                            <li><Link to="/about">About</Link></li>
+                            <li><Link to="/contact">Contact</Link></li>
+                            <li><Link to="/privacy">Privacy</Link></li>
+                            <li><Link to="/terms">Terms</Link></li>
+                        </ul>
+                    </div>
+
+                    {/* Contact */}
+                    <div className="footer-contact-wrapper">
+                        <h4 className="footer-heading">Contact</h4>
+                        <ul className="footer-contact">
+                            <li><Mail size={16} /> alloteme1@gmail.com</li>
+                            <li><Phone size={16} /> +91 8010961216</li>
+                            <li><MapPin size={16} /> Kolhapur, Maharashtra</li>
+                        </ul>
+                    </div>
+
                 </div>
 
-                <div>
-                    <h3 style={{ color: 'var(--dark)', marginBottom: '20px', fontSize: '18px' }}>Support</h3>
-                    <ul style={{ color: 'var(--text-soft)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <Mail size={16} color="var(--primary)" />
-                            alloteme1@gmail.com
-                        </li>
-                        <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <Phone size={16} color="var(--primary)" />
-                            +91 8010961216
-                        </li>
-                        <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <MapPin size={16} color="var(--primary)" />
-                            Kolhapur, Maharashtra, India
-                        </li>
-                    </ul>
+                {/* Bottom */}
+                <div className="footer-bottom">
+                    <p>© 2026 AlloteMe. Built for future engineers.</p>
+                    <span><Globe size={14} /> Made by AlloteMe Team</span>
                 </div>
 
-                <div>
-                    <h3 style={{ color: 'var(--dark)', marginBottom: '20px', fontSize: '18px' }}>Legal</h3>
-                    <ul style={{ color: 'var(--text-soft)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <li><Link to="/privacy" style={{ color: 'var(--text-soft)' }}>Privacy Policy</Link></li>
-                        <li><Link to="/terms" style={{ color: 'var(--text-soft)' }}>Terms & Conditions</Link></li>
-                    </ul>
-                </div>
-            </div>
-
-            <div className="container" style={{ borderTop: '1px solid #f1f5f9', marginTop: '60px', paddingTop: '30px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-soft)', fontSize: '14px' }}>
-                    &copy; 2026 AlloteMe. Developed with ❤️ for MHTCET, JEE and NEET students.
-                </p>
             </div>
         </footer>
     );

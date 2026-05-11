@@ -29,11 +29,47 @@ const institutionSchema = new mongoose.Schema({
     branches: [{ name: String, code: String }],
     // Hostel info
     hostel: {
-        available: Boolean,
-        boys: { available: Boolean, fees: Number, capacity: Number },
-        girls: { available: Boolean, fees: Number, capacity: Number },
-        notes: String
+        available: { type: Boolean, default: false },
+        boys: {
+            available: { type: Boolean, default: false },
+            fees: String,
+            capacity: String,
+            messFees: String,
+            securityDeposit: String
+        },
+        girls: {
+            available: { type: Boolean, default: false },
+            fees: String,
+            capacity: String,
+            messFees: String,
+            securityDeposit: String
+        },
+        contactNumber: String,
+        rooms: String,
+        facilities: {
+            wifi: { type: Boolean, default: false },
+            laundry: { type: Boolean, default: false },
+            cctv: { type: Boolean, default: false },
+            gym: { type: Boolean, default: false },
+            mess: { type: Boolean, default: true }
+        },
+        description: String,
+        images: [String]
     },
+    // Placement Statistics
+    placements: [{
+        year: Number,
+        highestPackage: String,
+        averagePackage: String,
+        placementPercentage: Number,
+        records: [{
+            studentName: String,
+            companyName: String,
+            package: Number, // in lakhs
+            batch: String
+        }],
+        images: [String]
+    }],
     // Facilities list
     facilities: [String],
     // Established year
