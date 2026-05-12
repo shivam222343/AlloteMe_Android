@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    ActivityIndicator, Alert, Linking, Platform, Dimensions, Image, TextInput, BackHandler
+    ActivityIndicator, Alert, Linking, Platform, Dimensions, Image, TextInput, BackHandler,
+    Animated, Easing
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
@@ -352,6 +353,30 @@ const NearbyCollegesScreen = ({ navigation }) => {
                         z-index: 1001; text-shadow: 0 2px 4px rgba(0,0,0,0.3);
                         font-weight: 300 !important;
                     }
+                    /* User Location Marker */
+                    .user-pin-wrapper { position: relative; width: 30px; height: 30px; }
+                    .user-pin-dot {
+                        width: 14px; height: 14px;
+                        background: #ef4444;
+                        border-radius: 50%;
+                        border: 3px solid #ffffff;
+                        box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+                        position: absolute; top: 50%; left: 50%;
+                        transform: translate(-50%, -50%);
+                        z-index: 2;
+                    }
+                    .user-pin-pulse {
+                        width: 30px; height: 30px;
+                        background: rgba(239, 68, 68, 0.3);
+                        border-radius: 50%;
+                        position: absolute; top: 0; left: 0;
+                        animation: pulse 2s infinite;
+                        z-index: 1;
+                    }
+                    @keyframes pulse {
+                        0% { transform: scale(0.5); opacity: 1; }
+                        100% { transform: scale(2.5); opacity: 0; }
+                    }
                 </style>
             </head>
             <body>
@@ -361,6 +386,15 @@ const NearbyCollegesScreen = ({ navigation }) => {
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                         attribution: '&copy; OpenStreetMap'
                     }).addTo(map);
+
+                    // User Location Marker
+                    var userIcon = L.divIcon({
+                        className: 'u-mark',
+                        html: '<div class="user-pin-wrapper"><div class="user-pin-pulse"></div><div class="user-pin-dot"></div></div>',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    });
+                    L.marker([${location.latitude}, ${location.longitude}], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
 
                     var markersData = ${JSON.stringify(collegeMarkers)};
                     var markers = [];
@@ -556,7 +590,54 @@ const NearbyCollegesScreen = ({ navigation }) => {
         }
     };
 
-    if (loading) return <MainLayout title="Nearby Colleges"><View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View></MainLayout>;
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const rotateAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (loading) {
+            Animated.loop(
+                Animated.parallel([
+                    Animated.sequence([
+                        Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
+                        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+                    ]),
+                    Animated.timing(rotateAnim, {
+                        toValue: 1,
+                        duration: 3000,
+                        easing: Easing.linear,
+                        useNativeDriver: true,
+                    })
+                ])
+            ).start();
+        } else {
+            pulseAnim.setValue(1);
+            rotateAnim.setValue(0);
+        }
+    }, [loading]);
+
+    const spin = rotateAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg']
+    });
+
+    if (loading) {
+        return (
+            <MainLayout title="Nearby Colleges">
+                <View style={styles.loadingWrapper}>
+                    <View style={styles.animationContainer}>
+                        <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]} />
+                        <Animated.View style={[styles.scannerRing, { transform: [{ rotate: spin }] }]} />
+                        <View style={styles.iconCircle}>
+                            <MapPin size={40} color="white" fill="white" />
+                        </View>
+                    </View>
+                    <Text style={styles.loadingText}>Fetching your location...</Text>
+                    <Text style={styles.loadingSubText}>Searching for top institutes near you</Text>
+                    <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 20 }} />
+                </View>
+            </MainLayout>
+        );
+    }
 
     if (errorMsg && !location) {
         return (
@@ -797,7 +878,38 @@ const styles = StyleSheet.create({
     setBtnText: { color: 'white', fontWeight: 'bold' },
     emptyState: { alignItems: 'center', marginTop: 40, paddingHorizontal: 30 },
     emptyText: { color: Colors.text.primary, fontWeight: 'bold', fontSize: 16, marginTop: 12 },
-    emptySubText: { color: Colors.text.tertiary, textAlign: 'center', marginTop: 8, fontSize: 13 }
+    emptySubText: { color: Colors.text.tertiary, textAlign: 'center', marginTop: 8, fontSize: 13 },
+    loadingWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white', padding: 20 },
+    animationContainer: { width: 120, height: 120, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
+    pulseCircle: {
+        position: 'absolute',
+        width: 100, height: 100,
+        borderRadius: 50,
+        backgroundColor: Colors.primary + '20',
+    },
+    scannerRing: {
+        position: 'absolute',
+        width: 120, height: 120,
+        borderRadius: 60,
+        borderWidth: 2,
+        borderColor: Colors.primary,
+        borderStyle: 'dashed',
+        opacity: 0.5
+    },
+    iconCircle: {
+        width: 70, height: 70,
+        borderRadius: 35,
+        backgroundColor: Colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 10,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10
+    },
+    loadingText: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 8 },
+    loadingSubText: { fontSize: 14, color: '#64748b', textAlign: 'center' },
 });
 
 export default NearbyCollegesScreen;

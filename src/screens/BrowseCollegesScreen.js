@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SectionList, TouchableOpacity, Image, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, Image, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
 import { institutionAPI, authAPI } from '../services/api';

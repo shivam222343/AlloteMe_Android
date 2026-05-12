@@ -1,7 +1,8 @@
 import * as Linking from 'expo-linking';
 
 const linking = {
-  prefixes: [Linking.createURL('/'), 'alloteme0077://'],
+  enabled: true,
+  prefixes: [Linking.createURL('/'), 'alloteme0077://', 'https://web.alloteme.online'],
   config: {
     screens: {
       Login: 'login',
@@ -26,6 +27,7 @@ const linking = {
               Pricing: 'pricing',
               DocumentVerification: 'documents',
               AdminDocumentManager: 'admin/documents',
+              AdminStudentDocuments: 'admin/student-docs',
             },
           },
         },

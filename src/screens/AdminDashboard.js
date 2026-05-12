@@ -5,8 +5,20 @@ import { Colors, Typography, Spacing, Shadows, BorderRadius } from '../constants
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import {
-    PlusCircle, FileUp, Users, Settings,
-    BarChart3, ShieldCheck, ChevronRight, Star, MessageSquare, Bell, TrendingUp, FileText
+    PlusCircle,
+    FileUp,
+    Users,
+    Settings,
+    BarChart3,
+    ShieldCheck,
+    ChevronRight,
+    Star,
+    MessageSquare,
+    Bell,
+    TrendingUp,
+    FileText,
+    CheckCircle,
+    Info
 } from 'lucide-react-native';
 
 const AdminDashboard = ({ navigation }) => {
@@ -121,11 +133,11 @@ const AdminDashboard = ({ navigation }) => {
             color: '#3B82F6'
         },
         {
-            title: 'Manage Documents',
-            desc: 'Edit global document requirements and lists',
-            icon: FileText,
-            route: 'AdminDocumentManager',
-            color: '#10B981'
+            title: 'Verify Student Docs',
+            desc: 'Review and verify documents submitted by students',
+            icon: ShieldCheck,
+            route: 'AdminStudentDocuments',
+            color: '#8B5CF6'
         },
     ];
 

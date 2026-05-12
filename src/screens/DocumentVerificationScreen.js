@@ -176,9 +176,10 @@ const TRANSLATIONS = {
         autoDelete: 'Uploaded documents are auto-deleted after 7 days for security.',
         gotIt: 'Got it',
         uploadBtn: 'Upload',
-        pending: 'Pending',
-        verified: 'Verified',
+        pending: 'Pending Verification',
+        verified: 'Verified & Accepted',
         rejected: 'Rejected',
+        remark: 'Remark: ',
         upgradeMsg: 'Document upload and verification is available for premium users only.',
         successMsg: 'Document uploaded for verification. Our counselors will review it within 24-48 hours.',
         noInfo: 'No detailed information available for this document.'
@@ -191,9 +192,10 @@ const TRANSLATIONS = {
         autoDelete: 'सुरक्षेसाठी अपलोड केलेली कागदपत्रे ७ दिवसांनंतर आपोआप हटविली जातात.',
         gotIt: 'समजले',
         uploadBtn: 'अपलोड करा',
-        pending: 'प्रलंबित',
-        verified: 'सत्यापित',
+        pending: 'पडताळणी प्रलंबित',
+        verified: 'पडताळणी पूर्ण',
         rejected: 'नाकारले',
+        remark: 'टीप: ',
         upgradeMsg: 'कागदपत्र अपलोड आणि पडताळणी केवळ प्रीमियम वापरकर्त्यांसाठी उपलब्ध आहे.',
         successMsg: 'कागदपत्र पडताळणीसाठी अपलोड केले. आमचे समुपदेशक २४-४८ तासांत याचे पुनरावलोकन करतील.',
         noInfo: 'या कागदपत्राबद्दल अधिक माहिती उपलब्ध नाही.'
@@ -228,10 +230,10 @@ const DocumentVerificationScreen = () => {
     const [category, setCategory] = useState(user?.admissionCategory || 'OPEN');
     const [infoModal, setInfoModal] = useState({ visible: false, title: '', content: '' });
     const [language, setLanguage] = useState('English');
-    const [uploads, setUploads] = useState({}); 
+    const [uploads, setUploads] = useState(user?.documents || {}); 
     const [isUploading, setIsUploading] = useState(null);
 
-    const isPremium = user?.isPremium || false;
+    const isPremium = user?.subscription?.type === 'standard' || user?.subscription?.type === 'advance' || user?.isPremium === true;
     const t = TRANSLATIONS[language];
 
     useEffect(() => {
@@ -259,49 +261,92 @@ const DocumentVerificationScreen = () => {
 
     const handleUpload = async (docName) => {
         if (!isPremium) {
-            Alert.alert(language === 'English' ? "Premium Feature" : "प्रीमियम सुविधा", t.upgradeMsg, [
-                { text: "Cancel", style: "cancel" },
-                { text: language === 'English' ? "Upgrade Now" : "आताच अपग्रेड करा", onPress: () => {} }
-            ]);
+            if (Platform.OS === 'web') {
+                // Better alert for web
+                alert(language === 'English' 
+                    ? "Premium Feature: Document upload and verification is available for premium users only." 
+                    : "प्रीमियम सुविधा: कागदपत्र अपलोड आणि पडताळणी केवळ प्रीमियम वापरकर्त्यांसाठी उपलब्ध आहे.");
+            } else {
+                Alert.alert(language === 'English' ? "Premium Feature" : "प्रीमियम सुविधा", t.upgradeMsg, [
+                    { text: "Cancel", style: "cancel" },
+                    { text: language === 'English' ? "Upgrade Now" : "आताच अपग्रेड करा", onPress: () => navigation.navigate('Pricing') }
+                ]);
+            }
             return;
         }
 
         try {
             console.log(`[DocumentVerification] Starting picker for: ${docName}`);
-            const result = await DocumentPicker.getDocumentAsync({
-                type: ['*/*'], // More permissive for initial selection
+            
+            // On Web, type: '*/*' is more reliable than an array for some browser environments
+            const pickerOptions = {
+                type: Platform.OS === 'web' ? '*/*' : ['*/*'],
                 copyToCacheDirectory: true,
                 multiple: false
-            });
+            };
 
-            if (!result || result.canceled || !result.assets || result.assets.length === 0) {
-                console.log('[DocumentVerification] Picker canceled or no assets');
+            const result = await DocumentPicker.getDocumentAsync(pickerOptions);
+
+            // Handle both legacy and assets-based results for cross-platform compatibility
+            const isCanceled = result.canceled === true || result.type === 'cancel';
+            const assets = result.assets || (result.uri ? [result] : []);
+
+            if (isCanceled || assets.length === 0) {
+                console.log('[DocumentVerification] Picker canceled');
                 return;
             }
 
-            const asset = result.assets[0];
+            const asset = assets[0];
             setIsUploading(docName);
             
-            // Simulation of upload with better state feedback
-            setTimeout(() => {
-                const newUploads = { 
-                    ...uploads, 
-                    [docName]: { 
-                        status: 'pending', 
-                        fileName: asset.name,
-                        uri: asset.uri,
-                        timestamp: Date.now() 
-                    } 
-                };
+            // 1. Prepare FormData for real upload
+            const formData = new FormData();
+            if (Platform.OS === 'web') {
+                // Fetch the blob from URI
+                const response = await fetch(asset.uri);
+                const blob = await response.blob();
+                formData.append('image', blob, asset.name || 'document.pdf');
+            } else {
+                formData.append('image', {
+                    uri: asset.uri,
+                    type: asset.mimeType || 'application/octet-stream',
+                    name: asset.name || 'document.pdf'
+                });
+            }
+
+            // 2. Upload to Server
+            const uploadRes = await uploadAPI.upload(formData);
+            const fileUrl = uploadRes.data.url;
+
+            // 3. Update User Profile on Backend
+            const newUploads = { 
+                ...uploads, 
+                [docName]: { 
+                    status: 'pending', 
+                    fileName: asset.name || 'document',
+                    uri: fileUrl,
+                    createdAt: new Date().toISOString()
+                } 
+            };
+
+            const updateRes = await updateProfile({ documents: newUploads });
+            
+            if (updateRes.success) {
                 setUploads(newUploads);
                 setIsUploading(null);
-                Alert.alert(language === 'English' ? "Success" : "यशस्वी", t.successMsg);
-            }, 2000);
+                const msg = language === 'English' ? "Success" : "यशस्वी";
+                if (Platform.OS === 'web') alert(t.successMsg);
+                else Alert.alert(msg, t.successMsg);
+            } else {
+                throw new Error("Failed to update profile");
+            }
 
         } catch (err) {
-            console.error('[DocumentVerification] Picker Error:', err);
+            console.error('[DocumentVerification] Upload Error:', err);
             setIsUploading(null);
-            Alert.alert("Error", "Failed to access document storage. Please check permissions.");
+            const errMsg = "Upload failed. Please try again or check your connection.";
+            if (Platform.OS === 'web') alert(errMsg);
+            else Alert.alert("Error", errMsg);
         }
     };
 
@@ -326,7 +371,7 @@ const DocumentVerificationScreen = () => {
                 </View>
             );
         }
-        if (upload.status === 'verified') {
+        if (upload.status === 'verified' || upload.status === 'accepted') {
             return (
                 <View style={styles.statusBadge}>
                     <CheckCircle size={12} color="#10B981" />
@@ -336,9 +381,14 @@ const DocumentVerificationScreen = () => {
         }
         if (upload.status === 'rejected') {
             return (
-                <View style={styles.statusBadge}>
-                    <XCircle size={12} color="#EF4444" />
-                    <Text style={[styles.statusText, { color: '#EF4444' }]}>{t.rejected}</Text>
+                <View>
+                    <View style={styles.statusBadge}>
+                        <XCircle size={12} color="#EF4444" />
+                        <Text style={[styles.statusText, { color: '#EF4444' }]}>{t.rejected}</Text>
+                    </View>
+                    {upload.remark ? (
+                        <Text style={styles.remarkText}>{t.remark}{upload.remark}</Text>
+                    ) : null}
                 </View>
             );
         }
@@ -503,9 +553,9 @@ const styles = StyleSheet.create({
 
     listContainer: { paddingBottom: 40 },
     docCard: { 
-        flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', 
-        padding: 14, borderRadius: 16, marginBottom: 10, ...Shadows.soft,
-        borderWidth: 1, borderColor: '#f1f5f9'
+        backgroundColor: '#fff', padding: 16, borderRadius: 16, 
+        marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+        flexDirection: 'row', alignItems: 'center', ...Shadows.soft
     },
     checkArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
     docInfo: { flex: 1 },
@@ -513,7 +563,8 @@ const styles = StyleSheet.create({
     docNameChecked: { textDecorationLine: 'line-through', color: Colors.text.tertiary, opacity: 0.7 },
     
     statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-    statusText: { fontSize: 10, fontWeight: '700' },
+    statusText: { fontSize: 10, fontWeight: '700', marginLeft: 4 },
+    remarkText: { fontSize: 10, color: '#EF4444', fontStyle: 'italic', marginTop: 2, marginLeft: 20 },
 
     actionArea: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     iconBtn: { padding: 10, borderRadius: 12, backgroundColor: '#F8FAFC' },

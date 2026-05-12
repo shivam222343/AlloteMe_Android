@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, SafeAreaView, Platform } from 'react-native';
 import { Colors, Spacing, Typography, BorderRadius } from '../../constants/theme';
 import GradientBorder from '../ui/GradientBorder';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     Home, Search, LayoutGrid, Users, History, Bookmark,
-    Settings, LogOut, X, ChevronRight, User, Star, PlusCircle, FileUp, Bot, Gem, Target, Youtube
+    Settings, LogOut, X, ChevronRight, User, Star, PlusCircle, FileUp, Bot, Gem, Target, Youtube, MapPin
 } from 'lucide-react-native';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +25,7 @@ const Sidebar = ({ navigation, state }) => {
         { label: 'Dashboard', icon: Home, route: 'Dashboard' },
         { label: 'Browse Colleges', icon: Search, route: 'BrowseColleges' },
         { label: 'College Predictor', icon: Target, route: 'Predictor' },
-        { label: 'Nearby Colleges', icon: Users, route: 'NearbyColleges' },
+        { label: 'Nearby Colleges', icon: MapPin, route: 'NearbyColleges' },
         { label: 'Saved Colleges', icon: Star, route: 'SavedColleges' },
         { label: 'Saved Predictions', icon: Bookmark, route: 'SavedPredictions' },
         { label: 'AI Counselor', icon: Bot, route: 'AICounselor' },
@@ -55,7 +55,15 @@ const Sidebar = ({ navigation, state }) => {
         const Icon = item.icon;
 
         const handleNav = () => {
-            navigation.navigate('MainTabs', { screen: item.route });
+            if (Platform.OS === 'web') {
+                // On web, we want to ensure the URL updates and history is pushed
+                navigation.navigate('AppDrawer', {
+                    screen: 'MainTabs',
+                    params: { screen: item.route }
+                });
+            } else {
+                navigation.navigate('MainTabs', { screen: item.route });
+            }
         };
 
         return (

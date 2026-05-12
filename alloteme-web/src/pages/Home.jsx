@@ -35,9 +35,9 @@ const professions = ["Engineers", "Doctors", "Visionaries", "Innovators", "Archi
 
 const founders = [
     { name: "Shivam Dombe", role: "Founder", img: "/Shivam.webp", bg: "/Bg.webp", github: "https://github.com/shivam222343", accent: "#b38728" },
-    { name: "Rohan Mane", role: "Co-Founder", img: "/Rohan.webp", bg: "/Blue.webp", github: "#", accent: "#245df1" },
-    { name: "Tejas Choudhari", role: "Co-Founder", img: "/Tejas.webp", bg: "/Pink.webp", github: "#", accent: "#ec4899" },
-    { name: "Omkar Kapare", role: "Marketing Lead", img: "/Om.webp", bg: "/Purple.webp", github: "#", accent: "#a855f7" }
+    { name: "Rohan Mane", role: "Co-Founder", img: "/Rohan.webp", bg: "/Blue.webp", github: "#", accent: "#245df1" }
+    // { name: "Tejas Choudhari", role: "Co-Founder", img: "/Shivam.webp", bg: "/Pink.webp", github: "#", accent: "#ec4899" },
+    // { name: "Omkar Kapare", role: "Marketing Lead", img: "/Shivam.webp", bg: "/Purple.webp", github: "#", accent: "#a855f7" }
 ];
 
 const Home = () => {
