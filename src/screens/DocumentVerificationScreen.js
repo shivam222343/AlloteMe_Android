@@ -233,6 +233,16 @@ const DocumentVerificationScreen = () => {
     const [uploads, setUploads] = useState(user?.documents || {}); 
     const [isUploading, setIsUploading] = useState(null);
 
+    // Sync state with user profile updates (e.g. after refresh or background updates)
+    useEffect(() => {
+        if (user?.documents) {
+            setUploads(user.documents);
+        }
+        if (user?.admissionCategory) {
+            setCategory(user.admissionCategory);
+        }
+    }, [user?.documents, user?.admissionCategory]);
+
     const isPremium = user?.subscription?.type === 'standard' || user?.subscription?.type === 'advance' || user?.isPremium === true;
     const t = TRANSLATIONS[language];
 
@@ -325,11 +335,15 @@ const DocumentVerificationScreen = () => {
                     status: 'pending', 
                     fileName: asset.name || 'document',
                     uri: fileUrl,
-                    createdAt: new Date().toISOString()
+                    createdAt: new Date().toISOString(),
+                    category: category // Tag the document with the category used during upload
                 } 
             };
 
-            const updateRes = await updateProfile({ documents: newUploads });
+            const updateRes = await updateProfile({ 
+                documents: newUploads,
+                admissionCategory: category // Ensure category is also saved
+            });
             
             if (updateRes.success) {
                 setUploads(newUploads);
@@ -465,7 +479,10 @@ const DocumentVerificationScreen = () => {
                         <TouchableOpacity 
                             key={cat} 
                             style={[styles.catTab, category === cat && styles.catTabActive]}
-                            onPress={() => setCategory(cat)}
+                            onPress={async () => {
+                                setCategory(cat);
+                                await updateProfile({ admissionCategory: cat });
+                            }}
                         >
                             <Text style={[styles.catTabText, category === cat && styles.catTabTextActive]}>{cat}</Text>
                         </TouchableOpacity>

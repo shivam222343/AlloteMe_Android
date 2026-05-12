@@ -9,7 +9,7 @@ import { authAPI } from '../services/api';
 import { 
     Users, FileText, CheckCircle, XCircle, Download, 
     ChevronRight, Search, DownloadCloud, FileCheck, 
-    Calendar, User, MessageSquare, ExternalLink, Info
+    Calendar, User, MessageSquare, ExternalLink, Info, AlertCircle, Tag
 } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -22,6 +22,7 @@ const AdminStudentDocumentsScreen = () => {
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [remark, setRemark] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isFetchingDetail, setIsFetchingDetail] = useState(false);
 
     useEffect(() => {
         fetchStudents();
@@ -31,13 +32,17 @@ const AdminStudentDocumentsScreen = () => {
         setLoading(true);
         try {
             const res = await authAPI.getAllUsers();
-            // Filter users who have documents submitted
-            const submitted = res.data.filter(u => u.documents && Object.keys(u.documents).length > 0);
+            // Show all students, as 'documents' field might only be available in full profile
+            const submitted = res.data.filter(u => u.role !== 'admin');
             
-            // Sort by most recent submission (assuming documents have createdAt)
+            // Sort by most recent submission or account creation as fallback
             const sorted = submitted.sort((a, b) => {
-                const latestA = Math.max(...Object.values(a.documents).map(d => new Date(d.createdAt).getTime() || 0));
-                const latestB = Math.max(...Object.values(b.documents).map(d => new Date(d.createdAt).getTime() || 0));
+                const latestA = a.documents ? Math.max(...Object.values(a.documents).map(d => new Date(d.createdAt).getTime() || 0)) : 0;
+                const latestB = b.documents ? Math.max(...Object.values(b.documents).map(d => new Date(d.createdAt).getTime() || 0)) : 0;
+                
+                if (latestA === 0 && latestB === 0) {
+                    return new Date(b.createdAt) - new Date(a.createdAt);
+                }
                 return latestB - latestA;
             });
 
@@ -60,6 +65,20 @@ const AdminStudentDocumentsScreen = () => {
         setFilteredStudents(filtered);
     };
 
+    const handleSelectStudent = async (student) => {
+        setIsFetchingDetail(true);
+        try {
+            // Fetch full user details to ensure we have the documents field
+            const res = await authAPI.getUserById(student._id);
+            setSelectedStudent(res.data);
+        } catch (error) {
+            console.error('Failed to fetch user details:', error);
+            Alert.alert("Error", "Failed to load document details.");
+        } finally {
+            setIsFetchingDetail(false);
+        }
+    };
+
     const handleVerify = async (docName, status) => {
         if (!selectedStudent) return;
         if (status === 'rejected' && !remark.trim()) {
@@ -77,15 +96,11 @@ const AdminStudentDocumentsScreen = () => {
                 verifiedAt: new Date().toISOString()
             };
 
-            // Update user role/profile on backend
-            // In this app, authAPI.updateUserRole is used for admin updates
             await authAPI.updateUserRole(selectedStudent._id, { documents: updatedDocs });
             
-            // Update local state
             const updatedStudent = { ...selectedStudent, documents: updatedDocs };
             setSelectedStudent(updatedStudent);
             
-            // Update students list
             setStudents(prev => prev.map(s => s._id === selectedStudent._id ? updatedStudent : s));
             
             Alert.alert("Success", `Document ${status} successfully.`);
@@ -123,8 +138,8 @@ const AdminStudentDocumentsScreen = () => {
             let csvContent = "Name,Email,Admission Category,Documents,Status\n";
             
             students.forEach(s => {
-                const docNames = Object.keys(s.documents).join("; ");
-                const statuses = Object.values(s.documents).map(d => d.status).join("; ");
+                const docNames = s.documents ? Object.keys(s.documents).join("; ") : "None";
+                const statuses = s.documents ? Object.values(s.documents).map(d => d.status).join("; ") : "None";
                 csvContent += `"${s.displayName}","${s.email}","${s.admissionCategory || 'OPEN'}","${docNames}","${statuses}"\n`;
             });
 
@@ -150,13 +165,13 @@ const AdminStudentDocumentsScreen = () => {
     };
 
     const renderStudentItem = ({ item }) => {
-        const docCount = Object.keys(item.documents).length;
-        const pendingCount = Object.values(item.documents).filter(d => d.status === 'pending').length;
+        const docCount = item.documents ? Object.keys(item.documents).length : 0;
+        const pendingCount = item.documents ? Object.values(item.documents).filter(d => d.status === 'pending').length : 0;
         
         return (
             <TouchableOpacity 
                 style={styles.studentCard}
-                onPress={() => setSelectedStudent(item)}
+                onPress={() => handleSelectStudent(item)}
             >
                 <View style={styles.studentInfo}>
                     <Text style={styles.studentName}>{item.displayName}</Text>
@@ -211,7 +226,7 @@ const AdminStudentDocumentsScreen = () => {
                         ListEmptyComponent={
                             <View style={styles.emptyBox}>
                                 <FileCheck size={48} color={Colors.divider} />
-                                <Text style={styles.emptyText}>No document submissions found.</Text>
+                                <Text style={styles.emptyText}>No students found.</Text>
                             </View>
                         }
                     />
@@ -219,109 +234,132 @@ const AdminStudentDocumentsScreen = () => {
 
                 {/* Detail Modal */}
                 <Modal
-                    visible={!!selectedStudent}
+                    visible={!!selectedStudent || isFetchingDetail}
                     animationType="slide"
                     transparent={true}
                     onRequestClose={() => setSelectedStudent(null)}
                 >
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <View>
-                                    <Text style={styles.modalTitle}>{selectedStudent?.displayName}</Text>
-                                    <Text style={styles.modalSub}>{selectedStudent?.email}</Text>
+                            {isFetchingDetail ? (
+                                <View style={styles.center}>
+                                    <ActivityIndicator size="large" color={Colors.primary} />
+                                    <Text style={{ marginTop: 12, color: Colors.text.tertiary }}>Loading documents...</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setSelectedStudent(null)}>
-                                    <XCircle size={24} color={Colors.text.tertiary} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                                <View style={styles.studentDetailBox}>
-                                    <View style={styles.detailItem}>
-                                        <User size={16} color={Colors.primary} />
-                                        <Text style={styles.detailLabel}>Category:</Text>
-                                        <Text style={styles.detailValue}>{selectedStudent?.admissionCategory || 'OPEN'}</Text>
+                            ) : (
+                                <>
+                                    <View style={styles.modalHeader}>
+                                        <View>
+                                            <Text style={styles.modalTitle}>{selectedStudent?.displayName}</Text>
+                                            <Text style={styles.modalSub}>{selectedStudent?.email}</Text>
+                                        </View>
+                                        <TouchableOpacity onPress={() => setSelectedStudent(null)}>
+                                            <XCircle size={24} color={Colors.text.tertiary} />
+                                        </TouchableOpacity>
                                     </View>
-                                    <View style={styles.detailItem}>
-                                        <Calendar size={16} color={Colors.primary} />
-                                        <Text style={styles.detailLabel}>Admission Path:</Text>
-                                        <Text style={styles.detailValue}>{selectedStudent?.admissionPath || 'General'}</Text>
-                                    </View>
-                                </View>
 
-                                <Text style={styles.sectionTitle}>Submitted Documents</Text>
-                                
-                                {selectedStudent && Object.entries(selectedStudent.documents).map(([name, doc]) => (
-                                    <View key={name} style={styles.docVerifyCard}>
-                                        <View style={styles.docHeader}>
-                                            <FileText size={18} color={Colors.text.primary} />
-                                            <Text style={styles.docName}>{name}</Text>
-                                            <View style={[
-                                                styles.statusBadge, 
-                                                doc.status === 'accepted' ? styles.statusAccepted : 
-                                                doc.status === 'rejected' ? styles.statusRejected : styles.statusPending
-                                            ]}>
-                                                <Text style={styles.statusText}>{doc.status.toUpperCase()}</Text>
+                                    <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                                        <View style={styles.studentDetailBox}>
+                                            <View style={styles.detailItem}>
+                                                <User size={16} color={Colors.primary} />
+                                                <Text style={styles.detailLabel}>Category:</Text>
+                                                <Text style={styles.detailValue}>{selectedStudent?.admissionCategory || 'OPEN'}</Text>
+                                            </View>
+                                            <View style={styles.detailItem}>
+                                                <Calendar size={16} color={Colors.primary} />
+                                                <Text style={styles.detailLabel}>Admission Path:</Text>
+                                                <Text style={styles.detailValue}>{selectedStudent?.admissionPath || 'General'}</Text>
                                             </View>
                                         </View>
 
-                                        <View style={styles.docActions}>
-                                            <TouchableOpacity 
-                                                style={styles.viewDocBtn}
-                                                onPress={() => handleDownload(doc.uri, `${selectedStudent.displayName}_${name}.pdf`)}
-                                            >
-                                                <ExternalLink size={14} color={Colors.primary} />
-                                                <Text style={styles.viewDocText}>View / Download</Text>
-                                            </TouchableOpacity>
-                                        </View>
+                                        <Text style={styles.sectionTitle}>Submitted Documents</Text>
+                                        
+                                        {selectedStudent?.documents && Object.keys(selectedStudent.documents).length > 0 ? (
+                                            Object.entries(selectedStudent.documents).map(([name, doc]) => (
+                                                <View key={name} style={styles.docVerifyCard}>
+                                                    <View style={styles.docHeader}>
+                                                        <FileText size={18} color={Colors.text.primary} />
+                                                        <Text style={styles.docName}>{name}</Text>
+                                                        <View style={[
+                                                            styles.statusBadge, 
+                                                            doc.status === 'accepted' || doc.status === 'verified' ? styles.statusAccepted : 
+                                                            doc.status === 'rejected' ? styles.statusRejected : styles.statusPending
+                                                        ]}>
+                                                            <Text style={styles.statusText}>{(doc.status || 'pending').toUpperCase()}</Text>
+                                                        </View>
+                                                    </View>
 
-                                        {doc.status === 'pending' && (
-                                            <View style={styles.verifyControls}>
-                                                <TextInput 
-                                                    style={styles.remarkInput}
-                                                    placeholder="Remark (optional for accept, required for reject)"
-                                                    value={remark}
-                                                    onChangeText={setRemark}
-                                                />
-                                                <View style={styles.btnGroup}>
-                                                    <TouchableOpacity 
-                                                        style={[styles.verifyBtn, styles.rejectBtn]}
-                                                        onPress={() => handleVerify(name, 'rejected')}
-                                                        disabled={isProcessing}
-                                                    >
-                                                        <XCircle size={16} color="#fff" />
-                                                        <Text style={styles.verifyBtnText}>Reject</Text>
-                                                    </TouchableOpacity>
-                                                    <TouchableOpacity 
-                                                        style={[styles.verifyBtn, styles.acceptBtn]}
-                                                        onPress={() => handleVerify(name, 'accepted')}
-                                                        disabled={isProcessing}
-                                                    >
-                                                        <CheckCircle size={16} color="#fff" />
-                                                        <Text style={styles.verifyBtnText}>Accept</Text>
-                                                    </TouchableOpacity>
+                                                    {doc.category && (
+                                                        <View style={styles.docCategoryBadge}>
+                                                            <Tag size={10} color={Colors.primary} />
+                                                            <Text style={styles.docCategoryText}>{doc.category}</Text>
+                                                        </View>
+                                                    )}
+
+                                                    <View style={styles.docActions}>
+                                                        <TouchableOpacity 
+                                                            style={styles.viewDocBtn}
+                                                            onPress={() => handleDownload(doc.uri, `${selectedStudent.displayName}_${name}.pdf`)}
+                                                        >
+                                                            <ExternalLink size={14} color={Colors.primary} />
+                                                            <Text style={styles.viewDocText}>View / Download</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+
+                                                    {doc.status === 'pending' && (
+                                                        <View style={styles.verifyControls}>
+                                                            <TextInput 
+                                                                style={styles.remarkInput}
+                                                                placeholder="Remark (optional for accept, required for reject)"
+                                                                value={remark}
+                                                                onChangeText={setRemark}
+                                                            />
+                                                            <View style={styles.btnGroup}>
+                                                                <TouchableOpacity 
+                                                                    style={[styles.verifyBtn, styles.rejectBtn]}
+                                                                    onPress={() => handleVerify(name, 'rejected')}
+                                                                    disabled={isProcessing}
+                                                                >
+                                                                    <XCircle size={16} color="#fff" />
+                                                                    <Text style={styles.verifyBtnText}>Reject</Text>
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity 
+                                                                    style={[styles.verifyBtn, styles.acceptBtn]}
+                                                                    onPress={() => handleVerify(name, 'accepted')}
+                                                                    disabled={isProcessing}
+                                                                >
+                                                                    <CheckCircle size={16} color="#fff" />
+                                                                    <Text style={styles.verifyBtnText}>Accept</Text>
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+                                                    )}
+
+                                                    {doc.remark ? (
+                                                        <View style={styles.remarkBox}>
+                                                            <MessageSquare size={14} color="#64748B" />
+                                                            <Text style={styles.remarkText}>{doc.remark}</Text>
+                                                        </View>
+                                                    ) : null}
                                                 </View>
+                                            ))
+                                        ) : (
+                                            <View style={styles.emptyDetailBox}>
+                                                <AlertCircle size={24} color={Colors.text.tertiary} />
+                                                <Text style={styles.emptyDetailText}>No documents uploaded yet.</Text>
                                             </View>
                                         )}
-
-                                        {doc.remark ? (
-                                            <View style={styles.remarkBox}>
-                                                <MessageSquare size={14} color="#64748B" />
-                                                <Text style={styles.remarkText}>{doc.remark}</Text>
-                                            </View>
-                                        ) : null}
-                                    </View>
-                                ))}
-                                
-                                <View style={styles.cleanupNotice}>
-                                    <Info size={14} color="#64748B" />
-                                    <Text style={styles.cleanupText}>
-                                        Note: Verified documents are automatically scheduled for deletion from the server after 7 days.
-                                    </Text>
-                                </View>
-                                <View style={{ height: 40 }} />
-                            </ScrollView>
+                                        
+                                        <View style={styles.cleanupNotice}>
+                                            <Info size={14} color="#64748B" />
+                                            <Text style={styles.cleanupText}>
+                                                Note: Verified documents are automatically scheduled for deletion from the server after 7 days.
+                                            </Text>
+                                        </View>
+                                        <View style={{ height: 40 }} />
+                                    </ScrollView>
+                                </>
+                            )}
                         </View>
                     </View>
                 </Modal>
@@ -431,7 +469,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row', gap: 8, padding: 16, 
         backgroundColor: '#F8FAFC', borderRadius: 12, marginTop: 10 
     },
-    cleanupText: { fontSize: 11, color: '#64748B', flex: 1 }
+    cleanupText: { fontSize: 11, color: '#64748B', flex: 1 },
+    docCategoryBadge: { 
+        flexDirection: 'row', alignItems: 'center', gap: 4, 
+        backgroundColor: '#F1F5F9', alignSelf: 'flex-start', 
+        paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginBottom: 12 
+    },
+    docCategoryText: { fontSize: 10, fontWeight: 'bold', color: Colors.text.secondary },
+    emptyDetailBox: { padding: 40, alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#CBD5E1' },
+    emptyDetailText: { marginTop: 8, color: Colors.text.tertiary, fontSize: 13 }
 });
 
 export default AdminStudentDocumentsScreen;

@@ -173,21 +173,30 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Account Details</Text>
+                    <Text style={styles.sectionTitle}>Document Verification</Text>
                     <View style={styles.card}>
-                        <InfoRow icon={Mail} label="Email Address" value={user.email} />
-                        <InfoRow icon={Phone} label="Mobile Number" value={user.phoneNumber ? `+91 ${user.phoneNumber}` : null} />
-                        <InfoRow icon={MapPin} label="Location" value={user.location} />
-                        <InfoRow icon={Calendar} label="Last Active" value={user.isOnline ? 'Active now' : new Date(user.lastActive).toLocaleString()} />
-                        <InfoRow icon={Clock} label="Account Created" value={new Date(user.createdAt).toLocaleDateString()} />
-                        <View style={styles.statusRow}>
-                            <View style={[styles.statusBadge, user.isVerified ? styles.verifiedBadge : styles.unverifiedBadge]}>
-                                {user.isVerified ? <CheckCircle2 size={12} color={Colors.success} /> : <AlertCircle size={12} color={Colors.error} />}
-                                <Text style={[styles.statusText, user.isVerified ? styles.verifiedText : styles.unverifiedText]}>
-                                    {user.isVerified ? 'Verified' : 'Unverified'}
-                                </Text>
+                        {user.documents && Object.keys(user.documents).length > 0 ? (
+                            <View>
+                                <View style={styles.docStats}>
+                                    <FileText size={20} color={Colors.primary} />
+                                    <Text style={styles.docStatsText}>
+                                        {Object.keys(user.documents).length} Documents Submitted
+                                    </Text>
+                                </View>
+                                <TouchableOpacity 
+                                    style={styles.manageDocsBtn}
+                                    onPress={() => navigation.navigate('AdminStudentDocuments', { search: user.email })}
+                                >
+                                    <Text style={styles.manageDocsText}>Manage Documents</Text>
+                                    <ChevronRight size={16} color="#fff" />
+                                </TouchableOpacity>
                             </View>
-                        </View>
+                        ) : (
+                            <View style={styles.emptyDocsBox}>
+                                <AlertCircle size={20} color={Colors.text.tertiary} />
+                                <Text style={styles.emptyDocsText}>No documents uploaded yet.</Text>
+                            </View>
+                        )}
                     </View>
                 </View>
 
@@ -478,7 +487,17 @@ const styles = StyleSheet.create({
         borderRadius: 20
     },
     tagDot: { width: 6, height: 6, borderRadius: 3 },
-    tagText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 }
+    tagText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+    docStats: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+    docStatsText: { fontSize: 15, fontWeight: 'bold', color: Colors.text.primary },
+    manageDocsBtn: { 
+        backgroundColor: Colors.primary, flexDirection: 'row', 
+        alignItems: 'center', justifyContent: 'center', gap: 8, 
+        paddingVertical: 12, borderRadius: 12, ...Shadows.sm 
+    },
+    manageDocsText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+    emptyDocsBox: { paddingVertical: 12, alignItems: 'center', gap: 8 },
+    emptyDocsText: { fontSize: 13, color: Colors.text.tertiary, fontStyle: 'italic' }
 });
 
 export default AdminUserDetailScreen;
