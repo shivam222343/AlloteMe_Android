@@ -225,7 +225,7 @@ const DOCUMENT_DISPLAY_NAMES = {
 };
 
 const DocumentVerificationScreen = () => {
-    const { user } = useAuth();
+    const { user, updateProfile } = useAuth();
     const [checklist, setChecklist] = useState({});
     const [category, setCategory] = useState(user?.admissionCategory || 'OPEN');
     const [infoModal, setInfoModal] = useState({ visible: false, title: '', content: '' });
