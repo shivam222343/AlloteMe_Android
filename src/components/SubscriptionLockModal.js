@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
 import { Colors, Shadows } from '../constants/theme';
-import { Lock, Sparkles, Zap, ChevronRight, X } from 'lucide-react-native';
+import { Lock, Sparkles, Zap, ChevronRight, X, BadgePercent } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 
 const SubscriptionLockModal = () => {
-    const { subscriptionModal, setSubscriptionModal } = useAuth();
+    const { user, subscriptionModal, setSubscriptionModal } = useAuth();
     const navigation = useNavigation();
 
     if (!subscriptionModal.visible) return null;
@@ -24,6 +24,8 @@ const SubscriptionLockModal = () => {
         setSubscriptionModal({ visible: false, feature: '' });
         navigation.navigate('Pricing');
     };
+
+    const isRenewal = user?.subscription?.type === 'standard' || user?.subscription?.type === 'advance';
 
     return (
         <Modal
@@ -48,11 +50,29 @@ const SubscriptionLockModal = () => {
                         <Lock size={32} color={Colors.primary} />
                     </LinearGradient>
 
-                    <Text style={styles.title}>Feature Locked</Text>
+                    <Text style={styles.title}>{isRenewal ? 'Limit Reached' : 'Feature Locked'}</Text>
                     <Text style={styles.subtitle}>
-                        You've reached your free limit for {'\n'}
+                        You've reached your {isRenewal ? 'plan' : 'free'} limit for {'\n'}
                         <Text style={styles.highlight}>{featureNames[subscriptionModal.feature] || 'this feature'}</Text>.
                     </Text>
+
+                    {isRenewal ? (
+                        <View style={styles.promoBanner}>
+                            <BadgePercent size={20} color="#F59E0B" />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.promoTitle}>Special Renewal Offer!</Text>
+                                <Text style={styles.promoText}>Renew now and get <Text style={{fontWeight: 'bold'}}>30% OFF</Text> on any plan.</Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={styles.promoBanner}>
+                            <Sparkles size={20} color="#F59E0B" />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.promoTitle}>Unlock Premium Access</Text>
+                                <Text style={styles.promoText}>Get unlimited AI counseling and accurate predictions.</Text>
+                            </View>
+                        </View>
+                    )}
 
                     <View style={styles.perksList}>
                         <View style={styles.perkItem}>
@@ -75,7 +95,7 @@ const SubscriptionLockModal = () => {
                             end={{ x: 1, y: 0 }}
                             style={styles.upgradeBtn}
                         >
-                            <Text style={styles.upgradeText}>Upgrade Now</Text>
+                            <Text style={styles.upgradeText}>{isRenewal ? 'Renew with 30% OFF' : 'Upgrade Now'}</Text>
                             <ChevronRight size={18} color="white" />
                         </LinearGradient>
                     </TouchableOpacity>
@@ -139,6 +159,29 @@ const styles = StyleSheet.create({
     highlight: {
         color: Colors.primary,
         fontWeight: 'bold'
+    },
+    promoBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#FFFBEB',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#FEF3C7',
+        marginBottom: 20,
+        width: '100%'
+    },
+    promoTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#92400E',
+        marginBottom: 2
+    },
+    promoText: {
+        fontSize: 12,
+        color: '#B45309',
+        lineHeight: 18
     },
     perksList: {
         width: '100%',

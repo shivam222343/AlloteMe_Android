@@ -668,6 +668,46 @@ const deleteCutoffs = async (req, res) => {
     }
 };
 
+const getCutoffSummary = async (req, res) => {
+    try {
+        const summary = await Cutoff.aggregate([
+            {
+                $group: {
+                    _id: { collegeId: "$collegeId", year: "$year", round: "$round" }
+                }
+            },
+            {
+                $group: {
+                    _id: { collegeId: "$_id.collegeId", year: "$_id.year" },
+                    rounds: { $addToSet: "$_id.round" }
+                }
+            },
+            {
+                $group: {
+                    _id: "$_id.collegeId",
+                    years: {
+                        $push: {
+                            year: "$_id.year",
+                            rounds: "$rounds"
+                        }
+                    }
+                }
+            }
+        ]);
+
+        const summaryDict = {};
+        summary.forEach(item => {
+            if(item._id) {
+                summaryDict[item._id] = item.years;
+            }
+        });
+
+        res.json(summaryDict);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     addCutoffData,
     bulkAddCutoffData,
@@ -676,5 +716,6 @@ module.exports = {
     getCutoffsByInstitution,
     predictColleges,
     deleteCutoffs,
-    estimateRank
+    estimateRank,
+    getCutoffSummary
 };

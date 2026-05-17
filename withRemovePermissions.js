@@ -13,8 +13,11 @@ module.exports = function withRemovePermissions(config) {
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
       'android.permission.READ_MEDIA_AUDIO',
+      'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+      'android.permission.ACCESS_MEDIA_LOCATION',
       'android.permission.READ_EXTERNAL_STORAGE',
       'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.MANAGE_EXTERNAL_STORAGE'
     ];
 
     // Ensure the permissions array exists
@@ -26,7 +29,7 @@ module.exports = function withRemovePermissions(config) {
     permissionsToRemove.forEach(permission => {
         // Remove existing if any
         androidManifest['uses-permission'] = androidManifest['uses-permission'].filter(
-            p => p.$['android:name'] !== permission
+            p => p.$ && p.$['android:name'] !== permission
         );
         
         // Add forced remove entry
@@ -41,3 +44,4 @@ module.exports = function withRemovePermissions(config) {
     return config;
   });
 };
+

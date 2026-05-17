@@ -23,6 +23,7 @@ const UploadCutoffScreen = ({ navigation }) => {
     const [jsonText, setJsonText] = useState('');
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [bulkParsedData, setBulkParsedData] = useState(null);
+    const [cutoffSummary, setCutoffSummary] = useState({});
 
     const [metaData, setMetaData] = useState({
         examType: (admissionPath || 'MHTCET').toUpperCase(),
@@ -90,11 +91,20 @@ const UploadCutoffScreen = ({ navigation }) => {
     }, [admissionPath]);
 
     const fetchInstitutions = async () => {
+        setLoading(true);
         try {
-            const res = await institutionAPI.getAll(admissionPath);
-            setInstitutions(res.data);
+            const [resInst, resSummary] = await Promise.all([
+                institutionAPI.getAll(admissionPath),
+                cutoffAPI.getSummary()
+            ]);
+            setInstitutions(resInst.data);
+            if (resSummary.data) {
+                setCutoffSummary(resSummary.data);
+            }
         } catch (error) {
-            Alert.alert('Error', 'Failed to fetch institutions');
+            Alert.alert('Error', 'Failed to fetch data');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -225,6 +235,83 @@ const UploadCutoffScreen = ({ navigation }) => {
         }
     };
 
+    const renderStatusDots = (collegeId) => {
+        const yearsData = cutoffSummary[collegeId];
+        if (!yearsData || yearsData.length === 0) return null;
+        
+        // Sort years descending
+        const sortedYears = [...yearsData].sort((a, b) => b.year - a.year);
+        
+        const maxDots = 3;
+        const dotsToShow = sortedYears.slice(0, maxDots);
+        const extraCount = sortedYears.length > maxDots ? sortedYears.length - maxDots : 0;
+        
+        return (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                {dotsToShow.map((data, index) => {
+                    const numRounds = data.rounds.map(r => Number(r));
+                    const hasR1 = numRounds.includes(1);
+                    const hasR2 = numRounds.includes(2);
+                    const hasR3 = numRounds.includes(3);
+
+                    const coreColor = '#10b981'; // Green dot
+
+                    let dotComponent;
+                    if (hasR1 && hasR2) {
+                        dotComponent = (
+                            <View style={{
+                                width: 14, height: 14, borderRadius: 7,
+                                borderWidth: 2, borderColor: '#3b82f6', // Blue for R2
+                                justifyContent: 'center', alignItems: 'center'
+                            }}>
+                                <View style={{
+                                    width: 10, height: 10, borderRadius: 5,
+                                    borderWidth: 2, borderColor: '#f59e0b', // Yellow for R1
+                                    justifyContent: 'center', alignItems: 'center'
+                                }}>
+                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: coreColor }} />
+                                </View>
+                            </View>
+                        );
+                    } else if (hasR1 || hasR2 || hasR3) {
+                        dotComponent = (
+                            <View style={{
+                                width: 12, height: 12, borderRadius: 6,
+                                borderWidth: 2, borderColor: hasR1 ? '#f59e0b' : (hasR2 ? '#3b82f6' : '#8b5cf6'),
+                                justifyContent: 'center', alignItems: 'center'
+                            }}>
+                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: coreColor }} />
+                            </View>
+                        );
+                    } else {
+                        dotComponent = <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: coreColor }} />;
+                    }
+
+                    return (
+                        <View key={index} style={{ alignItems: 'center' }}>
+                            {dotComponent}
+                            <Text style={{ fontSize: 8, color: Colors.text.tertiary, marginTop: 2 }}>{data.year}</Text>
+                        </View>
+                    );
+                })}
+                {extraCount > 0 && (
+                    <View style={{ alignItems: 'center', justifyContent: 'flex-start', height: '100%' }}>
+                        <View style={{ 
+                            width: 16, height: 16, borderRadius: 8, 
+                            backgroundColor: Colors.primary + '20', 
+                            justifyContent: 'center', alignItems: 'center' 
+                        }}>
+                            <Text style={{ fontSize: 9, fontWeight: 'bold', color: Colors.primary }}>
+                                +{extraCount}
+                            </Text>
+                        </View>
+                        <Text style={{ fontSize: 8, color: 'transparent', marginTop: 2 }}>-</Text>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
     const renderStepContent = () => {
         switch (step) {
             case 1: // Select Institution
@@ -240,37 +327,45 @@ const UploadCutoffScreen = ({ navigation }) => {
                                 placeholderTextColor={Colors.text.tertiary}
                             />
                         </View>
-                        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                            {filteredInstitutions.map(inst => (
-                                <TouchableOpacity
-                                    key={inst._id}
-                                    style={[styles.instItem, selectedInst?._id === inst._id && styles.selectedItem]}
-                                    onPress={() => {
-                                        setSelectedInst(inst);
-                                        setStep(2);
-                                        // Reset branch selection when switching inst
-                                        setSelectedBranch(null);
-                                        setIsBulkMode(false);
-                                    }}
-                                >
-                                    <View style={styles.instIconBg}>
-                                        <Building2 size={20} color={Colors.primary} />
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                                            <Text style={styles.instName}>{inst.name}</Text>
-                                            {inst.dteCode && (
-                                                <View style={styles.dteBadge}>
-                                                    <Text style={styles.dteBadgeText}>{inst.dteCode}</Text>
-                                                </View>
-                                            )}
+                        {loading && institutions.length === 0 ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color={Colors.primary} />
+                                <Text style={styles.loadingText}>Fetching Colleges...</Text>
+                            </View>
+                        ) : (
+                            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                                {filteredInstitutions.map(inst => (
+                                    <TouchableOpacity
+                                        key={inst._id}
+                                        style={[styles.instItem, selectedInst?._id === inst._id && styles.selectedItem]}
+                                        onPress={() => {
+                                            setSelectedInst(inst);
+                                            setStep(2);
+                                            // Reset branch selection when switching inst
+                                            setSelectedBranch(null);
+                                            setIsBulkMode(false);
+                                        }}
+                                    >
+                                        <View style={styles.instIconBg}>
+                                            <Building2 size={20} color={Colors.primary} />
                                         </View>
-                                        <Text style={styles.instLoc}>{inst.location?.city || 'Location N/A'}</Text>
-                                    </View>
-                                    <ChevronRight size={20} color={Colors.divider} />
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                                                <Text style={styles.instName}>{inst.name}</Text>
+                                                {inst.dteCode && (
+                                                    <View style={styles.dteBadge}>
+                                                        <Text style={styles.dteBadgeText}>{inst.dteCode}</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={styles.instLoc}>{inst.location?.city || 'Location N/A'}</Text>
+                                            {renderStatusDots(inst._id)}
+                                        </View>
+                                        <ChevronRight size={20} color={Colors.divider} />
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        )}
                     </View>
                 );
 
@@ -530,6 +625,8 @@ const styles = StyleSheet.create({
 
     dteBadge: { backgroundColor: Colors.primary + '10', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: Colors.primary + '30' },
     dteBadgeText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+    loadingText: { marginTop: 12, fontSize: 14, color: Colors.text.tertiary, fontWeight: '500' }
 });
 
 export default UploadCutoffScreen;

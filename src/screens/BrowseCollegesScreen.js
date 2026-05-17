@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SectionList, TouchableOpacity, Image, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import { institutionAPI, authAPI } from '../services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { Search, MapPin, Star, Pencil, Info, Trash2, ArrowUpDown, Filter, ChevronDown, Check } from 'lucide-react-native';
@@ -20,8 +21,8 @@ const BrowseCollegesScreen = ({ navigation }) => {
     const [savingId, setSavingId] = useState(null);
     const [sortBy, setSortBy] = useState('default'); // 'default', 'fees-low', 'fees-high', 'rating', 'name'
     const [activeCity, setActiveCity] = useState('All Cities');
-    const [showSortModal, setShowSortModal] = useState(false);
-    const [showCityModal, setShowCityModal] = useState(false);
+    const [showFilterModal, setShowFilterModal] = useState(false);
+    const [selectedType, setSelectedType] = useState('All');
 
     const tabs = ['All', 'Autonomous', 'Government', 'Private', 'Deemed'];
     const sortOptions = [
@@ -91,18 +92,18 @@ const BrowseCollegesScreen = ({ navigation }) => {
         );
     };
 
-    const handleFilter = (text, tab, sort = sortBy, city = activeCity) => {
+    const handleFilter = (text, type = selectedType, sort = sortBy, city = activeCity) => {
         setSearch(text);
-        setActiveTab(tab);
+        setSelectedType(type);
         setSortBy(sort);
         setActiveCity(city);
 
         let filteredData = institutions.filter(item => {
             const matchesSearch = item.name.toLowerCase().includes(text.toLowerCase()) ||
                 (item.university && item.university.toLowerCase().includes(text.toLowerCase()));
-            const matchesTab = tab === 'All' || item.type.includes(tab);
+            const matchesType = type === 'All' || item.type.includes(type);
             const matchesCity = city === 'All Cities' || item.location?.city === city;
-            return matchesSearch && matchesTab && matchesCity;
+            return matchesSearch && matchesType && matchesCity;
         });
 
         // Apply Sorting
@@ -111,12 +112,32 @@ const BrowseCollegesScreen = ({ navigation }) => {
         } else if (sort === 'fees-high') {
             filteredData.sort((a, b) => (b.feesPerYear || 0) - (a.feesPerYear || 0));
         } else if (sort === 'rating') {
-            filteredData.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+            filteredData.sort((a, b) => (b.rating?.value || 0) - (a.rating?.value || 0));
         } else if (sort === 'name') {
             filteredData.sort((a, b) => a.name.localeCompare(b.name));
         }
 
         setFiltered(filteredData);
+    };
+
+    const getSections = () => {
+        if (filtered.length === 0) return [];
+
+        // Group by city
+        const groups = filtered.reduce((acc, inst) => {
+            const city = inst.location?.city || 'Other Cities';
+            if (!acc[city]) acc[city] = [];
+            acc[city].push(inst);
+            return acc;
+        }, {});
+
+        // Convert to SectionList format
+        const citySections = Object.keys(groups).sort().map(city => ({
+            title: city,
+            data: groups[city]
+        }));
+
+        return citySections;
     };
 
     const handleToggleSave = async (id) => {
@@ -217,9 +238,32 @@ const BrowseCollegesScreen = ({ navigation }) => {
         );
     };
 
-    const renderSectionHeader = ({ section: { title, isSearch } }) => {
-        if (isSearch) {
-            return (
+    const renderSectionHeader = ({ section: { title } }) => {
+        return (
+            <View style={styles.citySectionHeader}>
+                <MapPin size={14} color={Colors.primary} />
+                <Text style={styles.citySectionTitle}>{title}</Text>
+                <View style={styles.citySectionLine} />
+            </View>
+        );
+    };
+
+    const ListHeader = () => (
+        <View style={styles.topSection}>
+            <View style={styles.titleRow}>
+                <View>
+                    <Text style={styles.title}>Explore Colleges</Text>
+                    <Text style={styles.subtitle}>{filtered.length} institutes available</Text>
+                </View>
+            </View>
+        </View>
+    );
+
+    const sections = getSections();
+
+    return (
+        <MainLayout scrollable={false} noPadding>
+            <View style={styles.container}>
                 <View style={styles.stickySearchContainer}>
                     <View style={styles.searchBar}>
                         <Search size={20} color={Colors.text.tertiary} />
@@ -227,63 +271,20 @@ const BrowseCollegesScreen = ({ navigation }) => {
                             style={styles.searchInput}
                             placeholder="Search colleges..."
                             value={search}
-                            onChangeText={(t) => handleFilter(t, activeTab)}
+                            onChangeText={(t) => handleFilter(t)}
                         />
+                        <TouchableOpacity 
+                            style={styles.searchFilterBtn}
+                            onPress={() => setShowFilterModal(true)}
+                        >
+                            <Filter size={18} color={Colors.primary} />
+                            {(sortBy !== 'default' || activeCity !== 'All Cities' || selectedType !== 'All') && (
+                                <View style={styles.filterDot} />
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
-            );
-        }
-        return null;
-    };
 
-    const ListHeader = () => (
-        <View style={styles.topSection}>
-            <Text style={styles.title}>Explore Colleges</Text>
-            
-            <View style={styles.filterOptions}>
-                <TouchableOpacity style={styles.filterBtn} onPress={() => setShowSortModal(true)}>
-                    <ArrowUpDown size={14} color={Colors.primary} />
-                    <Text style={styles.filterBtnText}>
-                        {sortOptions.find(o => o.id === sortBy)?.label.split(':')[0] || 'Sort'}
-                    </Text>
-                    <ChevronDown size={14} color={Colors.text.tertiary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.filterBtn} onPress={() => setShowCityModal(true)}>
-                    <MapPin size={14} color={Colors.primary} />
-                    <Text style={styles.filterBtnText} numberOfLines={1}>{activeCity}</Text>
-                    <ChevronDown size={14} color={Colors.text.tertiary} />
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.tabBar}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab;
-                        return (
-                            <TouchableOpacity
-                                key={tab}
-                                style={[styles.tabItem, isActive && styles.activeTabItem]}
-                                onPress={() => handleFilter(search, tab)}
-                            >
-                                <Text style={[styles.tabItemText, isActive && styles.activeTabItemText]}>{tab}</Text>
-                                {isActive && <View style={styles.activeLine} />}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-            </View>
-        </View>
-    );
-
-    const sections = [
-        { title: 'Search', isSearch: true, data: [] },
-        { title: 'Colleges', data: filtered || [] }
-    ];
-
-    return (
-        <MainLayout scrollable={false} noPadding>
-            <View style={styles.container}>
                 {loading && institutions.length === 0 ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={Colors.primary} />
@@ -291,105 +292,115 @@ const BrowseCollegesScreen = ({ navigation }) => {
                     </View>
                 ) : (
                     <SectionList
-                    sections={sections}
-                    keyExtractor={(item) => item._id}
-                    renderItem={({ item }) => <InstitutionCard item={item} />}
-                    renderSectionHeader={renderSectionHeader}
-                    ListHeaderComponent={ListHeader}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                    stickySectionHeadersEnabled={true}
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <View style={styles.emptyIconContainer}>
-                                <Search size={48} color={Colors.primary + '40'} />
-                                <View style={styles.emptyCircle} />
+                        sections={sections}
+                        keyExtractor={(item) => item._id}
+                        renderItem={({ item }) => <InstitutionCard item={item} />}
+                        renderSectionHeader={renderSectionHeader}
+                        ListHeaderComponent={ListHeader}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                        stickySectionHeadersEnabled={true}
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <View style={styles.emptyIconContainer}>
+                                    <Search size={48} color={Colors.primary + '40'} />
+                                </View>
+                                <Text style={styles.emptyTitle}>
+                                    {loading ? 'Fetching Institutes...' : 'No Colleges Found'}
+                                </Text>
+                                <Text style={styles.emptySubText}>
+                                    {loading
+                                        ? 'Connecting to high-speed admission database...'
+                                        : `We couldn't find any ${selectedType !== 'All' ? selectedType : ''} colleges matching your filters in ${activeCity}.`}
+                                </Text>
+                                {!loading && (
+                                    <TouchableOpacity
+                                        style={styles.resetBtn}
+                                        onPress={() => handleFilter('', 'All', 'default', 'All Cities')}
+                                    >
+                                        <Text style={styles.resetBtnText}>Clear All Filters</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
-                            <Text style={styles.emptyTitle}>
-                                {loading ? 'Fetching Institutes...' : 'No Colleges Found'}
-                            </Text>
-                            <Text style={styles.emptySubText}>
-                                {loading
-                                    ? 'Connecting to high-speed admission database...'
-                                    : `We couldn't find any ${activeTab !== 'All' ? activeTab : ''} colleges matching your filters in ${activeCity}.`}
-                            </Text>
-                            {!loading && (
-                                <TouchableOpacity
-                                    style={styles.resetBtn}
-                                    onPress={() => handleFilter('', 'All', 'default', 'All Cities')}
-                                >
-                                    <Text style={styles.resetBtnText}>Clear All Filters</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                    }
-                />
+                        }
+                    />
                 )}
             </View>
 
-            {/* Sort Modal */}
+            {/* Unified Filter Modal */}
             <Modal
-                visible={showSortModal}
+                visible={showFilterModal}
                 animationType="slide"
                 transparent={true}
-                onRequestClose={() => setShowSortModal(false)}
+                onRequestClose={() => setShowFilterModal(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={styles.modalContentExtended}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Sort By</Text>
-                            <TouchableOpacity onPress={() => setShowSortModal(false)} style={styles.closeBtn}>
-                                <Check size={20} color={Colors.primary} />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Filter size={20} color={Colors.primary} />
+                                <Text style={styles.modalTitle}>Filters & Sorting</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowFilterModal(false)} style={styles.closeBtn}>
+                                <Check size={24} color={Colors.primary} />
                             </TouchableOpacity>
                         </View>
-                        {sortOptions.map(opt => (
-                            <TouchableOpacity
-                                key={opt.id}
-                                style={[styles.modalItem, sortBy === opt.id && styles.activeModalItem]}
+
+                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                            <Text style={styles.filterLabel}>Institution Type</Text>
+                            <View style={styles.filterGrid}>
+                                {tabs.map(type => (
+                                    <TouchableOpacity 
+                                        key={type} 
+                                        style={[styles.filterChip, selectedType === type && styles.filterChipActive]}
+                                        onPress={() => handleFilter(search, type)}
+                                    >
+                                        <Text style={[styles.filterChipText, selectedType === type && styles.filterChipTextActive]}>{type}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.filterLabel}>Sort By</Text>
+                            <View style={styles.filterGrid}>
+                                {sortOptions.map(opt => (
+                                    <TouchableOpacity 
+                                        key={opt.id} 
+                                        style={[styles.filterChip, sortBy === opt.id && styles.filterChipActive]}
+                                        onPress={() => handleFilter(search, selectedType, opt.id)}
+                                    >
+                                        <opt.icon size={14} color={sortBy === opt.id ? Colors.primary : Colors.text.tertiary} />
+                                        <Text style={[styles.filterChipText, sortBy === opt.id && styles.filterChipTextActive]}>{opt.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.filterLabel}>Select City</Text>
+                            <View style={styles.filterGrid}>
+                                {cities.map(city => (
+                                    <TouchableOpacity 
+                                        key={city} 
+                                        style={[styles.filterChip, activeCity === city && styles.filterChipActive]}
+                                        onPress={() => handleFilter(search, selectedType, sortBy, city)}
+                                    >
+                                        <Text style={[styles.filterChipText, activeCity === city && styles.filterChipTextActive]}>{city}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Button 
+                                title="Apply Filters" 
+                                onPress={() => setShowFilterModal(false)}
+                                style={{ marginTop: 30 }}
+                            />
+                            <TouchableOpacity 
+                                style={styles.clearAllBtn}
                                 onPress={() => {
-                                    handleFilter(search, activeTab, opt.id);
-                                    setShowSortModal(false);
+                                    handleFilter('', 'All', 'default', 'All Cities');
+                                    setShowFilterModal(false);
                                 }}
                             >
-                                <opt.icon size={20} color={sortBy === opt.id ? Colors.primary : Colors.text.tertiary} />
-                                <Text style={[styles.modalItemText, sortBy === opt.id && styles.activeModalItemText]}>{opt.label}</Text>
-                                {sortBy === opt.id && <Check size={18} color={Colors.primary} />}
+                                <Text style={styles.clearAllText}>Reset All</Text>
                             </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            </Modal>
-
-            {/* City Modal */}
-            <Modal
-                visible={showCityModal}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowCityModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Select City</Text>
-                            <TouchableOpacity onPress={() => setShowCityModal(false)} style={styles.closeBtn}>
-                                <Check size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        </View>
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            {cities.map(city => (
-                                <TouchableOpacity
-                                    key={city}
-                                    style={[styles.modalItem, activeCity === city && styles.activeModalItem]}
-                                    onPress={() => {
-                                        handleFilter(search, activeTab, sortBy, city);
-                                        setShowCityModal(false);
-                                    }}
-                                >
-                                    <MapPin size={20} color={activeCity === city ? Colors.primary : Colors.text.tertiary} />
-                                    <Text style={[styles.modalItemText, activeCity === city && styles.activeModalItemText]}>{city}</Text>
-                                    {activeCity === city && <Check size={18} color={Colors.primary} />}
-                                </TouchableOpacity>
-                            ))}
                         </ScrollView>
                     </View>
                 </View>
@@ -400,146 +411,93 @@ const BrowseCollegesScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.white },
-    topSection: { paddingTop: 20, paddingHorizontal: 20, backgroundColor: Colors.white },
-    stickySearchContainer: {
-        backgroundColor: Colors.white,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        zIndex: 10,
+    topSection: { paddingTop: 20, paddingHorizontal: 20, backgroundColor: Colors.white, paddingBottom: 10 },
+    titleRow: { marginBottom: 12 },
+    title: { fontSize: 26, fontWeight: 'bold', color: Colors.text.primary },
+    subtitle: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
+    
+    stickySearchContainer: { 
+        backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 12, ...Shadows.sm 
     },
-    title: { fontSize: 28, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 16 },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        height: 48,
+    searchBar: { 
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', 
+        borderRadius: 16, paddingHorizontal: 16, height: 56, gap: 12 
     },
-    searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: Colors.text.primary },
-    filterOptions: { flexDirection: 'row', gap: 12, marginTop: 16 },
-    filterBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.white,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: Colors.divider,
-        gap: 8,
-        ...Shadows.sm
+    searchInput: { flex: 1, fontSize: 16, color: Colors.text.primary, height: '100%' },
+    searchFilterBtn: { padding: 8, position: 'relative' },
+    filterDot: { 
+        position: 'absolute', top: 4, right: 4, width: 8, height: 8, 
+        borderRadius: 4, backgroundColor: Colors.primary, borderWidth: 1.5, borderColor: '#F1F5F9' 
     },
-    filterBtnText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary, flex: 1 },
 
-    // Modal Styles
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: {
+    citySectionHeader: { 
+        flexDirection: 'row', alignItems: 'center', gap: 8, 
+        backgroundColor: '#F8FAFC', paddingHorizontal: 16, paddingVertical: 12,
+        marginTop: 8
+    },
+    citySectionTitle: { fontSize: 13, fontWeight: 'bold', color: Colors.text.secondary, textTransform: 'uppercase', letterSpacing: 1 },
+    citySectionLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0', marginLeft: 8 },
+
+    listContent: { paddingBottom: 100 },
+    listItem: {
+        padding: 16,
         backgroundColor: Colors.white,
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        padding: 24,
-        maxHeight: '80%',
-        ...Shadows.lg
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9'
+    },
+    itemHeader: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+    itemThumbnail: { width: 50, height: 50, borderRadius: 10, backgroundColor: '#F1F5F9' },
+    itemInfo: { flex: 1 },
+    itemName: { fontSize: 16, fontWeight: 'bold', color: Colors.text.primary },
+    subInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+    itemUniversity: { fontSize: 12, color: Colors.text.tertiary },
+    dteMiniBadge: { backgroundColor: '#F0F9FF', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+    dteMiniText: { fontSize: 9, fontWeight: 'bold', color: '#0369A1' },
+
+    badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    professionTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    professionTagText: { fontSize: 10, fontWeight: 'bold', color: Colors.text.secondary },
+    nirfBadgeMini: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    nirfTextMini: { fontSize: 10, fontWeight: 'bold', color: '#92400E' },
+
+    itemFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    itemLoc: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    itemLocText: { fontSize: 12, color: Colors.text.tertiary },
+    itemFees: { fontSize: 15, fontWeight: 'bold', color: Colors.primary },
+    itemFooterRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primary + '10', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    editBtnText: { fontSize: 11, fontWeight: 'bold', color: Colors.primary },
+    deleteBtn: { padding: 4 },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalContentExtended: { 
+        backgroundColor: Colors.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, 
+        padding: 24, maxHeight: '85%', ...Shadows.lg 
     },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text.primary },
-    closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.divider, justifyContent: 'center', alignItems: 'center' },
-    modalItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 12, borderRadius: 12, marginBottom: 4, gap: 12 },
-    activeModalItem: { backgroundColor: Colors.primary + '08' },
-    modalItemText: { fontSize: 16, color: Colors.text.primary, flex: 1 },
-    activeModalItemText: { color: Colors.primary, fontWeight: 'bold' },
-
-    tabBar: {
-        backgroundColor: Colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.divider
-    },
-    tabScroll: { paddingHorizontal: 10 },
-    tabItem: {
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        marginHorizontal: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative'
-    },
-    activeTabItem: {},
-    tabItemText: { fontSize: 14, color: Colors.text.tertiary, fontWeight: '600' },
-    activeTabItemText: { color: Colors.primary, fontWeight: 'bold' },
-    activeLine: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 3,
-        backgroundColor: Colors.primary,
-        borderTopLeftRadius: 3,
-        borderTopRightRadius: 3
-    },
-
-    listContent: { paddingBottom: 80 },
-    listItem: {
-        padding: 20,
-        backgroundColor: Colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.divider
-    },
-    itemHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 14 },
-    itemThumbnail: { width: 60, height: 60, borderRadius: 12, backgroundColor: Colors.divider },
-    itemInfo: { flex: 1 },
-    itemName: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 2 },
-    subInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    itemUniversity: { fontSize: 13, color: Colors.text.tertiary, fontWeight: '500' },
-    dteMiniBadge: { backgroundColor: Colors.primary + '08', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 0.5, borderColor: Colors.primary + '15' },
-    dteMiniText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
-
-    badgeRow: { flexDirection: 'row', gap: 10, marginBottom: 16, alignItems: 'center' },
-    professionTag: {
-        backgroundColor: Colors.primary + '10',
-        paddingHorizontal: 10, paddingVertical: 5,
-        borderRadius: 6, borderWidth: 1, borderColor: Colors.primary + '20'
-    },
-    professionTagText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary, textTransform: 'uppercase' },
-    nirfBadgeMini: {
+    closeBtn: { padding: 4 },
+    filterLabel: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary, marginTop: 24, marginBottom: 12 },
+    filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    filterChip: { 
         flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: '#FFF8E1',
-        paddingHorizontal: 10, paddingVertical: 5,
-        borderRadius: 6, borderWidth: 1, borderColor: '#FFD54F'
+        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, 
+        backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' 
     },
-    nirfTextMini: { fontSize: 10, fontWeight: 'bold', color: '#B8860B' },
+    filterChipActive: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
+    filterChipText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },
+    filterChipTextActive: { color: Colors.primary },
+    clearAllBtn: { marginTop: 20, paddingVertical: 12, alignItems: 'center' },
+    clearAllText: { color: Colors.text.tertiary, fontSize: 14, fontWeight: '600' },
 
-    itemFooter: {
-        flexDirection: 'row', justifyContent: 'space-between',
-        alignItems: 'center'
-    },
-    itemLoc: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    itemLocText: { fontSize: 13, color: Colors.text.secondary, fontWeight: '500' },
-    itemFees: { fontSize: 16, fontWeight: 'bold', color: Colors.primary },
-    itemFooterRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    editBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 5,
-        backgroundColor: Colors.primary + '12',
-        paddingHorizontal: 10, paddingVertical: 6,
-        borderRadius: 10, borderWidth: 1, borderColor: Colors.primary + '25'
-    },
-    deleteBtn: {
-        backgroundColor: Colors.error + '10',
-        paddingHorizontal: 8, paddingVertical: 6,
-        borderRadius: 8, borderWidth: 1, borderColor: Colors.error + '25',
-        justifyContent: 'center', alignItems: 'center'
-    },
-    editBtnText: { fontSize: 11, fontWeight: 'bold', color: Colors.primary },
-    emptyContainer: { alignItems: 'center', paddingVertical: 100, paddingHorizontal: 40 },
-    emptyIconContainer: { marginBottom: 24, position: 'relative', alignItems: 'center', justifyContent: 'center' },
-    emptyCircle: { position: 'absolute', width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary + '08' },
-    emptyTitle: { fontSize: 22, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 12 },
-    emptySubText: { textAlign: 'center', color: Colors.text.tertiary, fontSize: 14, lineHeight: 22, marginBottom: 24 },
-    resetBtn: { backgroundColor: Colors.primary + '10', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.primary + '20' },
-    resetBtnText: { color: Colors.primary, fontWeight: 'bold', fontSize: 14 },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-    loadingText: { fontSize: 16, color: Colors.text.tertiary, fontWeight: '600' }
+    loadingText: { fontSize: 16, color: Colors.text.tertiary, fontWeight: '600' },
+    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 40 },
+    emptyIconContainer: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+    emptyTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 8 },
+    emptySubText: { fontSize: 14, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 },
+    resetBtn: { marginTop: 24, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: Colors.primary },
+    resetBtnText: { color: Colors.white, fontWeight: 'bold' }
 });
 
 export default BrowseCollegesScreen;

@@ -181,13 +181,33 @@ const CreateInstitutionScreen = ({ navigation }) => {
         }
     };
 
-    const handleSave = async () => {
+    const handleSave = async (force = false) => {
         if (!formData.name || !formData.type) {
             Alert.alert('Error', 'Please fill name and type');
             return;
         }
+
         setLoading(true);
         try {
+            // Duplicate DTE Code Check
+            if (formData.dteCode && !force) {
+                const res = await institutionAPI.getAll(formData.category || admissionPath || 'MHTCET');
+                const existing = res.data.find(inst => inst.dteCode === formData.dteCode);
+                
+                if (existing) {
+                    setLoading(false);
+                    Alert.alert(
+                        'DTE Code Already Exists',
+                        `Institution "${existing.name}" already has DTE Code: ${formData.dteCode}. \n\nAre you sure you want to add another institution with the same code?`,
+                        [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Yes, Proceed', onPress: () => handleSave(true) }
+                        ]
+                    );
+                    return;
+                }
+            }
+
             const n = (v) => (v !== '' && v != null && !isNaN(parseFloat(v))) ? parseFloat(v) : undefined;
             const i = (v) => (v !== '' && v != null && !isNaN(parseInt(v))) ? parseInt(v) : undefined;
 

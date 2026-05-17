@@ -223,13 +223,33 @@ const EditInstitutionScreen = ({ route, navigation }) => {
         setFormData({ ...formData, galleryImages: imgs });
     };
 
-    const handleSave = async () => {
+    const handleSave = async (force = false) => {
         if (!formData.name || !formData.type) {
             Alert.alert('Error', 'Please fill name and type');
             return;
         }
         setLoading(true);
         try {
+            // Duplicate DTE Code Check
+            if (formData.dteCode && !force) {
+                const res = await institutionAPI.getAll(formData.category || admissionPath || 'MHTCET');
+                // Check if any OTHER institution has this DTE code
+                const duplicate = res.data.find(inst => inst.dteCode === formData.dteCode && inst._id !== id);
+                
+                if (duplicate) {
+                    setLoading(false);
+                    Alert.alert(
+                        'DTE Code Already Exists',
+                        `Another institution "${duplicate.name}" already has DTE Code: ${formData.dteCode}. \n\nAre you sure you want to use this code for "${formData.name}" as well?`,
+                        [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Yes, Update', onPress: () => handleSave(true) }
+                        ]
+                    );
+                    return;
+                }
+            }
+
             const n = (v) => (v !== '' && v != null && !isNaN(parseFloat(v))) ? parseFloat(v) : undefined;
             const i = (v) => (v !== '' && v != null && !isNaN(parseInt(v))) ? parseInt(v) : undefined;
 

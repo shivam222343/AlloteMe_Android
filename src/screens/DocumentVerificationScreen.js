@@ -226,7 +226,7 @@ const DOCUMENT_DISPLAY_NAMES = {
 
 const DocumentVerificationScreen = () => {
     const { user, updateProfile } = useAuth();
-    const [checklist, setChecklist] = useState({});
+    const [checklist, setChecklist] = useState(user?.documentChecklist || {});
     const [category, setCategory] = useState(user?.admissionCategory || 'OPEN');
     const [infoModal, setInfoModal] = useState({ visible: false, title: '', content: '' });
     const [language, setLanguage] = useState('English');
@@ -241,31 +241,21 @@ const DocumentVerificationScreen = () => {
         if (user?.admissionCategory) {
             setCategory(user.admissionCategory);
         }
-    }, [user?.documents, user?.admissionCategory]);
+        if (user?.documentChecklist) {
+            setChecklist(user.documentChecklist);
+        }
+    }, [user?.documents, user?.admissionCategory, user?.documentChecklist]);
 
     const isPremium = user?.subscription?.type === 'standard' || user?.subscription?.type === 'advance' || user?.isPremium === true;
     const t = TRANSLATIONS[language];
-
-    useEffect(() => {
-        loadChecklist();
-    }, []);
-
-    const loadChecklist = async () => {
-        try {
-            const saved = await AsyncStorage.getItem(`checklist_${user?._id}`);
-            if (saved) setChecklist(JSON.parse(saved));
-        } catch (e) {
-            console.error("Failed to load checklist", e);
-        }
-    };
 
     const toggleCheck = async (doc) => {
         const newChecklist = { ...checklist, [doc]: !checklist[doc] };
         setChecklist(newChecklist);
         try {
-            await AsyncStorage.setItem(`checklist_${user?._id}`, JSON.stringify(newChecklist));
+            await updateProfile({ documentChecklist: newChecklist });
         } catch (e) {
-            console.error("Failed to save checklist", e);
+            console.error("Failed to save checklist to profile", e);
         }
     };
 

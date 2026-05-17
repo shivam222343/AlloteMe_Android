@@ -88,6 +88,7 @@ export const institutionAPI = {
 
 export const cutoffAPI = {
     getAll: () => api.get('cutoffs'),
+    getSummary: () => api.get('cutoffs/summary/all'),
     predict: (data) => api.post('cutoffs/predict', data),
     estimateRank: (percentile, admissionPath) => api.get('cutoffs/estimate-rank', { params: { percentile, admissionPath } }),
     getByInstitution: (id) => api.get(`cutoffs/${id}`),

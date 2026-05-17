@@ -8,9 +8,12 @@ const {
     getCutoffsByInstitution,
     predictColleges,
     deleteCutoffs,
-    estimateRank
+    estimateRank,
+    getCutoffSummary
 } = require('../controllers/cutoffController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+
+router.get('/summary/all', protect, authorize('admin'), getCutoffSummary);
 
 router.get('/estimate-rank', estimateRank);
 router.route('/')

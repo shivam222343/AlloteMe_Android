@@ -14,12 +14,15 @@ import { Platform } from 'react-native';
 
 const ProfileScreen = ({ navigation, route }) => {
     const { user, logout, refreshUser } = useAuth();
-    const [uploading, setUploading] = useState(false);
+    const [uploading, setUploading] = useState(null); // 'profile' or 'banner' or null
     const [avatarLoading, setAvatarLoading] = useState(false);
-    const [showGallery, setShowGallery] = useState(false);
     const [galleryAvatars, setGalleryAvatars] = useState([]);
     const [bannerPreview, setBannerPreview] = useState(null);
     const [profilePreview, setProfilePreview] = useState(null);
+
+    React.useEffect(() => {
+        refreshAvatarOptions();
+    }, []);
 
     React.useEffect(() => {
         if (route.params?.autoOpenEdit) {
@@ -46,7 +49,7 @@ const ProfileScreen = ({ navigation, route }) => {
     };
 
     const handleUpload = async (uri, type) => {
-        setUploading(true);
+        setUploading(type);
         try {
             const formData = new FormData();
             const fileName = uri.split('/').pop();
@@ -85,7 +88,7 @@ const ProfileScreen = ({ navigation, route }) => {
             console.error('Upload error:', error);
             Alert.alert('Error', 'Failed to upload image. Please try again.');
         } finally {
-            setUploading(false);
+            setUploading(null);
         }
     };
 
@@ -123,10 +126,10 @@ const ProfileScreen = ({ navigation, route }) => {
         }
     };
 
-    const openGallery = () => {
+    const refreshAvatarOptions = () => {
         const categories = ['bottts', 'avataaars', 'identities', 'pixel-art', 'adventurer', 'open-peeps', 'lorelei', 'fun-emoji'];
         const newAvatars = [];
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 9; i++) {
             const category = categories[i % categories.length];
             const seed = Math.random().toString(36).substring(7);
             newAvatars.push({
@@ -136,12 +139,10 @@ const ProfileScreen = ({ navigation, route }) => {
             });
         }
         setGalleryAvatars(newAvatars);
-        setShowGallery(true);
     };
 
     const selectAvatar = (avatar) => {
         handleUpdateAvatar(avatar.url, avatar.seed);
-        setShowGallery(false);
     };
 
     const InfoRow = ({ icon: Icon, label, value }) => (
@@ -180,6 +181,11 @@ const ProfileScreen = ({ navigation, route }) => {
                             }
                             style={styles.bannerImg}
                         />
+                        {uploading === 'banner' && (
+                            <View style={styles.bannerUploadOverlay}>
+                                <ActivityIndicator size="small" color="#FFF" />
+                            </View>
+                        )}
                         <TouchableOpacity
                             style={styles.bannerEditBtn}
                             onPress={() => pickImage('banner')}
@@ -196,7 +202,7 @@ const ProfileScreen = ({ navigation, route }) => {
                                     source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=6366f1&color=fff&size=200` }}
                                     style={styles.avatarImg}
                                 />
-                                {uploading && (
+                                {uploading === 'profile' && (
                                     <View style={styles.uploadOverlay}>
                                         <ActivityIndicator size="small" color="#FFF" />
                                     </View>
@@ -246,30 +252,44 @@ const ProfileScreen = ({ navigation, route }) => {
 
                 {/* AI Avatar Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>AI Avatar Assistant</Text>
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.sectionTitle}>AI Avatar Assistant</Text>
+                        <TouchableOpacity style={styles.refreshBtn} onPress={refreshAvatarOptions}>
+                            <RefreshCw size={14} color={Colors.primary} />
+                            <Text style={styles.refreshBtnText}>Generate Again</Text>
+                        </TouchableOpacity>
+                    </View>
+                    
                     <Card style={styles.avatarCard}>
-                        <View style={styles.avatarGenRow}>
-                            <View style={styles.avatarPreviewBox}>
-                                <GradientBorder size={64} borderWidth={3}>
-                                    <Image
-                                        source={{ uri: `https://api.dicebear.com/9.x/bottts/png?seed=${user?.preferences?.avatarSeed || 'default'}&backgroundColor=c7ecee&radius=50` }}
-                                        style={styles.smallAvatar}
-                                    />
-                                </GradientBorder>
-                            </View>
-                            <View style={styles.avatarGenInfo}>
-                                <Text style={styles.avatarGenTitle}>Unique AI Identity</Text>
-                                <Text style={styles.avatarGenSub}>Generate a personalized robot avatar for your profile.</Text>
-                                <TouchableOpacity
-                                    style={styles.genBtn}
-                                    onPress={openGallery}
-                                    disabled={avatarLoading}
-                                >
-                                    <Bot size={14} color={Colors.white} />
-                                    <Text style={styles.genBtnText}>{avatarLoading ? 'Updating...' : 'Choose AI Avatar'}</Text>
-                                </TouchableOpacity>
-                            </View>
+                        <View style={styles.gridContainer}>
+                            {galleryAvatars.map((item, index) => {
+                                const isCurrent = user?.preferences?.avatarSeed === item.seed;
+                                return (
+                                    <TouchableOpacity
+                                        key={index}
+                                        style={styles.galleryItem}
+                                        onPress={() => selectAvatar(item)}
+                                        disabled={avatarLoading}
+                                    >
+                                        <View style={[styles.avatarCircle, isCurrent && styles.avatarCircleActive]}>
+                                            <Image source={{ uri: item.url }} style={styles.galleryImg} />
+                                            {isCurrent && (
+                                                <View style={styles.checkBadge}>
+                                                    <Check size={10} color="white" />
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text style={styles.categoryLabel}>{item.category}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
+                        {avatarLoading && (
+                            <View style={styles.inlineLoader}>
+                                <ActivityIndicator size="small" color={Colors.primary} />
+                                <Text style={styles.inlineLoaderText}>Updating...</Text>
+                            </View>
+                        )}
                     </Card>
                 </View>
 
@@ -297,57 +317,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Avatar Gallery Modal */}
-            <Modal
-                visible={showGallery}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowGallery(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <View>
-                                <Text style={styles.modalTitle}>AI Avatar Gallery</Text>
-                                <Text style={styles.modalSub}>Select your favorite identity</Text>
-                            </View>
-                            <TouchableOpacity onPress={() => setShowGallery(false)} style={styles.closeBtn}>
-                                <X size={20} color={Colors.text.secondary} />
-                            </TouchableOpacity>
-                        </View>
 
-                        {avatarLoading ? (
-                            <View style={styles.loaderBox}>
-                                <ActivityIndicator size="large" color={Colors.primary} />
-                                <Text style={styles.loaderText}>Updating your profile...</Text>
-                            </View>
-                        ) : (
-                            <View style={styles.gridContainer}>
-                                {galleryAvatars.map((item, index) => (
-                                    <TouchableOpacity
-                                        key={index}
-                                        style={styles.galleryItem}
-                                        onPress={() => selectAvatar(item)}
-                                    >
-                                        <GradientBorder size={80} borderWidth={2}>
-                                            <Image source={{ uri: item.url }} style={styles.galleryImg} />
-                                        </GradientBorder>
-                                        <Text style={styles.categoryLabel}>{item.category}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
-
-                        <Button
-                            title="Refresh Options"
-                            variant="outline"
-                            icon={RefreshCw}
-                            onPress={openGallery}
-                            style={styles.refreshModalBtn}
-                        />
-                    </View>
-                </View>
-            </Modal>
         </MainLayout>
     );
 };
@@ -369,6 +339,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.3)'
+    },
+    bannerUploadOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center'
     },
     profileInfo: { alignItems: 'center', marginTop: -60 },
     avatarWrapper: { width: '100%', height: '100%', position: 'relative' },
@@ -404,16 +380,28 @@ const styles = StyleSheet.create({
     infoLabel: { fontSize: 12, color: Colors.text.tertiary },
     infoValue: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary },
     editBtn: { marginBottom: 12 },
-    avatarCard: { padding: 16, borderLeftWidth: 4, borderLeftColor: Colors.primary },
-    avatarGenRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-    avatarPreviewBox: { width: 64, height: 64 },
-    smallAvatar: { width: '100%', height: '100%' },
-    avatarGenInfo: { flex: 1 },
-    avatarGenTitle: { fontSize: 15, fontWeight: 'bold', color: Colors.text.primary },
-    avatarGenSub: { fontSize: 11, color: Colors.text.tertiary, marginTop: 2, marginBottom: 8 },
-    genBtn: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start' },
-    genBtnText: { color: Colors.white, fontSize: 12, fontWeight: 'bold' },
-    rotating: { opacity: 0.5 },
+    sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary + '10', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+    refreshBtnText: { color: Colors.primary, fontSize: 12, fontWeight: 'bold' },
+    avatarCard: { padding: 16 },
+    gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
+    galleryItem: { width: '30%', alignItems: 'center', marginBottom: 12 },
+    avatarCircle: { 
+        width: 70, height: 70, borderRadius: 35, backgroundColor: '#F1F5F9', 
+        justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#E2E8F0',
+        overflow: 'hidden', position: 'relative'
+    },
+    avatarCircleActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '05' },
+    galleryImg: { width: '90%', height: '90%' },
+    checkBadge: { 
+        position: 'absolute', top: 0, right: 0, 
+        backgroundColor: Colors.primary, width: 20, height: 20, 
+        borderRadius: 10, justifyContent: 'center', alignItems: 'center',
+        borderWidth: 1.5, borderColor: Colors.white
+    },
+    categoryLabel: { fontSize: 10, color: Colors.text.tertiary, marginTop: 4, textTransform: 'capitalize' },
+    inlineLoader: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center', marginTop: 10 },
+    inlineLoaderText: { fontSize: 12, color: Colors.text.tertiary },
     logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, padding: 16 },
     logoutText: { color: Colors.error, fontWeight: 'bold' },
     settingsBtn: {
@@ -428,23 +416,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         backgroundColor: Colors.white
     },
-    settingsText: { color: Colors.primary, fontWeight: 'bold' },
-
-    // Modal Styles
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: { backgroundColor: Colors.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '85%' },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text.primary },
-    modalSub: { fontSize: 13, color: Colors.text.tertiary, marginTop: 2 },
-    closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.divider, justifyContent: 'center', alignItems: 'center' },
-    gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 24 },
-    galleryItem: { width: '30%', alignItems: 'center', marginBottom: 8 },
-    galleryImg: { width: '100%', height: '100%' },
-    categoryLabel: { fontSize: 10, color: Colors.text.tertiary, marginTop: 6, textTransform: 'capitalize' },
-    loaderBox: { padding: 40, alignItems: 'center', gap: 16 },
-    loaderText: { fontSize: 14, color: Colors.text.secondary },
-    refreshModalBtn: { marginBottom: 12 },
-    webLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary }
+    settingsText: { color: Colors.primary, fontWeight: 'bold' }
 });
 
 export default ProfileScreen;

@@ -376,22 +376,7 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                                 </>
                             )}
 
-                            {user.lastPredictorPreferences.topResults && user.lastPredictorPreferences.topResults.length > 0 && (
-                                <>
-                                    <Text style={[styles.innerLabel, { color: Colors.primary, marginTop: 24, marginBottom: 12 }]}>Top Results from this Search</Text>
-                                    <View style={styles.resultsBox}>
-                                        {user.lastPredictorPreferences.topResults.map((r, i) => (
-                                            <View key={i} style={styles.resultRow}>
-                                                <Text style={styles.resultColl} numberOfLines={1}>{r.collegeName}</Text>
-                                                <View style={styles.resultSub}>
-                                                    <Text style={styles.resultBranch}>{r.branch}</Text>
-                                                    <Text style={styles.resultDets}>{r.category} | {r.percentile}%ile | R{r.round}</Text>
-                                                </View>
-                                            </View>
-                                        ))}
-                                    </View>
-                                </>
-                            )}
+
 
                             <Text style={[styles.timeText, { marginTop: 16, textAlign: 'right', fontSize: 10 }]}>
                                 Predicted on: {user.lastPredictorPreferences.timestamp ? new Date(user.lastPredictorPreferences.timestamp).toLocaleString() : 'N/A'}
