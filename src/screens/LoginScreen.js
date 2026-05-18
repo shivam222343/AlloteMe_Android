@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
@@ -88,8 +88,9 @@ const LoginScreen = ({ navigation }) => {
 
     return (
         <MainLayout showHeader={false} style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.contentContainer}
                 style={styles.content}
             >
                 <View style={styles.header}>
@@ -151,7 +152,7 @@ const LoginScreen = ({ navigation }) => {
                         <Text style={styles.linkText}>Create Account</Text>
                     </TouchableOpacity>
                 </View>
-            </KeyboardAvoidingView>
+            </ScrollView>
         </MainLayout>
     );
 };
@@ -160,8 +161,8 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    content: {
-        flex: 1,
+    contentContainer: {
+        flexGrow: 1,
         justifyContent: 'center',
         paddingVertical: 40,
     },

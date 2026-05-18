@@ -13,6 +13,7 @@ router.post('/settings', protect, systemController.updateSetting);
 router.get('/coupons', protect, systemController.getCoupons);
 router.post('/coupons', protect, systemController.createCoupon);
 router.put('/coupons/:id/toggle', protect, systemController.toggleCoupon);
+router.put('/coupons/:id/toggle-checkout', protect, systemController.toggleCheckoutCoupon);
 router.delete('/coupons/:id', protect, systemController.deleteCoupon);
 
 module.exports = router;

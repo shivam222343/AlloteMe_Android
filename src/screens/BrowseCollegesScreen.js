@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SectionList, TouchableOpacity, Image, TextInput, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, Image, TextInput, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -70,6 +70,19 @@ const BrowseCollegesScreen = ({ navigation }) => {
     };
 
     const handleDelete = async (id, name) => {
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm(`Are you sure you want to delete ${name}? This will remove all cutoff data for this institute.`);
+            if (confirmed) {
+                try {
+                    await institutionAPI.delete(id);
+                    fetchInstitutions();
+                } catch (err) {
+                    window.alert('Failed to delete institution');
+                }
+            }
+            return;
+        }
+
         Alert.alert(
             "Delete Institution",
             `Are you sure you want to delete ${name}? This will remove all cutoff data for this institute.`,

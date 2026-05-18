@@ -43,8 +43,8 @@ exports.getCoupons = async (req, res) => {
 // POST create coupon
 exports.createCoupon = async (req, res) => {
     try {
-        const { code, discountPercentage, maxUses } = req.body;
-        const coupon = new Coupon({ code, discountPercentage, maxUses });
+        const { code, discountPercentage, maxUses, showInCheckout } = req.body;
+        const coupon = new Coupon({ code, discountPercentage, maxUses, showInCheckout: showInCheckout || false });
         await coupon.save();
         res.status(201).json(coupon);
     } catch (err) {
@@ -58,6 +58,19 @@ exports.toggleCoupon = async (req, res) => {
         const coupon = await Coupon.findById(req.params.id);
         if (!coupon) return res.status(404).json({ message: 'Coupon not found' });
         coupon.isActive = !coupon.isActive;
+        await coupon.save();
+        res.json(coupon);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// PUT toggle show in checkout
+exports.toggleCheckoutCoupon = async (req, res) => {
+    try {
+        const coupon = await Coupon.findById(req.params.id);
+        if (!coupon) return res.status(404).json({ message: 'Coupon not found' });
+        coupon.showInCheckout = !coupon.showInCheckout;
         await coupon.save();
         res.json(coupon);
     } catch (err) {

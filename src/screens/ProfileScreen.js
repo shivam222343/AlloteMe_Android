@@ -19,6 +19,18 @@ const ProfileScreen = ({ navigation, route }) => {
     const [galleryAvatars, setGalleryAvatars] = useState([]);
     const [bannerPreview, setBannerPreview] = useState(null);
     const [profilePreview, setProfilePreview] = useState(null);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await logout();
+        } catch (e) {
+            console.error('Logout error', e);
+        } finally {
+            setIsLoggingOut(false);
+        }
+    };
 
     React.useEffect(() => {
         refreshAvatarOptions();
@@ -195,20 +207,52 @@ const ProfileScreen = ({ navigation, route }) => {
                         </TouchableOpacity>
                     </View>
                     <View style={styles.profileInfo}>
-                        <GradientBorder size={120} borderWidth={4}>
-                            <View style={styles.avatarWrapper}>
-                                <Image
-                                    key={user?.preferences?.avatarUrl || profilePreview}
-                                    source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=6366f1&color=fff&size=200` }}
-                                    style={styles.avatarImg}
-                                />
-                                {uploading === 'profile' && (
-                                    <View style={styles.uploadOverlay}>
-                                        <ActivityIndicator size="small" color="#FFF" />
-                                    </View>
-                                )}
-                            </View>
-                        </GradientBorder>
+                        {user?.subscription?.type === 'advance' ? (
+                            <GradientBorder size={120} borderWidth={4} colors={['#FFDF00', '#FFF8DC', '#FFDF00', '#F59E0B', '#FFDF00']}>
+                                <View style={styles.avatarWrapper}>
+                                    <Image
+                                        key={user?.preferences?.avatarUrl || profilePreview}
+                                        source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=6366f1&color=fff&size=200` }}
+                                        style={styles.avatarImg}
+                                    />
+                                    {uploading === 'profile' && (
+                                        <View style={styles.uploadOverlay}>
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        </View>
+                                    )}
+                                </View>
+                            </GradientBorder>
+                        ) : user?.subscription?.type === 'standard' ? (
+                            <GradientBorder size={120} borderWidth={3} colors={['#F59E0B', '#D97706']}>
+                                <View style={styles.avatarWrapper}>
+                                    <Image
+                                        key={user?.preferences?.avatarUrl || profilePreview}
+                                        source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=6366f1&color=fff&size=200` }}
+                                        style={styles.avatarImg}
+                                    />
+                                    {uploading === 'profile' && (
+                                        <View style={styles.uploadOverlay}>
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        </View>
+                                    )}
+                                </View>
+                            </GradientBorder>
+                        ) : (
+                            <GradientBorder size={120} borderWidth={4}>
+                                <View style={styles.avatarWrapper}>
+                                    <Image
+                                        key={user?.preferences?.avatarUrl || profilePreview}
+                                        source={{ uri: profilePreview || user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=6366f1&color=fff&size=200` }}
+                                        style={styles.avatarImg}
+                                    />
+                                    {uploading === 'profile' && (
+                                        <View style={styles.uploadOverlay}>
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        </View>
+                                    )}
+                                </View>
+                            </GradientBorder>
+                        )}
                         <TouchableOpacity
                             style={styles.cameraBtn}
                             onPress={() => pickImage('profile')}
@@ -301,16 +345,22 @@ const ProfileScreen = ({ navigation, route }) => {
                         onPress={() => navigation.navigate('CompleteProfile')}
                         style={styles.editBtn}
                     />
-                    <TouchableOpacity
-                        style={styles.settingsBtn}
-                        onPress={() => navigation.navigate('Settings')}
-                    >
+                    <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Settings')}>
                         <Settings size={20} color={Colors.primary} />
                         <Text style={styles.settingsText}>App Settings</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-                        <LogOut size={20} color={Colors.error} />
-                        <Text style={styles.logoutText}>Log Out</Text>
+                    <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} disabled={isLoggingOut}>
+                        {isLoggingOut ? (
+                            <>
+                                <ActivityIndicator size="small" color={Colors.error} />
+                                <Text style={styles.logoutText}>Logging out...</Text>
+                            </>
+                        ) : (
+                            <>
+                                <LogOut size={20} color={Colors.error} />
+                                <Text style={styles.logoutText}>Log Out</Text>
+                            </>
+                        )}
                     </TouchableOpacity>
                 </View>
 

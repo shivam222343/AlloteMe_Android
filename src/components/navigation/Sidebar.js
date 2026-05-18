@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, SafeAreaView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, SafeAreaView, Platform, ActivityIndicator } from 'react-native';
 import { Colors, Spacing, Typography, BorderRadius } from '../../constants/theme';
 import GradientBorder from '../ui/GradientBorder';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +12,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const Sidebar = ({ navigation, state }) => {
     const { user, logout } = useAuth();
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await logout();
+        } catch (e) {
+            console.error('Logout error', e);
+        } finally {
+            setIsLoggingOut(false);
+        }
+    };
 
     // Map local banner IDs to assets
     const bannerAssets = {
@@ -146,9 +158,18 @@ const Sidebar = ({ navigation, state }) => {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-                    <LogOut size={20} color={Colors.error} />
-                    <Text style={styles.logoutText}>Log Out</Text>
+                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} disabled={isLoggingOut}>
+                    {isLoggingOut ? (
+                        <>
+                            <ActivityIndicator size="small" color={Colors.error} />
+                            <Text style={styles.logoutText}>Logging out...</Text>
+                        </>
+                    ) : (
+                        <>
+                            <LogOut size={20} color={Colors.error} />
+                            <Text style={styles.logoutText}>Log Out</Text>
+                        </>
+                    )}
                 </TouchableOpacity>
                 <Text style={styles.versionText}>AlloteMe v1.0.0</Text>
             </View>

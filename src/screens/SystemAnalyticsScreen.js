@@ -4,7 +4,7 @@ import { LineChart, BarChart } from 'react-native-chart-kit';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI, systemAPI } from '../services/api';
-import { TrendingUp, Users, Home, Activity, FileText, ChevronRight, Settings, Tag, Trash2, Save, Plus } from 'lucide-react-native';
+import { TrendingUp, Users, Home, Activity, FileText, ChevronRight, Settings, Tag, Trash2, Save, Plus, Eye } from 'lucide-react-native';
 
 const SystemAnalyticsScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
@@ -71,6 +71,15 @@ const SystemAnalyticsScreen = ({ navigation }) => {
             setCoupons(coupons.map(c => c._id === id ? res.data : c));
         } catch (e) {
             Alert.alert('Error', 'Failed to toggle coupon');
+        }
+    };
+
+    const handleToggleCheckoutCoupon = async (id) => {
+        try {
+            const res = await systemAPI.toggleCheckoutCoupon(id);
+            setCoupons(coupons.map(c => c._id === id ? res.data : c));
+        } catch (e) {
+            Alert.alert('Error', 'Failed to toggle checkout visibility');
         }
     };
 
@@ -198,11 +207,22 @@ const SystemAnalyticsScreen = ({ navigation }) => {
                                 <Text style={styles.couponUses}>Used: {coupon.timesUsed}</Text>
                             </View>
                             <View style={styles.couponActions}>
-                                <Switch 
-                                    value={coupon.isActive} 
-                                    onValueChange={() => handleToggleCoupon(coupon._id)} 
-                                    trackColor={{ true: Colors.primary, false: '#cbd5e1' }}
-                                />
+                                <View style={{ alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 9, color: Colors.text.tertiary, marginBottom: 2 }}>Active</Text>
+                                    <Switch 
+                                        value={coupon.isActive} 
+                                        onValueChange={() => handleToggleCoupon(coupon._id)} 
+                                        trackColor={{ true: Colors.primary, false: '#cbd5e1' }}
+                                    />
+                                </View>
+                                <View style={{ alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 9, color: Colors.text.tertiary, marginBottom: 2 }}>Show at Checkout</Text>
+                                    <Switch 
+                                        value={coupon.showInCheckout} 
+                                        onValueChange={() => handleToggleCheckoutCoupon(coupon._id)} 
+                                        trackColor={{ true: '#10b981', false: '#cbd5e1' }}
+                                    />
+                                </View>
                                 <TouchableOpacity onPress={() => handleDeleteCoupon(coupon._id)} style={styles.delBtn}>
                                     <Trash2 size={18} color={Colors.error} />
                                 </TouchableOpacity>

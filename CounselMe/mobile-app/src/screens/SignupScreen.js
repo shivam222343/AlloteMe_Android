@@ -46,7 +46,7 @@ const SignupScreen = ({ navigation }) => {
     );
 
     return (
-        <MainLayout>
+        <MainLayout scrollable={true} showHeader={false}>
             <View style={styles.container}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Create Account</Text>

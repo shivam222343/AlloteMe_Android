@@ -115,8 +115,8 @@ const PricingScreen = ({ navigation }) => {
         const fetchCoupons = async () => {
             try {
                 const res = await systemAPI.getCoupons();
-                // Filter only active coupons
-                const active = res.data.filter(c => c.isActive);
+                // Filter only active coupons that are set to show in checkout
+                const active = res.data.filter(c => c.isActive && c.showInCheckout);
                 setAvailableCoupons(active);
             } catch (err) {
                 console.log('Failed to fetch coupons');

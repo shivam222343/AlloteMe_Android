@@ -5,7 +5,8 @@ const CouponSchema = new mongoose.Schema({
     discountPercentage: { type: Number, required: true, min: 0, max: 100 },
     isActive: { type: Boolean, default: true },
     maxUses: { type: Number, default: 0 }, // 0 means unlimited
-    timesUsed: { type: Number, default: 0 }
+    timesUsed: { type: Number, default: 0 },
+    showInCheckout: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Coupon', CouponSchema);

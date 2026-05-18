@@ -150,6 +150,7 @@ export const systemAPI = {
     getCoupons: () => api.get('system/coupons'),
     createCoupon: (data) => api.post('system/coupons', data),
     toggleCoupon: (id) => api.put(`system/coupons/${id}/toggle`),
+    toggleCheckoutCoupon: (id) => api.put(`system/coupons/${id}/toggle-checkout`),
     deleteCoupon: (id) => api.delete(`system/coupons/${id}`),
     validateCoupon: (code) => api.post('system/coupons/validate', { code })
 };

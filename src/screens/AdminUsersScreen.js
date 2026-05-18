@@ -93,12 +93,28 @@ const AdminUsersScreen = ({ navigation }) => {
             activeOpacity={0.7}
         >
             <View style={styles.avatarContainer}>
-                <GradientBorder size={54} borderWidth={item.isOnline ? 3 : 1} borderColor={item.isOnline ? Colors.success : Colors.divider}>
-                    <Image
-                        source={{ uri: item.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${item.displayName}&background=6366f1&color=fff&size=100` }}
-                        style={styles.avatar}
-                    />
-                </GradientBorder>
+                {item.subscription?.type === 'advance' ? (
+                    <GradientBorder size={54} borderWidth={3} colors={['#FFDF00', '#FFF8DC', '#FFDF00', '#F59E0B', '#FFDF00']}>
+                        <Image
+                            source={{ uri: item.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${item.displayName}&background=6366f1&color=fff&size=100` }}
+                            style={styles.avatar}
+                        />
+                    </GradientBorder>
+                ) : item.subscription?.type === 'standard' ? (
+                    <GradientBorder size={54} borderWidth={2} colors={['#F59E0B', '#D97706']}>
+                        <Image
+                            source={{ uri: item.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${item.displayName}&background=6366f1&color=fff&size=100` }}
+                            style={styles.avatar}
+                        />
+                    </GradientBorder>
+                ) : (
+                    <GradientBorder size={54} borderWidth={item.isOnline ? 3 : 1} colors={item.isOnline ? [Colors.success, Colors.success] : [Colors.divider, Colors.divider]}>
+                        <Image
+                            source={{ uri: item.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${item.displayName}&background=6366f1&color=fff&size=100` }}
+                            style={styles.avatar}
+                        />
+                    </GradientBorder>
+                )}
                 <View style={[styles.statusDot, { backgroundColor: item.isOnline ? Colors.success : '#F59E0B' }]} />
             </View>
             <View style={styles.userInfo}>

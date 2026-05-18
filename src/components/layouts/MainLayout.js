@@ -35,7 +35,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
     }, [title]);
 
     // Fallback for devices/web where insets might be 0
-    const topPadding = Math.max(insets.top, Platform.OS === 'ios' ? 0 : 20);
+    const topPadding = Platform.OS === 'web' ? 0 : Math.max(insets.top, Platform.OS === 'ios' ? 0 : 20);
     // On Android, insets.bottom often includes the system nav bar which we don't want to double-pad
     const bottomPadding = Platform.OS === 'android' ? 0 : Math.max(insets.bottom, 0);
 
@@ -118,12 +118,28 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 style={styles.avatarBtn}
                                 activeOpacity={0.7}
                             >
-                                <GradientBorder size={36} borderWidth={2}>
-                                    <Image
-                                        source={{ uri: user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
-                                        style={styles.avatarImg}
-                                    />
-                                </GradientBorder>
+                                {user?.subscription?.type === 'advance' ? (
+                                    <GradientBorder size={36} borderWidth={2.5} colors={['#FFDF00', '#FFF8DC', '#FFDF00', '#F59E0B', '#FFDF00']}>
+                                        <Image
+                                            source={{ uri: user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
+                                            style={styles.avatarImg}
+                                        />
+                                    </GradientBorder>
+                                ) : user?.subscription?.type === 'standard' ? (
+                                    <GradientBorder size={36} borderWidth={2} colors={['#F59E0B', '#D97706']}>
+                                        <Image
+                                            source={{ uri: user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
+                                            style={styles.avatarImg}
+                                        />
+                                    </GradientBorder>
+                                ) : (
+                                    <GradientBorder size={36} borderWidth={2}>
+                                        <Image
+                                            source={{ uri: user?.preferences?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.displayName || 'User'}&background=Random&size=128` }}
+                                            style={styles.avatarImg}
+                                        />
+                                    </GradientBorder>
+                                )}
                             </TouchableOpacity>
                         </View>
                     </View>
