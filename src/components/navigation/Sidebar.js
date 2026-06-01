@@ -40,6 +40,7 @@ const Sidebar = ({ navigation, state }) => {
         { label: 'Nearby Colleges', icon: MapPin, route: 'NearbyColleges' },
         { label: 'Saved Colleges', icon: Star, route: 'SavedColleges' },
         { label: 'Saved Predictions', icon: Bookmark, route: 'SavedPredictions' },
+        { label: 'Option Form List', icon: LayoutGrid, route: 'OptionFormList' },
         { label: 'AI Counselor', icon: Bot, route: 'AICounselor' },
         { label: 'Videos', icon: Youtube, route: 'Videos' },
         { label: 'Documents', icon: FileUp, route: 'DocumentVerification' },

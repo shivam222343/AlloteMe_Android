@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
 import { Colors, Shadows } from '../../constants/theme';
 import { Home, Search, LayoutGrid, User, Bot, CloudUpload } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,9 +8,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const BottomBar = ({ state, navigation }) => {
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
     const isAdmin = user?.role === 'admin';
 
     const currentRoute = state.routes[state.index].name;
+
+    const isDesktop = Platform.OS === 'web' && width > 768;
+    if (isDesktop) {
+        return null;
+    }
 
     if (currentRoute === 'PredictionResults' || currentRoute === 'CollegeDetail' || currentRoute === 'AdminUserDetail') {
         return null;

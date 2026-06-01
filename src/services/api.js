@@ -18,7 +18,7 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
-        
+
         // Prevent aggressive browser caching across logouts for GET requests
         // Using timestamp param instead of headers to avoid CORS preflight issues with remote backends
         if (config.method && config.method.toLowerCase() === 'get') {
@@ -27,7 +27,7 @@ api.interceptors.request.use(
                 _t: Date.now()
             };
         }
-        
+
         return config;
     },
     (error) => Promise.reject(error)
@@ -161,6 +161,12 @@ export const videoAPI = {
     delete: (id) => api.delete(`videos/${id}`)
 };
 
+export const optionFormAPI = {
+    getAll: () => api.get('option-forms'),
+    add: (data) => api.post('option-forms', data),
+    delete: (id) => api.delete(`option-forms/${id}`)
+};
+
 export default {
     authAPI,
     institutionAPI,
@@ -172,5 +178,6 @@ export default {
     reviewAPI,
     customFormsAPI,
     systemAPI,
-    videoAPI
+    videoAPI,
+    optionFormAPI
 };

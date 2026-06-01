@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    Dimensions, FlatList, Image, ActivityIndicator, Platform
+    Dimensions, FlatList, Image, ActivityIndicator, Platform, useWindowDimensions
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import MainLayout from '../components/layouts/MainLayout';
@@ -19,16 +19,26 @@ import RatingSection from '../components/ui/RatingSection';
 import TestimonialSlider from '../components/ui/TestimonialSlider';
 import { LinearGradient } from 'expo-linear-gradient';
 import SubscriptionPopup from '../components/ui/SubscriptionPopup';
-import { videoAPI } from '../services/api';
+import { videoAPI, optionFormAPI } from '../services/api';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { PlayCircle, X, Youtube } from 'lucide-react-native';
 import { Modal as RNModal } from 'react-native';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SLIDER_WIDTH = SCREEN_WIDTH - 32;
-const CARD_WIDTH = (SCREEN_WIDTH - 32 - 12 - 4) / 2; // Extra buffer for rounding
+const PRESET_COLORS = [
+    { border: '#3b82f6', bg: '#eff6ff', text: '#1d4ed8' },
+    { border: '#10b981', bg: '#ecfdf5', text: '#047857' },
+    { border: '#f59e0b', bg: '#fffbeb', text: '#b45309' },
+    { border: '#8b5cf6', bg: '#f5f3ff', text: '#6d28d9' },
+    { border: '#ec4899', bg: '#fdf2f8', text: '#be185d' }
+];
 
 const StudentDashboard = ({ navigation }) => {
+    const { width: windowWidth } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && windowWidth > 768;
+    const SCREEN_WIDTH = isDesktop ? Math.min(windowWidth, 1200) : windowWidth;
+    const SLIDER_WIDTH = SCREEN_WIDTH - 32;
+    const CARD_WIDTH = isDesktop ? (SCREEN_WIDTH - 32 - 36) / 4 : (SCREEN_WIDTH - 32 - 12 - 4) / 2;
+    const FEATURED_CARD_WIDTH = isDesktop ? (SCREEN_WIDTH - 32 - 48) / 4 : SLIDER_WIDTH - 20;
     useFocusEffect(
         useCallback(() => {
             fetchFeatured();
@@ -43,6 +53,8 @@ const StudentDashboard = ({ navigation }) => {
     const [showSubscriptionPopup, setShowSubscriptionPopup] = useState(false);
     const [videos, setVideos] = useState([]);
     const [selectedVideo, setSelectedVideo] = useState(null);
+    const [optionPresets, setOptionPresets] = useState([]);
+    const [loadingPresets, setLoadingPresets] = useState(true);
     const flatListRef = React.useRef(null);
     const pathScrollRef = React.useRef(null);
 
@@ -85,9 +97,52 @@ const StudentDashboard = ({ navigation }) => {
         }
     }, [user?.preferences?.isProfileComplete, hasSkippedProfile]);
 
+    const fetchPresets = async () => {
+        try {
+            setLoadingPresets(true);
+            const res = await optionFormAPI.getAll();
+            const sortedPresets = (res.data.data || []).sort((a, b) => Number(b.percentile) - Number(a.percentile));
+            setOptionPresets(sortedPresets);
+        } catch (error) {
+            console.error('Fetch option presets error:', error);
+        } finally {
+            setLoadingPresets(false);
+        }
+    };
+
+    const matchesExamType = (category, examType) => {
+        if (!category || !examType) return false;
+        const cat = category.toUpperCase().trim();
+        const type = examType.toUpperCase().trim();
+        
+        // Strict segregation between PCM and PCB
+        if (type.includes('PCM') && cat.includes('PCB')) return false;
+        if (type.includes('PCB') && cat.includes('PCM')) return false;
+
+        if (type === 'MHTCET PCM' || type === 'MHTCET-PCM') {
+            return cat === 'MHTCET PCM' || cat === 'ENGINEERING' || cat === 'MHTCET' || cat === 'MHTCET-PCM';
+        }
+        if (type === 'MHTCET PCB' || type === 'MHTCET-PCB') {
+            return cat === 'MHTCET PCB' || cat === 'PHARMACY' || cat === 'MHTCET-PCB';
+        }
+        return cat === type;
+    };
+
+    const displayPresets = useMemo(() => {
+        return optionPresets.filter(preset => {
+            // 1. Direct category match
+            if (matchesExamType(preset.category, admissionPath)) return true;
+            // 2. First college category match
+            const firstCollegeCat = preset.colleges?.[0]?.collegeId?.category;
+            if (firstCollegeCat && matchesExamType(firstCollegeCat, admissionPath)) return true;
+            return false;
+        });
+    }, [optionPresets, admissionPath]);
+
     useFocusEffect(
         useCallback(() => {
             fetchFeatured();
+            fetchPresets();
         }, [admissionPath])
     );
 
@@ -104,7 +159,7 @@ const StudentDashboard = ({ navigation }) => {
     }, [admissionPath]);
 
     useEffect(() => {
-        if (featuredColleges.length > 0) {
+        if (!isDesktop && featuredColleges.length > 0) {
             const timer = setInterval(() => {
                 let nextIndex = currentIndex + 1;
                 if (nextIndex >= featuredColleges.length) {
@@ -118,7 +173,7 @@ const StudentDashboard = ({ navigation }) => {
             }, 4500); // Increased to 4.5s for readability
             return () => clearInterval(timer);
         }
-    }, [currentIndex, featuredColleges]);
+    }, [currentIndex, featuredColleges, isDesktop]);
 
     const fetchFeatured = async () => {
         setLoadingFeatured(true);
@@ -227,7 +282,7 @@ const StudentDashboard = ({ navigation }) => {
 
         return (
             <TouchableOpacity
-                style={styles.featuredCard}
+                style={[styles.featuredCard, { width: FEATURED_CARD_WIDTH }]}
                 activeOpacity={0.9}
                 onPress={() => navigation.navigate('CollegeDetail', { id: item._id })}
             >
@@ -259,7 +314,7 @@ const StudentDashboard = ({ navigation }) => {
         const Icon = item.icon;
         return (
             <TouchableOpacity
-                style={[styles.statCard, item.isEditable && styles.statCardEditable]}
+                style={[styles.statCard, { width: CARD_WIDTH }, item.isEditable && styles.statCardEditable]}
                 onPress={() => {
                     if (item.isEditable) {
                         navigation.navigate('Profile', { autoOpenEdit: true, admissionPath });
@@ -288,7 +343,7 @@ const StudentDashboard = ({ navigation }) => {
         const Icon = item.icon;
         return (
             <TouchableOpacity
-                style={[styles.gridCard, item.highlight && styles.premiumGridCard]}
+                style={[styles.gridCard, { width: CARD_WIDTH }, item.highlight && styles.premiumGridCard]}
                 onPress={() => navigation.navigate(item.route)}
                 activeOpacity={0.7}
             >
@@ -305,190 +360,235 @@ const StudentDashboard = ({ navigation }) => {
     return (
         <MainLayout title="Dashboard" hideBack>
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                <View style={[styles.welcomeSection, { marginBottom: 12 }]}>
-                    <Text style={styles.welcomeText}>Welcome back,</Text>
-                    <Text style={styles.nameText}>{user?.displayName} 👋</Text>
-                </View>
-
-
-                {/* Admission Path Selector */}
-                <View style={styles.pathSelectorContainer}>
-                    <ScrollView
-                        ref={pathScrollRef}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.pathList}
-                        decelerationRate="fast"
-                    >
-                        {ADMISSION_PATHS.map((path) => (
-                            <TouchableOpacity
-                                key={path}
-                                style={[styles.pathChip, admissionPath === path && styles.activePathChip]}
-                                onPress={() => setAdmissionPath(path)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={[styles.pathText, admissionPath === path && styles.activePathText]}>
-                                    {path}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
-
-                {loadingFeatured ? (
-                    <View style={[styles.featuredSection, { height: 180, justifyContent: 'center' }]}>
-                        <ActivityIndicator size="small" color={Colors.primary} />
+                <View style={[isDesktop && { maxWidth: 1200, width: '100%', alignSelf: 'center', paddingHorizontal: 16 }]}>
+                    <View style={[styles.welcomeSection, { marginBottom: 12 }]}>
+                        <Text style={styles.welcomeText}>Welcome back,</Text>
+                        <Text style={styles.nameText}>{user?.displayName} 👋</Text>
                     </View>
-                ) : featuredColleges.length > 0 ? (
-                    <View style={styles.featuredSection}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>{admissionPath} Trends</Text>
-                            <View style={styles.dotContainer}>
-                                {featuredColleges.map((_, i) => (
-                                    <View
-                                        key={i}
-                                        style={[
-                                            styles.indicatorDot,
-                                            currentIndex === i && styles.activeDot
-                                        ]}
-                                    />
-                                ))}
-                            </View>
-                        </View>
-                        <FlatList
-                            ref={flatListRef}
+
+
+                    {/* Admission Path Selector */}
+                    <View style={styles.pathSelectorContainer}>
+                        <ScrollView
+                            ref={pathScrollRef}
                             horizontal
-                            data={featuredColleges}
-                            renderItem={renderFeaturedCard}
-                            keyExtractor={item => item._id}
                             showsHorizontalScrollIndicator={false}
-                            snapToInterval={SLIDER_WIDTH - 20 + 16}
-                            snapToAlignment="start"
-                            onScroll={handleScroll}
-                            scrollEventThrottle={16}
+                            contentContainerStyle={styles.pathList}
                             decelerationRate="fast"
-                            contentContainerStyle={styles.featuredList}
-                            getItemLayout={(data, index) => ({
-                                length: SLIDER_WIDTH - 20 + 16,
-                                offset: (SLIDER_WIDTH - 20 + 16) * index,
-                                index,
-                            })}
-                        />
-                    </View>
-                ) : (
-                    <View style={styles.emptyFeatured}>
-                        <Info size={24} color={Colors.text.tertiary} />
-                        <Text style={styles.emptyFeaturedText}>No featured {admissionPath} colleges at the moment.</Text>
-                    </View>
-                )}
-
-                <View style={styles.statsRow}>
-                    {quickStats.map((s, i) => <StatCard key={i} item={s} />)}
-                </View>
-
-                {/* Subscription Status Card - Premium Feel */}
-                <TouchableOpacity 
-                    style={styles.premiumSubCard} 
-                    onPress={() => navigation.navigate('Pricing')}
-                    activeOpacity={0.9}
-                >
-                    <View style={styles.premiumSubInfo}>
-                        <View style={styles.premiumSubBadge}>
-                            <Crown size={12} color="#F59E0B" fill="#F59E0B" />
-                            <Text style={styles.premiumSubBadgeText}>
-                                {(user?.subscription?.type || 'Free').toUpperCase()} PLAN
-                            </Text>
-                        </View>
-                        <Text style={styles.premiumSubTitle}>Your Admissions Power-Ups</Text>
-                        <Text style={styles.premiumSubDesc}>Keep track of your usage & limits</Text>
-                    </View>
-                    <View style={styles.premiumPerkContainer}>
-                        <View style={styles.premiumPerkItem}>
-                            <View style={[styles.premiumPerkIcon, { backgroundColor: '#F59E0B15' }]}>
-                                <Zap size={14} color="#F59E0B" fill="#F59E0B" />
-                            </View>
-                            <View>
-                                <Text style={styles.premiumPerkLabel}>AI Prompts</Text>
-                                <Text style={styles.premiumPerkVal}>
-                                    {user?.subscription?.usage?.aiPrompts || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts}
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={styles.premiumPerkItem}>
-                            <View style={[styles.premiumPerkIcon, { backgroundColor: '#8B5CF615' }]}>
-                                <Target size={14} color="#8B5CF6" fill="#8B5CF6" />
-                            </View>
-                            <View>
-                                <Text style={styles.premiumPerkLabel}>Predictions</Text>
-                                <Text style={styles.premiumPerkVal}>
-                                    {user?.subscription?.usage?.predictions || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                </TouchableOpacity>
-
-                <View style={[styles.sectionHeader, { marginTop: 8 }]}>
-                    <Text style={styles.sectionTitle}>Counseling Tools</Text>
-                </View>
-
-                <View style={styles.grid}>
-                    {menuItems.map((item, index) => <GridItem key={index} item={item} />)}
-                </View>
-
-                <View style={styles.promoCard}>
-                    <View style={styles.promoInfo}>
-                        <Text style={styles.promoTitle}>Need Admission Help?</Text>
-                        <Text style={styles.promoSub}>Connect with senior counselors for direct guidance.</Text>
-                        <TouchableOpacity style={styles.promoBtn} onPress={() => navigation.navigate('Counselors')}>
-                            <Text style={styles.promoBtnText}>Contact Now</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <GraduationCap size={60} color={Colors.white} style={styles.promoIcon} />
-                </View>
-
-                {videos.length > 0 && (
-                    <View style={styles.videoSection}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Latest Guidance</Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('Videos')}>
-                                <Text style={styles.seeAll}>See All</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <ScrollView 
-                            horizontal 
-                            showsHorizontalScrollIndicator={false} 
-                            contentContainerStyle={styles.videoList}
                         >
-                            {videos.map((video) => (
-                                <TouchableOpacity 
-                                    key={video._id} 
-                                    style={styles.videoChip}
-                                    activeOpacity={0.8}
-                                    onPress={() => setSelectedVideo(video)}
+                            {ADMISSION_PATHS.map((path) => (
+                                <TouchableOpacity
+                                    key={path}
+                                    style={[styles.pathChip, admissionPath === path && styles.activePathChip]}
+                                    onPress={() => setAdmissionPath(path)}
+                                    activeOpacity={0.7}
                                 >
-                                    <View style={styles.videoThumbWrapper}>
-                                        <Image source={{ uri: video.thumbnail }} style={styles.videoThumb} />
-                                        <View style={styles.videoPlayOverlay}>
-                                            <PlayCircle size={24} color={Colors.white} />
-                                        </View>
-                                    </View>
-                                    <Text style={styles.videoChipTitle} numberOfLines={2}>{video.title}</Text>
+                                    <Text style={[styles.pathText, admissionPath === path && styles.activePathText]}>
+                                        {path}
+                                    </Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                     </View>
-                )}
 
-                <View style={{ marginTop: 24 }}>
-                    <TestimonialSlider />
+                    {loadingFeatured ? (
+                        <View style={[styles.featuredSection, { height: 180, justifyContent: 'center' }]}>
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                        </View>
+                    ) : featuredColleges.length > 0 ? (
+                        <View style={styles.featuredSection}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>{admissionPath} Trends</Text>
+                                {!isDesktop && (
+                                    <View style={styles.dotContainer}>
+                                        {featuredColleges.map((_, i) => (
+                                            <View
+                                                key={i}
+                                                style={[
+                                                    styles.indicatorDot,
+                                                    currentIndex === i && styles.activeDot
+                                                ]}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+                            <FlatList
+                                ref={flatListRef}
+                                horizontal={true}
+                                data={featuredColleges}
+                                renderItem={renderFeaturedCard}
+                                keyExtractor={item => item._id}
+                                style={{ marginHorizontal: -16 }}
+                                showsHorizontalScrollIndicator={Platform.OS === 'web'}
+                                showsVerticalScrollIndicator={false}
+                                snapToInterval={isDesktop ? null : SLIDER_WIDTH - 20 + 16}
+                                snapToAlignment="start"
+                                onScroll={isDesktop ? null : handleScroll}
+                                scrollEventThrottle={16}
+                                decelerationRate="fast"
+                                contentContainerStyle={styles.featuredList}
+                                getItemLayout={isDesktop ? null : (data, index) => ({
+                                    length: SLIDER_WIDTH - 20 + 16,
+                                    offset: (SLIDER_WIDTH - 20 + 16) * index,
+                                    index,
+                                })}
+                            />
+                        </View>
+                    ) : (
+                        <View style={styles.emptyFeatured}>
+                            <Info size={24} color={Colors.text.tertiary} />
+                            <Text style={styles.emptyFeaturedText}>No featured {admissionPath} colleges at the moment.</Text>
+                        </View>
+                    )}
+
+                    <View style={[styles.statsRow, isDesktop && { flexWrap: 'nowrap', justifyContent: 'space-between' }]}>
+                        {quickStats.map((s, i) => <StatCard key={i} item={s} />)}
+                    </View>
+
+                    {/* Subscription Status Card - Premium Feel */}
+                    <TouchableOpacity
+                        style={styles.premiumSubCard}
+                        onPress={() => navigation.navigate('Pricing')}
+                        activeOpacity={0.9}
+                    >
+                        <View style={styles.premiumSubInfo}>
+                            <View style={styles.premiumSubBadge}>
+                                <Crown size={12} color="#F59E0B" fill="#F59E0B" />
+                                <Text style={styles.premiumSubBadgeText}>
+                                    {(user?.subscription?.type || 'Free').toUpperCase()} PLAN
+                                </Text>
+                            </View>
+                            <Text style={styles.premiumSubTitle}>Your Admissions Power-Ups</Text>
+                            <Text style={styles.premiumSubDesc}>Keep track of your usage & limits</Text>
+                        </View>
+                        <View style={styles.premiumPerkContainer}>
+                            <View style={styles.premiumPerkItem}>
+                                <View style={[styles.premiumPerkIcon, { backgroundColor: '#F59E0B15' }]}>
+                                    <Zap size={14} color="#F59E0B" fill="#F59E0B" />
+                                </View>
+                                <View>
+                                    <Text style={styles.premiumPerkLabel}>AI Prompts</Text>
+                                    <Text style={styles.premiumPerkVal}>
+                                        {user?.role === 'admin' ? '∞/∞' : `${user?.subscription?.usage?.aiPrompts || 0}/${SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts}`}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.premiumPerkItem}>
+                                <View style={[styles.premiumPerkIcon, { backgroundColor: '#8B5CF615' }]}>
+                                    <Target size={14} color="#8B5CF6" fill="#8B5CF6" />
+                                </View>
+                                <View>
+                                    <Text style={styles.premiumPerkLabel}>Predictions</Text>
+                                    <Text style={styles.premiumPerkVal}>
+                                        {user?.role === 'admin' ? '∞/∞' : `${user?.subscription?.usage?.predictions || 0}/${SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions}`}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+
+                    {displayPresets.length > 0 && (
+                        <View style={styles.presetsSection}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Best Option Form Lists</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('OptionFormList', { activePath: admissionPath })}>
+                                    <Text style={styles.seeAll}>View All</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={Platform.OS === 'web'}
+                                style={{ marginHorizontal: -16 }}
+                                contentContainerStyle={styles.presetsScroll}
+                            >
+                                {displayPresets.map((preset, idx) => {
+                                    const colors = PRESET_COLORS[idx % PRESET_COLORS.length];
+                                    return (
+                                        <TouchableOpacity
+                                            key={preset._id}
+                                            style={styles.presetChip}
+                                            activeOpacity={0.8}
+                                            onPress={() => navigation.navigate('OptionFormView', { preset })}
+                                        >
+                                            <View style={[styles.presetCircle, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+                                                <Text style={[styles.presetPercentileText, { color: colors.text }]}>
+                                                    {Number(preset.percentile).toFixed(2)}
+                                                </Text>
+                                                <Text style={[styles.presetCirclePercentSign, { color: colors.text }]}>%ile</Text>
+                                            </View>
+                                            <View style={styles.presetCategoryContainer}>
+                                                <Text style={[styles.presetCategoryText, { color: colors.text }]}>{preset.category}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                    )}
+
+                    <View style={[styles.sectionHeader, { marginTop: 8 }]}>
+                        <Text style={styles.sectionTitle}>Counseling Tools</Text>
+                    </View>
+
+                    <View style={styles.grid}>
+                        {menuItems.map((item, index) => <GridItem key={index} item={item} />)}
+                    </View>
+
+                    <View style={styles.promoCard}>
+                        <View style={styles.promoInfo}>
+                            <Text style={styles.promoTitle}>Need Admission Help?</Text>
+                            <Text style={styles.promoSub}>Connect with senior counselors for direct guidance.</Text>
+                            <TouchableOpacity style={styles.promoBtn} onPress={() => navigation.navigate('Counselors')}>
+                                <Text style={styles.promoBtnText}>Contact Now</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <GraduationCap size={60} color={Colors.white} style={styles.promoIcon} />
+                    </View>
+
+                    {videos.length > 0 && (
+                        <View style={styles.videoSection}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Latest Guidance</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('Videos')}>
+                                    <Text style={styles.seeAll}>See All</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.videoList}
+                            >
+                                {videos.map((video) => (
+                                    <TouchableOpacity
+                                        key={video._id}
+                                        style={styles.videoChip}
+                                        activeOpacity={0.8}
+                                        onPress={() => setSelectedVideo(video)}
+                                    >
+                                        <View style={styles.videoThumbWrapper}>
+                                            <Image source={{ uri: video.thumbnail }} style={styles.videoThumb} />
+                                            <View style={styles.videoPlayOverlay}>
+                                                <PlayCircle size={24} color={Colors.white} />
+                                            </View>
+                                        </View>
+                                        <Text style={styles.videoChipTitle} numberOfLines={2}>{video.title}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
+
+                    <View style={{ marginTop: 24 }}>
+                        <TestimonialSlider />
+                    </View>
+
+                    <View style={{ marginTop: 8 }}>
+                        <RatingSection />
+                    </View>
+
+                    <View style={{ height: 40 }} />
                 </View>
-
-                <View style={{ marginTop: 8 }}>
-                    <RatingSection />
-                </View>
-
-                <View style={{ height: 40 }} />
             </ScrollView>
 
             {/* In-App Full Screen Video Player Modal */}
@@ -500,19 +600,19 @@ const StudentDashboard = ({ navigation }) => {
                 onRequestClose={() => setSelectedVideo(null)}
             >
                 <View style={styles.fullScreenOverlay}>
-                    <TouchableOpacity 
-                        style={styles.fullScreenClose} 
+                    <TouchableOpacity
+                        style={styles.fullScreenClose}
                         onPress={() => setSelectedVideo(null)}
                     >
                         <X size={28} color={Colors.white} />
                     </TouchableOpacity>
-                    
+
                     <View style={styles.fullScreenPlayer}>
                         {selectedVideo && (
                             Platform.OS === 'web' ? (
                                 <iframe
                                     width="100%"
-                                    height={SCREEN_WIDTH * (9/16)}
+                                    height={SCREEN_WIDTH * (9 / 16)}
                                     src={`https://www.youtube.com/embed/${selectedVideo.videoId}?autoplay=1`}
                                     frameBorder="0"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -520,7 +620,7 @@ const StudentDashboard = ({ navigation }) => {
                                 />
                             ) : (
                                 <YoutubePlayer
-                                    height={SCREEN_WIDTH * (9/16)}
+                                    height={SCREEN_WIDTH * (9 / 16)}
                                     width={SCREEN_WIDTH}
                                     play={true}
                                     videoId={selectedVideo.videoId}
@@ -576,7 +676,6 @@ const styles = StyleSheet.create({
     featuredSection: { marginBottom: 32 },
     featuredList: { paddingHorizontal: 16 },
     featuredCard: {
-        width: SLIDER_WIDTH - 20,
         height: 180,
         borderRadius: 24,
         marginRight: 16,
@@ -612,7 +711,7 @@ const styles = StyleSheet.create({
 
     statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
     statCard: {
-        width: CARD_WIDTH, backgroundColor: Colors.white, padding: 12, borderRadius: 16,
+        backgroundColor: Colors.white, padding: 12, borderRadius: 16,
         flexDirection: 'row', alignItems: 'center', gap: 10, ...Shadows.sm,
         borderWidth: 1.5, borderColor: Colors.primary
     },
@@ -627,7 +726,7 @@ const styles = StyleSheet.create({
     activeDot: { width: 14, backgroundColor: Colors.primary, height: 6 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     gridCard: {
-        width: CARD_WIDTH, backgroundColor: Colors.white, padding: 12, borderRadius: 20,
+        backgroundColor: Colors.white, padding: 12, borderRadius: 20,
         borderWidth: 1.5, borderColor: Colors.primary, ...Shadows.xs
     },
     gridIconBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.primary + '10', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
@@ -815,25 +914,73 @@ const styles = StyleSheet.create({
         color: Colors.text.primary,
         lineHeight: 18
     },
-    fullScreenOverlay: { 
-        flex: 1, 
-        backgroundColor: '#000', 
+    fullScreenOverlay: {
+        flex: 1,
+        backgroundColor: '#000',
         justifyContent: 'center',
         alignItems: 'center'
     },
-    fullScreenClose: { 
-        position: 'absolute', 
-        top: 50, 
-        right: 20, 
+    fullScreenClose: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
         zIndex: 100,
         padding: 10,
         backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 25
     },
-    fullScreenPlayer: { 
+    fullScreenPlayer: {
         width: '100%',
-        aspectRatio: 16/9,
+        aspectRatio: 16 / 9,
         justifyContent: 'center'
+    },
+    presetsSection: {
+        marginTop: 24,
+        marginBottom: 16,
+    },
+    presetsScroll: {
+        paddingHorizontal: 16,
+        gap: 16,
+        paddingTop: 10
+    },
+    presetChip: {
+        alignItems: 'center',
+        marginRight: 4
+    },
+    presetCircle: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        borderWidth: 2.5,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 3,
+        backgroundColor: '#ffffff'
+    },
+    presetPercentileText: {
+        fontSize: 14,
+        fontWeight: '800'
+    },
+    presetCirclePercentSign: {
+        fontSize: 8,
+        fontWeight: '600',
+        marginTop: -1
+    },
+    presetCategoryContainer: {
+        marginTop: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        backgroundColor: '#f1f5f9'
+    },
+    presetCategoryText: {
+        fontSize: 9,
+        fontWeight: '700',
+        textTransform: 'uppercase'
     },
 });
 

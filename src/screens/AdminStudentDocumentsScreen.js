@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows, Spacing } from '../constants/theme';
-import { authAPI } from '../services/api';
+import { authAPI, api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { 
     Users, FileText, CheckCircle, XCircle, Download, 
     ChevronRight, Search, DownloadCloud, FileCheck, 
@@ -15,6 +16,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 const AdminStudentDocumentsScreen = () => {
+    const { socket } = useAuth();
     const [students, setStudents] = useState([]);
     const [filteredStudents, setFilteredStudents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -23,6 +25,28 @@ const AdminStudentDocumentsScreen = () => {
     const [remark, setRemark] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [isFetchingDetail, setIsFetchingDetail] = useState(false);
+
+    useEffect(() => {
+        if (socket) {
+            console.log('[AdminStudentDocuments] Registering socket listener for student updates');
+            const handleStudentUpdate = (updatedStudent) => {
+                console.log('[Socket] Received student document update:', updatedStudent._id);
+                
+                // Helper to update student documents
+                setStudents(prev => prev.map(s => s._id === updatedStudent._id ? { ...s, ...updatedStudent } : s));
+                setFilteredStudents(prev => prev.map(s => s._id === updatedStudent._id ? { ...s, ...updatedStudent } : s));
+                
+                // If the updated student is currently selected, update their detail modal too
+                setSelectedStudent(prev => prev && prev._id === updatedStudent._id ? { ...prev, ...updatedStudent } : prev);
+            };
+
+            socket.on('student:document_updated', handleStudentUpdate);
+
+            return () => {
+                socket.off('student:document_updated', handleStudentUpdate);
+            };
+        }
+    }, [socket]);
 
     useEffect(() => {
         fetchStudents();
@@ -96,9 +120,9 @@ const AdminStudentDocumentsScreen = () => {
                 verifiedAt: new Date().toISOString()
             };
 
-            await authAPI.updateUserRole(selectedStudent._id, { documents: updatedDocs });
+            const response = await authAPI.updateUserRole(selectedStudent._id, { documents: updatedDocs });
             
-            const updatedStudent = { ...selectedStudent, documents: updatedDocs };
+            const updatedStudent = { ...selectedStudent, ...response.data };
             setSelectedStudent(updatedStudent);
             
             setStudents(prev => prev.map(s => s._id === selectedStudent._id ? updatedStudent : s));
@@ -114,8 +138,13 @@ const AdminStudentDocumentsScreen = () => {
     };
 
     const handleDownload = async (url, fileName) => {
+        const isPdf = url.toLowerCase().endsWith('.pdf');
+        const viewUrl = isPdf 
+            ? `${api.defaults.baseURL}upload/view-pdf?url=${encodeURIComponent(url)}`
+            : url;
+
         if (Platform.OS === 'web') {
-            window.open(url, '_blank');
+            window.open(viewUrl, '_blank');
             return;
         }
 
@@ -306,7 +335,7 @@ const AdminStudentDocumentsScreen = () => {
                                                         </TouchableOpacity>
                                                     </View>
 
-                                                    {doc.status === 'pending' && (
+                                                    {doc.status !== 'accepted' && doc.status !== 'verified' && (
                                                         <View style={styles.verifyControls}>
                                                             <TextInput 
                                                                 style={styles.remarkInput}

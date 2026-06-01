@@ -20,16 +20,16 @@ const SubscriptionPopup = ({ visible, onClose, onSubscribe }) => {
             period: 'One time', 
             color: Colors.primary, 
             icon: Target,
-            features: ['Unlimited AI Prompts', '15 College Predictions', '5 PDF & CSV Exports', 'Standard Chat Support']
+            features: ['Unlimited AI Prompts', '15 College Predictions', '7 PDF & CSV Exports', '300+ College Info', '19000+ Listed Cutoffs', 'Personalized Presets']
         },
         { 
             id: 'advance', 
-            name: 'Elite Counselor', 
+            name: 'Elite Advance', 
             price: '₹149', 
             period: 'One time', 
             color: '#F59E0B', 
             icon: Crown,
-            features: ['Unlimited AI Prompts', '25 College Predictions', '12 PDF & CSV Exports', 'Personal Counselor Chat'],
+            features: ['Unlimited AI Prompts', '25 College Predictions', '15 PDF & CSV Exports', '300+ College Info', '19000+ Listed Cutoffs', 'Personalized Presets', 'Document Verifications'],
             popular: true
         }
     ]);
@@ -46,6 +46,9 @@ const SubscriptionPopup = ({ visible, onClose, onSubscribe }) => {
                         }
                         if (plan.id === 'advance' && settings.premiumPrice) {
                             return { ...plan, price: `₹${settings.premiumPrice}` };
+                        }
+                        if (plan.id === 'counselor' && settings.counselorPrice) {
+                            return { ...plan, price: `₹${settings.counselorPrice}` };
                         }
                         return plan;
                     }));
@@ -104,7 +107,7 @@ const SubscriptionPopup = ({ visible, onClose, onSubscribe }) => {
                                                 <Text style={styles.planName}>{plan.name}</Text>
                                                 <View style={styles.priceRow}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                                                        <Text style={styles.originalPrice}>₹{parseInt(plan.price.replace('₹', '')) + 100}</Text>
+                                                        <Text style={styles.originalPrice}>₹{parseInt(plan.price.replace('₹', '')) + (plan.id === 'counselor' ? 1000 : plan.id === 'advance' ? 700 : 500)}</Text>
                                                         <Text style={styles.planPrice}>{plan.price}</Text>
                                                     </View>
                                                     <Text style={styles.planPeriod}>/ {plan.period}</Text>

@@ -9,12 +9,12 @@ import MainLayout from '../components/layouts/MainLayout';
 import { 
     CheckCircle, Circle, Info, FileUp, 
     XCircle, Clock, Languages, ChevronRight,
-    ShieldCheck, AlertCircle, Trash2
+    ShieldCheck, AlertCircle, Trash2, ExternalLink
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import * as DocumentPicker from 'expo-document-picker';
-import { uploadAPI } from '../services/api';
+import { uploadAPI, api } from '../services/api';
 
 const DOCUMENT_DATA = {
     "OPEN": [
@@ -224,10 +224,11 @@ const DOCUMENT_DISPLAY_NAMES = {
     "Father's Domicile Certificate": { en: "Father's Domicile Certificate", mr: "वडिलांचे अधिवास प्रमाणपत्र" }
 };
 
-const DocumentVerificationScreen = () => {
+const DocumentVerificationScreen = ({ navigation }) => {
     const { user, updateProfile } = useAuth();
     const [checklist, setChecklist] = useState(user?.documentChecklist || {});
-    const [category, setCategory] = useState(user?.admissionCategory || 'OPEN');
+    const [category, setCategory] = useState(user?.admissionCategory || null);
+    const [showSelector, setShowSelector] = useState(!user?.admissionCategory);
     const [infoModal, setInfoModal] = useState({ visible: false, title: '', content: '' });
     const [language, setLanguage] = useState('English');
     const [uploads, setUploads] = useState(user?.documents || {}); 
@@ -240,13 +241,16 @@ const DocumentVerificationScreen = () => {
         }
         if (user?.admissionCategory) {
             setCategory(user.admissionCategory);
+            setShowSelector(false);
+        } else if (!category) {
+            setShowSelector(true);
         }
         if (user?.documentChecklist) {
             setChecklist(user.documentChecklist);
         }
     }, [user?.documents, user?.admissionCategory, user?.documentChecklist]);
 
-    const isPremium = user?.subscription?.type === 'standard' || user?.subscription?.type === 'advance' || user?.isPremium === true;
+    const isPremium = user?.subscription?.type === 'advance' || user?.subscription?.type === 'counselor' || user?.role === 'admin' || user?.isPremium === true;
     const t = TRANSLATIONS[language];
 
     const toggleCheck = async (doc) => {
@@ -262,7 +266,6 @@ const DocumentVerificationScreen = () => {
     const handleUpload = async (docName) => {
         if (!isPremium) {
             if (Platform.OS === 'web') {
-                // Better alert for web
                 alert(language === 'English' 
                     ? "Premium Feature: Document upload and verification is available for premium users only." 
                     : "प्रीमियम सुविधा: कागदपत्र अपलोड आणि पडताळणी केवळ प्रीमियम वापरकर्त्यांसाठी उपलब्ध आहे.");
@@ -278,7 +281,6 @@ const DocumentVerificationScreen = () => {
         try {
             console.log(`[DocumentVerification] Starting picker for: ${docName}`);
             
-            // On Web, type: '*/*' is more reliable than an array for some browser environments
             const pickerOptions = {
                 type: Platform.OS === 'web' ? '*/*' : ['*/*'],
                 copyToCacheDirectory: true,
@@ -287,7 +289,6 @@ const DocumentVerificationScreen = () => {
 
             const result = await DocumentPicker.getDocumentAsync(pickerOptions);
 
-            // Handle both legacy and assets-based results for cross-platform compatibility
             const isCanceled = result.canceled === true || result.type === 'cancel';
             const assets = result.assets || (result.uri ? [result] : []);
 
@@ -299,10 +300,9 @@ const DocumentVerificationScreen = () => {
             const asset = assets[0];
             setIsUploading(docName);
             
-            // 1. Prepare FormData for real upload
+            // Prepare FormData for real upload
             const formData = new FormData();
             if (Platform.OS === 'web') {
-                // Fetch the blob from URI
                 const response = await fetch(asset.uri);
                 const blob = await response.blob();
                 formData.append('image', blob, asset.name || 'document.pdf');
@@ -314,43 +314,40 @@ const DocumentVerificationScreen = () => {
                 });
             }
 
-            // 2. Upload to Server
-            const uploadRes = await uploadAPI.upload(formData);
-            const fileUrl = uploadRes.data.url;
+            console.log('[DocumentVerification] Form data prepared, sending to server...');
+            const res = await uploadAPI.upload(formData);
+            const fileUrl = res.data.url;
+            console.log('[DocumentVerification] Upload complete. URL:', fileUrl);
 
-            // 3. Update User Profile on Backend
-            const newUploads = { 
-                ...uploads, 
-                [docName]: { 
-                    status: 'pending', 
-                    fileName: asset.name || 'document',
+            const newUploads = {
+                ...uploads,
+                [docName]: {
+                    status: 'pending',
+                    fileName: asset.name || 'document.pdf',
                     uri: fileUrl,
                     createdAt: new Date().toISOString(),
-                    category: category // Tag the document with the category used during upload
-                } 
+                    category: category,
+                    remark: ''
+                }
             };
 
-            const updateRes = await updateProfile({ 
-                documents: newUploads,
-                admissionCategory: category // Ensure category is also saved
-            });
-            
-            if (updateRes.success) {
-                setUploads(newUploads);
-                setIsUploading(null);
-                const msg = language === 'English' ? "Success" : "यशस्वी";
-                if (Platform.OS === 'web') alert(t.successMsg);
-                else Alert.alert(msg, t.successMsg);
-            } else {
-                throw new Error("Failed to update profile");
-            }
+            setUploads(newUploads);
+            await updateProfile({ documents: newUploads });
 
-        } catch (err) {
-            console.error('[DocumentVerification] Upload Error:', err);
+            if (Platform.OS === 'web') {
+                alert(t.successMsg);
+            } else {
+                Alert.alert("Success", t.successMsg);
+            }
+        } catch (error) {
+            console.error('[DocumentVerification] Upload error:', error);
+            if (Platform.OS === 'web') {
+                alert("Upload failed. Please try again.");
+            } else {
+                Alert.alert("Error", "Upload failed. Please try again.");
+            }
+        } finally {
             setIsUploading(null);
-            const errMsg = "Upload failed. Please try again or check your connection.";
-            if (Platform.OS === 'web') alert(errMsg);
-            else Alert.alert("Error", errMsg);
         }
     };
 
@@ -396,10 +393,12 @@ const DocumentVerificationScreen = () => {
                 </View>
             );
         }
+        return null;
     };
 
     const renderItem = ({ item }) => {
         const displayName = language === 'English' ? DOCUMENT_DISPLAY_NAMES[item]?.en : DOCUMENT_DISPLAY_NAMES[item]?.mr;
+        const upload = uploads[item];
         
         return (
             <View style={styles.docCard}>
@@ -424,28 +423,141 @@ const DocumentVerificationScreen = () => {
                         <Info size={18} color={Colors.primary} />
                     </TouchableOpacity>
                     
-                    <TouchableOpacity 
-                        onPress={() => handleUpload(item)} 
-                        style={[
-                            styles.uploadBtn, 
-                            isPremium && styles.uploadBtnPremium,
-                            isUploading === item && styles.uploadingBtn
-                        ]}
-                        disabled={isUploading === item}
-                    >
-                        {isUploading === item ? (
-                            <ActivityIndicator size="small" color={isPremium ? "#fff" : Colors.primary} />
-                        ) : (
-                            <>
-                                <FileUp size={16} color={isPremium ? "#fff" : Colors.text.tertiary} />
-                                {isPremium && <Text style={styles.uploadBtnText}>{t.uploadBtn}</Text>}
-                            </>
-                        )}
-                    </TouchableOpacity>
+                    {upload ? (
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    if (upload.uri) {
+                                        const isPdf = upload.uri.toLowerCase().endsWith('.pdf') || (upload.fileName && upload.fileName.toLowerCase().endsWith('.pdf'));
+                                        const viewUrl = isPdf 
+                                            ? `${api.defaults.baseURL}upload/view-pdf?url=${encodeURIComponent(upload.uri)}`
+                                            : upload.uri;
+                                        
+                                        if (Platform.OS === 'web') {
+                                            window.open(viewUrl, '_blank');
+                                        } else {
+                                            import('react-native').then(({ Linking }) => {
+                                                Linking.openURL(viewUrl).catch(err => {
+                                                    Alert.alert("Error", "Could not open document link.");
+                                                });
+                                            });
+                                        }
+                                    }
+                                }} 
+                                style={[styles.uploadBtn, { backgroundColor: Colors.primary + '15' }]}
+                            >
+                                <ExternalLink size={16} color={Colors.primary} />
+                                <Text style={[styles.uploadBtnText, { color: Colors.primary }]}>
+                                    {language === 'English' ? 'View' : 'पहा'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {upload.status === 'rejected' && (
+                                <TouchableOpacity 
+                                    onPress={() => handleUpload(item)} 
+                                    style={[
+                                        styles.uploadBtn, 
+                                        isPremium && styles.uploadBtnPremium,
+                                        isUploading === item && styles.uploadingBtn
+                                    ]}
+                                    disabled={isUploading === item}
+                                >
+                                    {isUploading === item ? (
+                                        <ActivityIndicator size="small" color={isPremium ? "#fff" : Colors.primary} />
+                                    ) : (
+                                        <>
+                                            <FileUp size={16} color={isPremium ? "#fff" : Colors.text.tertiary} />
+                                            {isPremium && (
+                                                <Text style={styles.uploadBtnText}>
+                                                    {language === 'English' ? 'Upload Again' : 'पुन्हा अपलोड करा'}
+                                                </Text>
+                                            )}
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    ) : (
+                        <TouchableOpacity 
+                            onPress={() => handleUpload(item)} 
+                            style={[
+                                styles.uploadBtn, 
+                                isPremium && styles.uploadBtnPremium,
+                                isUploading === item && styles.uploadingBtn
+                            ]}
+                            disabled={isUploading === item}
+                        >
+                            {isUploading === item ? (
+                                <ActivityIndicator size="small" color={isPremium ? "#fff" : Colors.primary} />
+                            ) : (
+                                <>
+                                    <FileUp size={16} color={isPremium ? "#fff" : Colors.text.tertiary} />
+                                    {isPremium && <Text style={styles.uploadBtnText}>{t.uploadBtn}</Text>}
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         );
     };
+
+    if (showSelector) {
+        return (
+            <MainLayout title={language === 'English' ? "Documents Checklist" : "कागदपत्रे यादी"} scrollable={true} hideBack={true}>
+                <View style={styles.selectorContainer}>
+                    <Text style={styles.selectorTitle}>
+                        {language === 'English' ? "Select your Admission Category" : "तुमचा प्रवेश प्रवर्ग निवडा"}
+                    </Text>
+                    <Text style={styles.selectorSubtitle}>
+                        {language === 'English' 
+                            ? "Choose your category to load the customized administrative and legal documents required for engineering/pharmacy admissions."
+                            : "अभियांत्रिकी/औषधनिर्माणशास्त्र प्रवेशासाठी आवश्यक असलेली कागदपत्रांची यादी पाहण्यासाठी तुमचा प्रवर्ग निवडा."
+                        }
+                    </Text>
+                    
+                    <View style={styles.selectorGrid}>
+                        {Object.keys(DOCUMENT_DATA).map((cat) => {
+                            let desc = "";
+                            if (cat === "OPEN") desc = language === 'English' ? "General merit category without reservation." : "कोणतेही आरक्षण नसलेला खुला प्रवर्ग.";
+                            else if (cat === "EWS") desc = language === 'English' ? "Economically Weaker Section (income < 8 Lakhs)." : "आर्थिकदृष्ट्या दुर्बल घटक (८ लाखांच्या खाली).";
+                            else if (cat === "OBC") desc = language === 'English' ? "Other Backward Class candidates." : "इतर मागासवर्गीय उमेदवार.";
+                            else if (cat === "SEBC") desc = language === 'English' ? "Socially and Educationally Backward Class." : "सामाजिक आणि शैक्षणिकदृष्ट्या मागास प्रवर्ग.";
+                            else if (cat === "NT/SBC") desc = language === 'English' ? "Nomadic Tribes / Special Backward Class." : "भटक्या जमाती किंवा विशेष मागास प्रवर्ग.";
+                            else if (cat === "SC/ST") desc = language === 'English' ? "Scheduled Caste / Scheduled Tribe reservation." : "अनुसूचित जाती / अनुसूचित जमाती प्रवर्ग.";
+                            else if (cat === "TFWS") desc = language === 'English' ? "Tuition Fee Waiver Scheme (merit based)." : "शिक्षण शुल्क माफी योजना (गुणवत्तेवर आधारित).";
+                            else if (cat === "Minority") desc = language === 'English' ? "Linguistic or Religious minority seats." : "भाषिक किंवा धार्मिक अल्पसंख्याक जागा.";
+                            else if (cat === "Defence") desc = language === 'English' ? "Wards of active or retired service members." : "सक्रिय किंवा सेवानिवृत्त संरक्षण कर्मचाऱ्यांचे पाल्य.";
+                            else if (cat === "PH") desc = language === 'English' ? "Physically Handicapped / Disabled quota." : "शारीरिकदृष्ट्या अपंग / दिव्यांग प्रवर्ग.";
+                            else if (cat === "Orphan") desc = language === 'English' ? "Orphan category candidate benefits." : "अनाथ प्रवर्गातील उमेदवारांसाठी.";
+                            else if (cat === "OMS / Migration") desc = language === 'English' ? "Other Than Maharashtra State / Migration boards." : "महाराष्ट्र राज्याबाहेरील / स्थलांतरित बोर्डाचे विद्यार्थी.";
+
+                            return (
+                                <TouchableOpacity
+                                    key={cat}
+                                    style={styles.selectorCard}
+                                    onPress={async () => {
+                                        setCategory(cat);
+                                        setShowSelector(false);
+                                        await updateProfile({ admissionCategory: cat });
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <LinearGradient
+                                        colors={[Colors.primary + '05', Colors.primary + '15']}
+                                        style={styles.selectorCardGrad}
+                                    >
+                                        <Text style={styles.selectorCardTitle}>{cat}</Text>
+                                        <Text style={styles.selectorCardDesc}>{desc}</Text>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </View>
+            </MainLayout>
+        );
+    }
 
     return (
         <MainLayout scrollable={false}>
@@ -454,13 +566,22 @@ const DocumentVerificationScreen = () => {
                     <Text style={styles.title}>{t.title}</Text>
                     <Text style={styles.subtitle}>{t.subtitle(category)}</Text>
                 </View>
-                <TouchableOpacity 
-                    style={styles.langBtn}
-                    onPress={() => setLanguage(language === 'English' ? 'Marathi' : 'English')}
-                >
-                    <Languages size={18} color={Colors.primary} />
-                    <Text style={styles.langText}>{language === 'English' ? 'Marathi' : 'English'}</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity 
+                        style={styles.langBtn}
+                        onPress={() => setShowSelector(true)}
+                    >
+                        <ShieldCheck size={16} color={Colors.primary} />
+                        <Text style={styles.langText}>{language === 'English' ? 'Change' : 'बदला'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={styles.langBtn}
+                        onPress={() => setLanguage(language === 'English' ? 'Marathi' : 'English')}
+                    >
+                        <Languages size={16} color={Colors.primary} />
+                        <Text style={styles.langText}>{language === 'English' ? 'Marathi' : 'English'}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={styles.categoryBar}>
@@ -599,7 +720,17 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 18, fontWeight: '500', color: Colors.text.primary, flex: 1, marginRight: 10 },
     modalBody: { fontSize: 14, color: Colors.text.secondary, lineHeight: 22, marginBottom: 25 },
     modalBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: 12, alignItems: 'center' },
-    modalBtnText: { color: '#fff', fontWeight: '500', fontSize: 15 }
+    modalBtnText: { color: '#fff', fontWeight: '500', fontSize: 15 },
+
+    // Onboarding Selector Styles
+    selectorContainer: { flex: 1, paddingVertical: 20, alignItems: 'center', maxWidth: 1000, alignSelf: 'center', width: '100%' },
+    selectorTitle: { fontSize: 24, fontWeight: 'bold', color: Colors.text.primary, textAlign: 'center', marginBottom: 8 },
+    selectorSubtitle: { fontSize: 13, color: Colors.text.tertiary, textAlign: 'center', marginBottom: 28, paddingHorizontal: 16, lineHeight: 20 },
+    selectorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center', width: '100%' },
+    selectorCard: { width: Platform.OS === 'web' ? '23%' : '46%', minWidth: 150, borderRadius: 16, overflow: 'hidden', borderWidth: 1.5, borderColor: '#E2E8F0', ...Shadows.sm },
+    selectorCardGrad: { padding: 16, minHeight: 120, justifyContent: 'center' },
+    selectorCardTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.primary, marginBottom: 6 },
+    selectorCardDesc: { fontSize: 11, color: Colors.text.secondary, lineHeight: 15 }
 });
 
 export default DocumentVerificationScreen;

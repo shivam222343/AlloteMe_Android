@@ -4,15 +4,135 @@ import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
 import { MapPin, Layers, Calendar, GripVertical, ChevronLeft, Trash2, X, ShieldCheck, Bookmark, FileText, Download, Search } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+const SavedPredictionRow = React.memo(({
+    item,
+    drag,
+    isActive,
+    index,
+    searchText,
+    navigation,
+    handleRemove
+}) => {
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [
+                {
+                    scale: withSpring(
+                        isActive ? 1.01 : 1,
+                        {
+                            damping: 15,
+                            stiffness: 150,
+                        }
+                    ),
+                },
+            ],
+        };
+    });
+
+    const college = item.collegeId && typeof item.collegeId === 'object' ? item.collegeId : { name: 'Loading...' };
+
+    return (
+        <TouchableOpacity
+            onLongPress={searchText ? null : drag}
+            delayLongPress={Platform.OS === 'web' ? 80 : 150}
+            onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
+            disabled={isActive}
+            activeOpacity={0.9}
+            style={[
+                styles.fullWidthItem,
+                Platform.OS === 'web' && { cursor: isActive ? 'grabbing' : 'grab' }
+            ]}
+        >
+            <Animated.View style={animatedStyle}>
+                <Card style={[styles.resultCard, isActive && styles.activeCard]}>
+                    <View style={styles.cardHeader}>
+                        <View style={styles.numberTag}>
+                            <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
+                        </View>
+                        <View style={styles.instHeader}>
+                            <View style={styles.instBasicRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.instName} numberOfLines={2}>
+                                        {college.name}
+                                    </Text>
+                                    <View style={styles.locRow}>
+                                        <MapPin size={10} color={Colors.text.tertiary} />
+                                        <Text style={styles.locText}>{college.location?.city || 'Verified'}</Text>
+                                        <View style={styles.sep} />
+                                        <Text style={styles.dteText}>DTE: {college.dteCode || '—'}</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: (item.chanceColor || '#0A66C2') + '10' }]}>
+                            <Text style={[styles.matchPercent, { color: item.chanceColor || '#0A66C2' }]}>{item.chanceLabel || 'Saved'}</Text>
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => handleRemove(item)}
+                            style={styles.deleteBtn}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Trash2 size={18} color="#ef4444" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.branchSection}>
+                        <Text style={styles.branchName}>{item.branch}</Text>
+                        <View style={styles.badgeRow}>
+                            <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
+                            <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
+                            {item.category && (
+                                <View style={[
+                                    styles.badge,
+                                    { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
+                                ]}>
+                                    <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
+                                    <Text style={[
+                                        styles.badgeText,
+                                        { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
+                                    ]}>{item.category}</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {item.percentile && (
+                        <View style={styles.statsRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.statLabel}>PERCENTILE</Text>
+                                <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.statLabel}>RANK</Text>
+                                <Text style={styles.statVal}>
+                                    {item.rank || (item.percentile ? Math.round(((100 - item.percentile) / 100) * 380000) : '—')}
+                                </Text>
+                            </View>
+                            <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                                <Text style={styles.statLabel}>CHANCE</Text>
+                                <Text style={[styles.statVal, { color: item.chanceColor, fontSize: 13 }]}>{item.chanceLabel}</Text>
+                            </View>
+                        </View>
+                    )}
+                </Card>
+            </Animated.View>
+        </TouchableOpacity>
+    );
+});
 
 const SavedPredictionsScreen = ({ navigation }) => {
     const insets = useSafeAreaInsets();
-    const { user, toggleSavePredictionOptimistic, updateProfile } = useAuth();
+    const { user, toggleSavePredictionOptimistic, updateProfile, checkLimit, incrementUsage, admissionPath } = useAuth();
     const [isReordering, setIsReordering] = useState(false);
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
@@ -21,9 +141,32 @@ const SavedPredictionsScreen = ({ navigation }) => {
 
     const getCollegeId = (c) => (c && typeof c === 'object' ? c._id : c);
 
+    const matchesExamType = (category, examType) => {
+        if (!category || !examType) return false;
+        const cat = category.toUpperCase().trim();
+        const type = examType.toUpperCase().trim();
+        if (type === 'MHTCET PCM' || type === 'MHTCET-PCM') {
+            return cat === 'MHTCET PCM' || cat === 'ENGINEERING' || cat === 'MHTCET' || cat === 'MHTCET-PCM';
+        }
+        if (type === 'MHTCET PCB' || type === 'MHTCET-PCB') {
+            return cat === 'MHTCET PCB' || cat === 'PHARMACY' || cat === 'MHTCET-PCB';
+        }
+        return cat === type;
+    };
+
     // Filter and Search logic
     const savedList = useMemo(() => {
         let list = user?.savedPredictions || [];
+
+        // Type specific filtering
+        const activeType = admissionPath || user?.examType;
+        if (activeType) {
+            list = list.filter(item => {
+                const collegeCat = item.collegeId?.category || 'Engineering';
+                return matchesExamType(collegeCat, activeType);
+            });
+        }
+
         if (searchText) {
             list = list.filter(item => {
                 const collName = (item.collegeId?.name || '').toLowerCase();
@@ -32,7 +175,7 @@ const SavedPredictionsScreen = ({ navigation }) => {
             });
         }
         return list;
-    }, [user?.savedPredictions, searchText]);
+    }, [user?.savedPredictions, admissionPath, user?.examType, searchText]);
 
     const handleRemove = useCallback((item) => {
         const title = "Remove Prediction";
@@ -79,6 +222,10 @@ const SavedPredictionsScreen = ({ navigation }) => {
 
     const exportToPDF = async () => {
         if (savedList.length === 0) return;
+
+        // Check Subscription Limit
+        if (!checkLimit('exports')) return;
+
         setExportingPDF(true);
         try {
             const html = `
@@ -175,8 +322,12 @@ const SavedPredictionsScreen = ({ navigation }) => {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
             }
+
+            // Increment Usage
+            incrementUsage('exports');
         } catch (error) {
             console.error('PDF Export Error:', error);
+            Alert.alert('PDF Export Failed');
         } finally {
             setExportingPDF(false);
         }
@@ -184,6 +335,10 @@ const SavedPredictionsScreen = ({ navigation }) => {
 
     const exportToCSV = async () => {
         if (savedList.length === 0) return;
+
+        // Check Subscription Limit
+        if (!checkLimit('exports')) return;
+
         setExportingCSV(true);
         try {
             let csv = '\uFEFFNo,DTE Code,College,Branch,Category,Quota,Cutoff%,Rank,Chance\n';
@@ -205,12 +360,17 @@ const SavedPredictionsScreen = ({ navigation }) => {
                 await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
                 await Sharing.shareAsync(fileUri);
             }
+
+            // Increment Usage
+            incrementUsage('exports');
         } catch (error) {
             console.error('CSV Export Error:', error);
         } finally {
             setExportingCSV(false);
         }
     };
+
+    const getItemKey = (item) => item._id || `${getCollegeId(item.collegeId)}_${item.branch}`;
 
     const handleDragEnd = async (data) => {
         if (searchText) {
@@ -219,7 +379,12 @@ const SavedPredictionsScreen = ({ navigation }) => {
         }
         
         try {
-            await updateProfile({ savedPredictions: data });
+            const fullList = user?.savedPredictions || [];
+            const reorderedKeys = new Set(data.map(getItemKey));
+            const remainingItems = fullList.filter(item => !reorderedKeys.has(getItemKey(item)));
+            const mergedList = [...data, ...remainingItems];
+
+            await updateProfile({ savedPredictions: mergedList });
         } catch (error) {
             console.error('Error saving reorder:', error);
             Alert.alert('Error', 'Failed to save new order.');
@@ -228,98 +393,19 @@ const SavedPredictionsScreen = ({ navigation }) => {
 
     const renderItem = useCallback(({ item, drag, isActive, getIndex }) => {
         const index = getIndex();
-        
-        // Handle both populated and non-populated collegeId for safety
-        const college = item.collegeId && typeof item.collegeId === 'object' ? item.collegeId : { name: 'Loading...' };
 
         return (
-            <TouchableOpacity
-                onLongPress={searchText ? null : drag}
-                delayLongPress={300}
-                onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
-                disabled={isActive}
-                activeOpacity={0.9}
-                style={styles.fullWidthItem}
-            >
-                <Card style={[styles.resultCard, isActive && styles.activeCard]}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.dragHandle}>
-                            <GripVertical size={16} color="#94a3b8" />
-                        </View>
-                        <View style={styles.numberTag}>
-                            <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
-                        </View>
-                        <View style={styles.instHeader}>
-                            <View style={styles.instBasicRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.instName} numberOfLines={2}>
-                                        {college.name}
-                                    </Text>
-                                    <View style={styles.locRow}>
-                                        <MapPin size={10} color={Colors.text.tertiary} />
-                                        <Text style={styles.locText}>{college.location?.city || 'Verified'}</Text>
-                                        <View style={styles.sep} />
-                                        <Text style={styles.dteText}>DTE: {college.dteCode || '—'}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-
-                        <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: (item.chanceColor || '#0A66C2') + '10' }]}>
-                            <Text style={[styles.matchPercent, { color: item.chanceColor || '#0A66C2' }]}>{item.chanceLabel || 'Saved'}</Text>
-                        </View>
-
-                        <TouchableOpacity
-                            onPress={() => handleRemove(item)}
-                            style={styles.deleteBtn}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                            <Trash2 size={18} color="#ef4444" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.branchSection}>
-                        <Text style={styles.branchName}>{item.branch}</Text>
-                        <View style={styles.badgeRow}>
-                            <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
-                            <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
-                            {item.category && (
-                                <View style={[
-                                    styles.badge,
-                                    { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
-                                ]}>
-                                    <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
-                                    <Text style={[
-                                        styles.badgeText,
-                                        { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
-                                    ]}>{item.category}</Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
-
-                    {item.percentile && (
-                        <View style={styles.statsRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.statLabel}>PERCENTILE</Text>
-                                <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.statLabel}>RANK</Text>
-                                <Text style={styles.statVal}>
-                                    {item.rank || (item.percentile ? Math.round(((100 - item.percentile) / 100) * 380000) : '—')}
-                                </Text>
-                            </View>
-                            <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                                <Text style={styles.statLabel}>CHANCE</Text>
-                                <Text style={[styles.statVal, { color: item.chanceColor, fontSize: 13 }]}>{item.chanceLabel}</Text>
-                            </View>
-                        </View>
-                    )}
-                </Card>
-            </TouchableOpacity>
+            <SavedPredictionRow
+                item={item}
+                drag={drag}
+                isActive={isActive}
+                index={index}
+                searchText={searchText}
+                navigation={navigation}
+                handleRemove={handleRemove}
+            />
         );
-    }, [navigation, handleRemove]);
+    }, [navigation, searchText, handleRemove]);
 
     if (!user) {
         return (
@@ -337,7 +423,13 @@ const SavedPredictionsScreen = ({ navigation }) => {
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.title}>Saved Predictions</Text>
-                    <Text style={styles.subtitle}>{savedList.length} items synced</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.subtitle}>{savedList.length} items synced</Text>
+                        <View style={styles.sep} />
+                        <Text style={styles.usageSmall}>
+                            Exports: {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.exports || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports)}
+                        </Text>
+                    </View>
                 </View>
                 <View style={styles.headerActions}>
                     <TouchableOpacity onPress={() => setIsSearchVisible(!isSearchVisible)} style={styles.actionIcon}><Search size={20} color={Colors.text.secondary} /></TouchableOpacity>
@@ -366,11 +458,18 @@ const SavedPredictionsScreen = ({ navigation }) => {
                     onDragEnd={({ data }) => handleDragEnd(data)}
                     keyExtractor={(item) => item._id || `${getCollegeId(item.collegeId)}_${item.branch}`}
                     renderItem={renderItem}
+                    activationDistance={5}
+                    dragItemOverflow={false}
+                    autoscrollThreshold={80}
+                    autoscrollSpeed={150}
+                    animationConfig={{
+                        damping: 35,
+                        stiffness: 400,
+                        mass: 0.3,
+                    }}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 60 }}
                     containerStyle={{ flex: 1 }}
-                    activationDistance={20}
-                    dragItemOverflow={true}
                     ListEmptyComponent={
                         <View style={styles.centerEmpty}>
                             <Bookmark size={48} color="#cbd5e1" />
@@ -400,14 +499,18 @@ const styles = StyleSheet.create({
     fullWidthItem: { width: '100%' },
     resultCard: { marginVertical: 0.5, padding: 14, borderRadius: 0, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     activeCard: {
-        backgroundColor: '#F0F9FF',
-        zIndex: 100,
-        elevation: 10,
+        backgroundColor: '#ffffff',
+        zIndex: 999,
+        elevation: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        transform: [{ scale: 1.02 }]
+        shadowOffset: {
+            width: 0,
+            height: 20,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     dragHandle: { paddingRight: 8, justifyContent: 'center' },
     cardHeader: { flexDirection: 'row', alignItems: 'center' },
@@ -437,7 +540,16 @@ const styles = StyleSheet.create({
     riskText: { color: "#ef4444" },
     centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 400, paddingHorizontal: 40 },
     emptyTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text.secondary, marginTop: 16 },
-    emptyText: { marginTop: 8, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 }
+    emptyText: { marginTop: 8, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 },
+    usageSmall: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: Colors.primary,
+        backgroundColor: Colors.primary + '10',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4
+    }
 });
 
 export default SavedPredictionsScreen;

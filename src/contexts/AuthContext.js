@@ -14,7 +14,7 @@ const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
     const [user, setUserState] = useState(null);
-    
+
     // Custom setUser that also handles initialization
     const setUser = (data) => {
         if (typeof data === 'function') {
@@ -261,13 +261,14 @@ export const AuthProvider = ({ children }) => {
 
     const checkLimit = (type) => {
         if (!user) return true;
-        
-        const sub = user.subscription || { type: 'free', usage: { aiPrompts: 0, predictions: 0, exports: 0 }};
+        if (user.role === 'admin') return true;
+
+        const sub = user.subscription || { type: 'free', usage: { aiPrompts: 0, predictions: 0, exports: 0 } };
         const plan = SUBSCRIPTION_PLANS[sub.type.toUpperCase()] || SUBSCRIPTION_PLANS.FREE;
-        
+
         const currentUsage = sub.usage?.[type] || 0;
         const limit = plan.limits[type];
-        
+
         if (currentUsage >= limit) {
             setSubscriptionModal({ visible: true, feature: type });
             return false;
@@ -277,16 +278,16 @@ export const AuthProvider = ({ children }) => {
 
     const incrementUsage = async (type) => {
         if (!user) return;
-        
+
         // Use a functional update to ensure we have the absolute latest state
         setUser(prev => {
             if (!prev) return prev;
 
-            const newUsage = { 
-                ...(prev.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }) 
+            const newUsage = {
+                ...(prev.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 })
             };
             newUsage[type] = (newUsage[type] || 0) + 1;
-            
+
             const updatedSubscription = {
                 ...(prev.subscription || { type: 'free' }),
                 usage: newUsage
@@ -297,7 +298,7 @@ export const AuthProvider = ({ children }) => {
                 subscription: updatedSubscription
             };
         });
-        
+
         // Local storage backup
         const cacheKey = `user_usage_${user._id}`;
         try {
@@ -326,7 +327,7 @@ export const AuthProvider = ({ children }) => {
             if (token) {
                 const response = await authAPI.getProfile();
                 const userData = response.data;
-                
+
                 // Ensure subscription object exists
                 if (!userData.subscription) {
                     userData.subscription = {
@@ -375,14 +376,14 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await authAPI.googleLogin(tokens);
             const { token, showAvatarPopup, isNewUser, ...userData } = response.data;
-            
+
             // Only set token and user if NOT a new user or if we don't care
             // Actually, we should set it anyway so they are "partially logged in"
             await AsyncStorage.setItem('userToken', token);
             setUser(userData);
-            
+
             if (showAvatarPopup) setShowAvatarPopupState(true);
-            
+
             return { success: true, isNewUser, user: userData };
         } catch (error) {
             console.error('Google Auth Error:', error);

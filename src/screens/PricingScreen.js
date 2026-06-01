@@ -24,11 +24,12 @@ const PLANS = [
         features: [
             { text: '3 AI Counseling Prompts', included: true },
             { text: '5 College Predictions', included: true },
-            { text: '1 PDF or CSV Export', included: true },
+            { text: '3 PDF or CSV Exports', included: true },
             { text: 'Browse All Colleges', included: true },
             { text: 'Admission Notifications', included: true },
             { text: 'Standard Chat Support', included: true },
             { text: 'Personal API Key', included: false },
+            { text: 'Document Verifications', included: false },
         ],
         buttonText: 'Current Plan',
         color: '#94A3B8'
@@ -44,9 +45,12 @@ const PLANS = [
             { text: 'Unlimited AI Prompts', included: true },
             { text: 'Personal API Key Support', included: true },
             { text: '15 College Predictions', included: true },
-            { text: '5 PDF & CSV Exports', included: true },
-            { text: '1 Live Zoom Consultation', included: true },
+            { text: '7 PDF & CSV Exports', included: true },
+            { text: '300+ College Info', included: true },
+            { text: '19000+ Listed Cutoffs', included: true },
+            { text: 'Personalized Preset Lists', included: true },
             { text: 'Standard Chat Support', included: true },
+            { text: 'Document Verifications', included: false },
             { text: 'End-to-End Support', included: false },
         ],
         buttonText: 'Get Standard',
@@ -63,13 +67,35 @@ const PLANS = [
             { text: 'Unlimited AI Prompts', included: true },
             { text: 'Personal API Key Support', included: true },
             { text: '25 College Predictions', included: true },
-            { text: '12 PDF & CSV Exports', included: true },
-            { text: 'Weekly Live Zoom Meet', included: true },
+            { text: '15 PDF & CSV Exports', included: true },
+            { text: '300+ College Info', included: true },
+            { text: '19000+ Listed Cutoffs', included: true },
+            { text: 'Personalized Preset Lists', included: true },
+            { text: 'Document Verifications', included: true },
             { text: 'Personal Counselor Chat', included: true },
             { text: '24/7 Call & WhatsApp', included: true },
         ],
         buttonText: 'Get Advance',
         color: '#F59E0B'
+    },
+    {
+        id: 'counselor',
+        name: 'Counselor Special',
+        subtitle: 'For Counseling Professionals',
+        price: '₹999',
+        priceLabel: 'One time',
+        isPremium: true,
+        features: [
+            { text: 'Unlimited AI Prompts', included: true },
+            { text: 'Counselor Profile in Expert Directory', included: true },
+            { text: '250 College Predictions', included: true },
+            { text: 'Unlimited PDF & CSV Exports', included: true },
+            { text: 'Special Counselor Dashboard', included: true },
+            { text: 'Direct Student Chat Access', included: true },
+            { text: '24/7 VIP Phone Support', included: true },
+        ],
+        buttonText: 'Get Counselor Special',
+        color: '#F43F5E'
     }
 ];
 
@@ -89,6 +115,50 @@ const PricingScreen = ({ navigation }) => {
     const [showCheckout, setShowCheckout] = useState(false);
     const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState(null);
 
+    const isPlanRenewable = (planId) => {
+        if (!user || !planId || planId === 'free') return false;
+        const isActive = user?.subscription?.type === planId;
+        if (!isActive) return false;
+        const activePlanDetails = SUBSCRIPTION_PLANS[planId.toUpperCase()];
+        const currentUsage = user?.subscription?.usage || {};
+        if (activePlanDetails) {
+            let renewable = false;
+            Object.keys(activePlanDetails.limits).forEach(key => {
+                const limit = activePlanDetails.limits[key];
+                if (limit !== Infinity && (currentUsage[key] || 0) >= limit) {
+                    renewable = true;
+                }
+            });
+            return renewable;
+        }
+        return false;
+    };
+
+    const getBaseCheckoutAmount = (plan) => {
+        if (!plan) return 0;
+        let amount = parseInt(plan.price.replace('₹', '')) || 0;
+        if (isPlanRenewable(plan.id) && amount > 0) {
+            amount = Math.round(amount * 0.7);
+        }
+        return amount;
+    };
+
+    const getCouponDiscountAmount = (plan) => {
+        if (!plan || !appliedCoupon) return 0;
+        const baseAmount = getBaseCheckoutAmount(plan);
+        return Math.round((baseAmount * appliedCoupon.discountPercentage) / 100);
+    };
+
+    const getTotalCheckoutAmount = (plan) => {
+        if (!plan) return 0;
+        const baseAmount = getBaseCheckoutAmount(plan);
+        if (appliedCoupon) {
+            const discount = getCouponDiscountAmount(plan);
+            return Math.max(0, baseAmount - discount);
+        }
+        return baseAmount;
+    };
+
     useEffect(() => {
         // Fetch dynamic pricing from backend
         const fetchPrices = async () => {
@@ -101,6 +171,9 @@ const PricingScreen = ({ navigation }) => {
                     }
                     if (plan.id === 'advance' && settings.premiumPrice) {
                         return { ...plan, price: `₹${settings.premiumPrice}` };
+                    }
+                    if (plan.id === 'counselor' && settings.counselorPrice) {
+                        return { ...plan, price: `₹${settings.counselorPrice}` };
                     }
                     return plan;
                 });
@@ -146,33 +219,7 @@ const PricingScreen = ({ navigation }) => {
     };
 
     const handleConfirmPayment = async (plan) => {
-        let amount = parseInt(plan.price.replace('₹', '')) || 0;
-        
-        // Define if it is a renewal
-        const isActive = user?.subscription?.type === plan.id;
-        let isRenewable = false;
-        if (isActive && plan.id !== 'free') {
-            const activePlanDetails = SUBSCRIPTION_PLANS[plan.id.toUpperCase()];
-            const currentUsage = user?.subscription?.usage || {};
-            if (activePlanDetails) {
-                Object.keys(activePlanDetails.limits).forEach(key => {
-                    const limit = activePlanDetails.limits[key];
-                    if (limit !== Infinity && (currentUsage[key] || 0) >= limit) {
-                        isRenewable = true;
-                    }
-                });
-            }
-        }
-
-        // Apply renewal discount 30%
-        if (isRenewable && amount > 0) {
-            amount = Math.round(amount * 0.7);
-        }
-
-        if (appliedCoupon && amount > 0) {
-            const discount = (amount * appliedCoupon.discountPercentage) / 100;
-            amount = Math.max(0, Math.round(amount - discount));
-        }
+        let amount = getTotalCheckoutAmount(plan);
         
         // Convert to paisa for Razorpay
         amount = amount * 100;
@@ -358,20 +405,27 @@ const PricingScreen = ({ navigation }) => {
         }
     };
 
-    const renderFeature = (feature, index) => (
-        <View key={index} style={styles.featureRow}>
-            <View style={[styles.iconCircle, { backgroundColor: feature.included ? '#10B98115' : '#EF444415' }]}>
-                {feature.included ? (
-                    <Check size={14} color="#10B981" />
-                ) : (
-                    <X size={14} color="#EF4444" />
-                )}
+    const renderFeature = (feature, index) => {
+        const isDocVerification = feature.text.toLowerCase().includes('document');
+        return (
+            <View key={index} style={styles.featureRow}>
+                <View style={[styles.iconCircle, { backgroundColor: feature.included ? '#10B98115' : '#EF444415' }]}>
+                    {feature.included ? (
+                        <Check size={14} color="#10B981" />
+                    ) : (
+                        <X size={14} color="#EF4444" />
+                    )}
+                </View>
+                <Text style={[
+                    styles.featureText, 
+                    !feature.included && styles.featureDisabled,
+                    (!feature.included && isDocVerification) && { color: '#EF4444', textDecorationLine: 'none', fontWeight: 'bold' }
+                ]}>
+                    {feature.text}
+                </Text>
             </View>
-            <Text style={[styles.featureText, !feature.included && styles.featureDisabled]}>
-                {feature.text}
-            </Text>
-        </View>
-    );
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -429,11 +483,12 @@ const PricingScreen = ({ navigation }) => {
                         <View style={[
                             styles.planCard,
                             plan.isPremium && styles.premiumCard,
-                            plan.isMid && styles.midCard
+                            plan.isMid && styles.midCard,
+                            plan.id === 'counselor' && { borderColor: '#F43F5E60' }
                         ]}>
                             {plan.isPremium ? (
                                 <LinearGradient
-                                    colors={['#F59E0B', '#B45309']}
+                                    colors={plan.id === 'counselor' ? ['#F43F5E', '#BE123C'] : ['#F59E0B', '#B45309']}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                     style={styles.premiumBadge}
@@ -456,7 +511,7 @@ const PricingScreen = ({ navigation }) => {
                                         <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>{originalPrice}</Text>
                                     ) : plan.price !== 'Free' && (
                                         <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>
-                                            ₹{parseInt(plan.price.replace('₹', '')) + 100}
+                                            ₹{parseInt(plan.price.replace('₹', '')) + (plan.id === 'counselor' ? 1000 : plan.id === 'advance' ? 700 : 500)}
                                         </Text>
                                     )}
                                     <Text style={styles.priceValue}>{displayPrice}</Text>
@@ -482,7 +537,7 @@ const PricingScreen = ({ navigation }) => {
                             </View>
 
                             {(() => {
-                                const planHierarchy = { free: 0, standard: 1, advance: 2 };
+                                const planHierarchy = { free: 0, standard: 1, advance: 2, counselor: 3 };
                                 const userLevel = planHierarchy[user?.subscription?.type] || 0;
                                 const currentPlanLevel = planHierarchy[plan.id] || 0;
                                 
@@ -505,7 +560,7 @@ const PricingScreen = ({ navigation }) => {
                                         ]}>
                                         {plan.isPremium ? (
                                             <LinearGradient
-                                                colors={['#F59E0B', '#D97706']}
+                                                colors={plan.id === 'counselor' ? ['#F43F5E', '#E11D48'] : ['#F59E0B', '#D97706']}
                                                 style={styles.gradientBtn}
                                             >
                                                 <Text style={styles.btnText}>{btnText}</Text>
@@ -589,10 +644,10 @@ const PricingScreen = ({ navigation }) => {
                                         <Text style={styles.summaryPlanName}>{selectedPlanForCheckout.name} Plan</Text>
                                         <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                                             <Text style={[styles.summaryPlanPrice, { textDecorationLine: 'line-through', marginRight: 8 }]}>
-                                                ₹{parseInt(selectedPlanForCheckout.price.replace('₹', '')) + 100}
+                                                ₹{parseInt(selectedPlanForCheckout.price.replace('₹', '')) + (selectedPlanForCheckout.id === 'advance' ? 700 : 500)}
                                             </Text>
                                             <Text style={[styles.summaryPlanPrice, { fontWeight: 'bold', color: Colors.primary }]}>
-                                                {selectedPlanForCheckout.price}
+                                                ₹{getBaseCheckoutAmount(selectedPlanForCheckout)}
                                             </Text>
                                             <Text style={styles.summaryPlanPrice}> / {selectedPlanForCheckout.priceLabel}</Text>
                                         </View>
@@ -685,6 +740,20 @@ const PricingScreen = ({ navigation }) => {
                                         <Text style={styles.invoiceValue}>{selectedPlanForCheckout?.price}</Text>
                                     </View>
                                     
+                                    {isPlanRenewable(selectedPlanForCheckout?.id) && (
+                                        <View style={styles.invoiceRow}>
+                                            <View style={styles.discountRow}>
+                                                <Text style={styles.invoiceLabel}>Renewal Discount</Text>
+                                                <View style={[styles.miniCouponTag, { backgroundColor: '#10b98115' }]}>
+                                                    <Text style={[styles.miniCouponText, { color: '#10b981' }]}>30% OFF</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={[styles.invoiceValue, { color: '#10b981' }]}>
+                                                - ₹{Math.round((parseInt(selectedPlanForCheckout?.price.replace('₹', '')) || 0) * 0.3)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    
                                     {appliedCoupon && (
                                         <View style={styles.invoiceRow}>
                                             <View style={styles.discountRow}>
@@ -694,7 +763,7 @@ const PricingScreen = ({ navigation }) => {
                                                 </View>
                                             </View>
                                             <Text style={[styles.invoiceValue, { color: '#10b981' }]}>
-                                                - ₹{Math.round((parseInt(selectedPlanForCheckout?.price.replace('₹', '')) * appliedCoupon.discountPercentage) / 100)}
+                                                - ₹{getCouponDiscountAmount(selectedPlanForCheckout)}
                                             </Text>
                                         </View>
                                     )}
@@ -704,14 +773,7 @@ const PricingScreen = ({ navigation }) => {
                                     <View style={styles.totalRow}>
                                         <Text style={styles.totalLabel}>Total Amount</Text>
                                         <Text style={styles.totalValue}>
-                                            ₹{(() => {
-                                                const base = parseInt(selectedPlanForCheckout?.price.replace('₹', '')) || 0;
-                                                if (appliedCoupon) {
-                                                    const discount = (base * appliedCoupon.discountPercentage) / 100;
-                                                    return Math.max(0, Math.round(base - discount));
-                                                }
-                                                return base;
-                                            })()}
+                                            ₹{getTotalCheckoutAmount(selectedPlanForCheckout)}
                                         </Text>
                                     </View>
                                 </View>

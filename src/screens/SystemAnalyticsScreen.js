@@ -12,6 +12,7 @@ const SystemAnalyticsScreen = ({ navigation }) => {
     
     const [basicPrice, setBasicPrice] = useState('99');
     const [premiumPrice, setPremiumPrice] = useState('499');
+    const [counselorPrice, setCounselorPrice] = useState('999');
     
     const [coupons, setCoupons] = useState([]);
     const [newCouponCode, setNewCouponCode] = useState('');
@@ -31,6 +32,7 @@ const SystemAnalyticsScreen = ({ navigation }) => {
             setData(statsRes.data);
             if (settingsRes.data.basicPrice) setBasicPrice(settingsRes.data.basicPrice.toString());
             if (settingsRes.data.premiumPrice) setPremiumPrice(settingsRes.data.premiumPrice.toString());
+            if (settingsRes.data.counselorPrice) setCounselorPrice(settingsRes.data.counselorPrice.toString());
             setCoupons(couponsRes.data || []);
         } catch (error) {
             console.error('Failed to fetch admin data', error);
@@ -43,6 +45,7 @@ const SystemAnalyticsScreen = ({ navigation }) => {
         try {
             await systemAPI.updateSetting({ key: 'basicPrice', value: Number(basicPrice) });
             await systemAPI.updateSetting({ key: 'premiumPrice', value: Number(premiumPrice) });
+            await systemAPI.updateSetting({ key: 'counselorPrice', value: Number(counselorPrice) });
             Alert.alert('Success', 'Pricing updated successfully!');
         } catch (e) {
             Alert.alert('Error', 'Failed to update pricing');
@@ -120,7 +123,7 @@ const SystemAnalyticsScreen = ({ navigation }) => {
     if (predictData.labels.length === 0) { predictData.labels = ['None']; predictData.datasets[0].data = [0]; }
 
     return (
-        <MainLayout title="Intelligence Dashboard">
+        <MainLayout title="System Analytics">
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 {/* Stats Grid */}
                 <View style={styles.statsGrid}>
@@ -163,6 +166,15 @@ const SystemAnalyticsScreen = ({ navigation }) => {
                             style={styles.input}
                             value={premiumPrice}
                             onChangeText={setPremiumPrice}
+                            keyboardType="numeric"
+                        />
+                    </View>
+                    <View style={styles.inputRow}>
+                        <Text style={styles.inputLabel}>Counselor Special Price (₹)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={counselorPrice}
+                            onChangeText={setCounselorPrice}
                             keyboardType="numeric"
                         />
                     </View>

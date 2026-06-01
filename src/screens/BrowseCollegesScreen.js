@@ -275,7 +275,7 @@ const BrowseCollegesScreen = ({ navigation }) => {
     const sections = getSections();
 
     return (
-        <MainLayout scrollable={false} noPadding>
+        <MainLayout title="Browse Colleges" scrollable={false} noPadding>
             <View style={styles.container}>
                 <View style={styles.stickySearchContainer}>
                     <View style={styles.searchBar}>

@@ -7,17 +7,36 @@ import { useAuth } from '../contexts/AuthContext';
 import OptimizedImage from '../components/ui/OptimizedImage';
 
 const SavedCollegesScreen = ({ navigation }) => {
-    const { user, refreshUser } = useAuth();
+    const { user, refreshUser, admissionPath } = useAuth();
     const [activeTab, setActiveTab] = useState('All');
     const [filtered, setFiltered] = useState([]);
     const [savingId, setSavingId] = useState(null);
 
     const tabs = ['All', 'Autonomous', 'Government', 'Private', 'Deemed'];
-    const saved = user?.savedColleges || [];
+
+    const matchesExamType = (category, examType) => {
+        if (!category || !examType) return false;
+        const cat = category.toUpperCase().trim();
+        const type = examType.toUpperCase().trim();
+        if (type === 'MHTCET PCM' || type === 'MHTCET-PCM') {
+            return cat === 'MHTCET PCM' || cat === 'ENGINEERING' || cat === 'MHTCET' || cat === 'MHTCET-PCM';
+        }
+        if (type === 'MHTCET PCB' || type === 'MHTCET-PCB') {
+            return cat === 'MHTCET PCB' || cat === 'PHARMACY' || cat === 'MHTCET-PCB';
+        }
+        return cat === type;
+    };
+
+    const activeType = admissionPath || user?.examType;
+
+    const saved = (user?.savedColleges || []).filter(item => {
+        const collegeCat = item.category || 'Engineering';
+        return matchesExamType(collegeCat, activeType);
+    });
 
     useEffect(() => {
         handleFilter(activeTab);
-    }, [user?.savedColleges, activeTab]);
+    }, [user?.savedColleges, admissionPath, user?.examType, activeTab]);
 
     const handleFilter = (tab) => {
         setActiveTab(tab);

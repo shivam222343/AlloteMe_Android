@@ -6,7 +6,7 @@ export const SUBSCRIPTION_PLANS = {
         limits: {
             aiPrompts: 3,
             predictions: 5,
-            exports: 1
+            exports: 3
         }
     },
     STANDARD: {
@@ -16,7 +16,7 @@ export const SUBSCRIPTION_PLANS = {
         limits: {
             aiPrompts: Infinity,
             predictions: 15,
-            exports: 5
+            exports: 7
         }
     },
     ADVANCE: {
@@ -26,7 +26,17 @@ export const SUBSCRIPTION_PLANS = {
         limits: {
             aiPrompts: Infinity,
             predictions: 25,
-            exports: 12
+            exports: 15
+        }
+    },
+    COUNSELOR: {
+        id: 'counselor',
+        name: 'Counselor Special',
+        price: 999,
+        limits: {
+            aiPrompts: Infinity,
+            predictions: 250,
+            exports: Infinity
         }
     }
 };

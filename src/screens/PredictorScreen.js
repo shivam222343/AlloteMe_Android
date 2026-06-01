@@ -273,21 +273,19 @@ const PredictorScreen = ({ navigation }) => {
                 <View style={styles.topHeader}>
                     <View>
                         <Text style={styles.title}>College Predictor</Text>
-                        <Text style={styles.subtitle}>Analyzing {user?.examType} Real Data • 2025 Edition</Text>
                     </View>
                     <View style={styles.usageChip}>
                         <Text style={styles.usageText}>
                             Predictions: <Text style={styles.usageBold}>
-                                {user?.subscription?.usage?.predictions || 0}/{SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions}
+                                {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.predictions || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions)}
                             </Text>
+                            Used.
                         </Text>
                     </View>
                 </View>
 
                 <Card style={styles.formCard}>
-                    <View style={styles.infoBox}>
-                        <Text style={styles.infoText}>Validating scores against millions of allotment records from DTE database.</Text>
-                    </View>
+
 
                     <View style={styles.inputGrid}>
                         <Input

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, KeyboardAvoidingView, Modal, FlatList,
-    Alert, Pressable, ActivityIndicator, ScrollView, Image
+    Alert, Pressable, ActivityIndicator, ScrollView, Image, useWindowDimensions
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors, Shadows } from '../../constants/theme';
@@ -27,6 +27,48 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         setShowAvatarPopup
     } = useAuth();
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
+
+    const desktopTabs = user?.role === 'admin' ? [
+        { name: 'Dashboard', label: 'Admin Console' },
+        { name: 'UploadCutoff', label: 'Upload' },
+        { name: 'BrowseColleges', label: 'Browse Institutes' },
+        { name: 'SystemAnalytics', label: 'Analytics' },
+    ] : [
+        { name: 'Dashboard', label: 'Home' },
+        { name: 'BrowseColleges', label: 'Browse' },
+        { name: 'AICounselor', label: 'ETA AI' },
+        { name: 'Counselors', label: 'Experts' },
+        { name: 'DocumentVerification', label: 'Documents' },
+    ];
+
+    const isTabActive = (tabName) => {
+        if (!title) return false;
+        const lowerTitle = title.toLowerCase();
+        if (tabName === 'Dashboard') {
+            return lowerTitle.includes('dashboard') || lowerTitle.includes('admin console');
+        }
+        if (tabName === 'BrowseColleges') {
+            return lowerTitle.includes('browse') || lowerTitle.includes('college') || lowerTitle.includes('institute') || lowerTitle.includes('explore');
+        }
+        if (tabName === 'AICounselor') {
+            return lowerTitle.includes('ai') || lowerTitle.includes('counselor');
+        }
+        if (tabName === 'Counselors') {
+            return lowerTitle.includes('expert') || lowerTitle.includes('connect') || lowerTitle.includes('counselor');
+        }
+        if (tabName === 'DocumentVerification') {
+            return lowerTitle.includes('document') || lowerTitle.includes('checklist') || lowerTitle.includes('कागदपत्रे');
+        }
+        if (tabName === 'UploadCutoff') {
+            return lowerTitle.includes('upload');
+        }
+        if (tabName === 'SystemAnalytics') {
+            return lowerTitle.includes('analytics') || lowerTitle.includes('intelligence');
+        }
+        return false;
+    };
 
     useEffect(() => {
         if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -78,7 +120,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
             {showHeader && (
                 <View style={[styles.header, { paddingTop: topPadding }]}>
                     <View style={styles.headerInner}>
-                        <View style={styles.leftRow}>
+                        <View style={[styles.leftRow, isDesktop && { flex: 0, marginRight: 24 }]}>
                             {!hideBack && navigation.canGoBack() ? (
                                 <TouchableOpacity
                                     onPress={() => navigation.goBack()}
@@ -102,6 +144,36 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 </Text>
                             )}
                         </View>
+
+                        {isDesktop && (
+                            <View style={styles.desktopNav}>
+                                {desktopTabs.map((tab) => {
+                                    const active = isTabActive(tab.name);
+                                    return (
+                                        <TouchableOpacity
+                                            key={tab.name}
+                                            style={[styles.desktopNavLink, active && styles.desktopNavLinkActive]}
+                                            onPress={() => {
+                                                if (Platform.OS === 'web') {
+                                                    navigation.navigate('AppDrawer', {
+                                                        screen: 'MainTabs',
+                                                        params: { screen: tab.name }
+                                                    });
+                                                } else {
+                                                    navigation.navigate('MainTabs', { screen: tab.name });
+                                                }
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={[styles.desktopNavText, active && styles.desktopNavTextActive]}>
+                                                {tab.label}
+                                            </Text>
+                                            {active && <View style={styles.desktopNavIndicator} />}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        )}
 
                         <View style={styles.rightActions}>
                             <TouchableOpacity
@@ -341,7 +413,15 @@ const styles = StyleSheet.create({
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary, marginLeft: 8 },
     boldText: { fontWeight: 'bold' },
     emptyBox: { padding: 60, alignItems: 'center', gap: 12 },
-    emptyText: { color: Colors.text.tertiary, fontSize: 14 }
+    emptyText: { color: Colors.text.tertiary, fontSize: 14 },
+
+    // Desktop topbar navigation styles
+    desktopNav: { flexDirection: 'row', gap: 24, alignItems: 'center', height: '100%' },
+    desktopNavLink: { paddingVertical: 18, paddingHorizontal: 4, position: 'relative', height: '100%', justifyContent: 'center' },
+    desktopNavLinkActive: {},
+    desktopNavText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
+    desktopNavTextActive: { color: Colors.primary, fontWeight: '700' },
+    desktopNavIndicator: { position: 'absolute', bottom: -1.5, left: 0, right: 0, height: 3, backgroundColor: Colors.primary, borderTopLeftRadius: 3, borderTopRightRadius: 3 }
 });
 
 export default MainLayout;

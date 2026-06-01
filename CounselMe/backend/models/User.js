@@ -128,6 +128,27 @@ const userSchema = new mongoose.Schema({
             exports: { type: Number, default: 0 }
         }
     },
+    admissionCategory: {
+        type: String,
+        default: 'OPEN'
+    },
+    documentChecklist: {
+        type: Map,
+        of: Boolean,
+        default: {}
+    },
+    documents: {
+        type: Map,
+        of: {
+            status: { type: String, enum: ['pending', 'verified', 'accepted', 'rejected'], default: 'pending' },
+            fileName: String,
+            uri: String,
+            createdAt: String,
+            category: String,
+            remark: String
+        },
+        default: {}
+    },
     fcmToken: {
         type: String,
         default: null

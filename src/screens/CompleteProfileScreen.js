@@ -31,6 +31,14 @@ const CompleteProfileScreen = ({ navigation, route }) => {
         phoneNumber: user?.phoneNumber || ''
     });
 
+    const [errors, setErrors] = useState({
+        percentile: '',
+        rank: '',
+        location: '',
+        phoneNumber: '',
+        expectedRegion: ''
+    });
+
     const handleExamChange = (type) => {
         const score = userScores[type] || {};
         setFormData(prev => ({
@@ -39,6 +47,13 @@ const CompleteProfileScreen = ({ navigation, route }) => {
             percentile: score.percentile?.toString() || '',
             rank: score.rank?.toString() || ''
         }));
+        setErrors({
+            percentile: '',
+            rank: '',
+            location: '',
+            phoneNumber: '',
+            expectedRegion: ''
+        });
     };
 
     // Auto-calculate Rank based on Percentile (similar to Predictor)
@@ -55,6 +70,7 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                 const res = await cutoffAPI.estimateRank(formData.percentile);
                 if (res.data?.rank) {
                     setFormData(prev => ({ ...prev, rank: res.data.rank.toString() }));
+                    if (errors.rank) setErrors(prev => ({ ...prev, rank: '' }));
                 }
             } catch (error) {
                 console.log('Rank estimation failed', error);
@@ -67,7 +83,21 @@ const CompleteProfileScreen = ({ navigation, route }) => {
     }, [formData.percentile]);
 
     const handleSubmit = async () => {
-        // No fields are mandatory anymore per user request
+        const newErrors = {
+            percentile: !formData.percentile.trim() ? 'please enter this' : '',
+            rank: !formData.rank.trim() ? 'please enter this' : '',
+            location: !formData.location.trim() ? 'please enter this' : '',
+            phoneNumber: !formData.phoneNumber.trim() ? 'please enter this' : '',
+            expectedRegion: !formData.expectedRegion.trim() ? 'please enter this' : ''
+        };
+
+        setErrors(newErrors);
+
+        // Block if any field is empty
+        if (Object.values(newErrors).some(err => err !== '')) {
+            return;
+        }
+
         setLoading(true);
         try {
             const updateData = {
@@ -106,11 +136,6 @@ const CompleteProfileScreen = ({ navigation, route }) => {
         }
     };
 
-    const handleSkip = () => {
-        setHasSkippedProfile(true);
-        navigation.navigate('Dashboard');
-    };
-
     return (
         <MainLayout title="Complete Profile" showHeader={true}>
             <KeyboardAvoidingView
@@ -145,7 +170,11 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                         <Input
                             label="Entrance Exam Percentile"
                             value={formData.percentile}
-                            onChangeText={(t) => setFormData({ ...formData, percentile: t })}
+                            onChangeText={(t) => {
+                                setFormData({ ...formData, percentile: t });
+                                if (errors.percentile) setErrors(prev => ({ ...prev, percentile: '' }));
+                            }}
+                            error={errors.percentile}
                             placeholder="e.g. 98.45"
                             keyboardType="decimal-pad"
                             leftIcon={<Hash size={18} color={Colors.text.tertiary} />}
@@ -155,7 +184,11 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                             <Input
                                 label="All India / State Rank"
                                 value={formData.rank}
-                                onChangeText={(t) => setFormData({ ...formData, rank: t })}
+                                onChangeText={(t) => {
+                                    setFormData({ ...formData, rank: t });
+                                    if (errors.rank) setErrors(prev => ({ ...prev, rank: '' }));
+                                }}
+                                error={errors.rank}
                                 placeholder={rankLoading ? "Calculating..." : "e.g. 1240"}
                                 keyboardType="number-pad"
                                 leftIcon={<Target size={18} color={Colors.text.tertiary} />}
@@ -172,7 +205,11 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                         <Input
                             label="Your Current City"
                             value={formData.location}
-                            onChangeText={(t) => setFormData({ ...formData, location: t })}
+                            onChangeText={(t) => {
+                                setFormData({ ...formData, location: t });
+                                if (errors.location) setErrors(prev => ({ ...prev, location: '' }));
+                            }}
+                            error={errors.location}
                             placeholder="e.g. Mumbai"
                             leftIcon={<MapPin size={18} color={Colors.text.tertiary} />}
                         />
@@ -180,7 +217,11 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                         <Input
                             label="WhatsApp Phone Number"
                             value={formData.phoneNumber}
-                            onChangeText={(t) => setFormData({ ...formData, phoneNumber: t })}
+                            onChangeText={(t) => {
+                                setFormData({ ...formData, phoneNumber: t });
+                                if (errors.phoneNumber) setErrors(prev => ({ ...prev, phoneNumber: '' }));
+                            }}
+                            error={errors.phoneNumber}
                             placeholder="e.g. 8010XXXXXX"
                             keyboardType="phone-pad"
                             maxLength={10}
@@ -189,7 +230,11 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                         <Input
                             label="Expected College Region"
                             value={formData.expectedRegion}
-                            onChangeText={(t) => setFormData({ ...formData, expectedRegion: t })}
+                            onChangeText={(t) => {
+                                setFormData({ ...formData, expectedRegion: t });
+                                if (errors.expectedRegion) setErrors(prev => ({ ...prev, expectedRegion: '' }));
+                            }}
+                            error={errors.expectedRegion}
                             placeholder="e.g. Pune, Mumbai, National"
                         />
                     </Card>
@@ -199,13 +244,6 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                             title="Finish & Save"
                             onPress={handleSubmit}
                             loading={loading}
-                            style={{ flex: 2 }}
-                        />
-                        <Button
-                            title="Skip"
-                            variant="ghost"
-                            onPress={handleSkip}
-                            style={{ flex: 1 }}
                         />
                     </View>
 

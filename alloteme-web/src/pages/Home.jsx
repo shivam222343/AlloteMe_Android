@@ -35,9 +35,8 @@ const professions = ["Engineers", "Doctors", "Visionaries", "Innovators", "Archi
 
 const founders = [
     { name: "Shivam Dombe", role: "Founder", img: "/Shivam.webp", bg: "/Bg.webp", github: "https://github.com/shivam222343", accent: "#b38728" },
-    { name: "Rohan Mane", role: "Co-Founder", img: "/Rohan.webp", bg: "/Blue.webp", github: "#", accent: "#245df1" }
-    // { name: "Tejas Choudhari", role: "Co-Founder", img: "/Shivam.webp", bg: "/Pink.webp", github: "#", accent: "#ec4899" },
-    // { name: "Omkar Kapare", role: "Marketing Lead", img: "/Shivam.webp", bg: "/Purple.webp", github: "#", accent: "#a855f7" }
+    { name: "Rohan Mane", role: "Co-Founder", img: "/Rohan_M.webp", bg: "/Blue.webp", github: "#", accent: "#245df1" },
+    { name: "Tejas Choudhari", role: "Co-Founder", img: "/Tejas_C.webp", bg: "/Pink.webp", github: "#", accent: "#ec4899" }
 ];
 
 const Home = () => {
@@ -156,7 +155,7 @@ const Home = () => {
 
                         <div className="hero-image-container" style={{
                             position: 'relative',
-                            minHeight: '400px',
+                            minHeight: '520px',
                             width: '100%',
                             display: 'flex',
                             alignItems: 'center',
@@ -171,12 +170,12 @@ const Home = () => {
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -50 }}
                                     transition={{ duration: 0.5 }}
-                                    style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    style={{ position: 'relative', width: '100%', maxWidth: '550px', minHeight: '520px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
                                 >
                                     <img
                                         src={founders[founderIndex].img}
                                         alt={founders[founderIndex].name}
-                                        style={{ width: '100%', maxWidth: '550px', height: 'auto', display: 'block', margin: '0 auto', zIndex: 2 }}
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', zIndex: 2 }}
                                     />
 
                                     <motion.div
@@ -184,7 +183,7 @@ const Home = () => {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.4 }}
                                         className="name-badge-container"
-                                        style={{ position: 'absolute', bottom: '35%', left: '-10%', zIndex: 10 }}
+                                        style={{ position: 'absolute', bottom: '35%', left: '16px', zIndex: 10 }}
                                     >
                                         <div className="name-badge">
                                             {founders[founderIndex].name} <span>{founders[founderIndex].role}</span>

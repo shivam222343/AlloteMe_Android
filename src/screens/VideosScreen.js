@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, Modal as RNModal, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Dimensions, ScrollView, Modal as RNModal, Platform, useWindowDimensions } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { videoAPI } from '../services/api';
 import { Colors, Shadows, BorderRadius } from '../constants/theme';
@@ -14,6 +14,8 @@ const { width } = Dimensions.get('window');
 const EXAM_OPTIONS = ['MHTCET PCM', 'MHTCET PCB', 'BBA', 'NEET', 'JEE', 'Engineering', 'Pharmacy'];
 
 const VideosScreen = () => {
+    const { width: windowWidth } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && windowWidth > 768;
     const { user, admissionPath, setAdmissionPath } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [videos, setVideos] = useState([]);
@@ -47,26 +49,49 @@ const VideosScreen = () => {
         }
     };
 
-    const renderVideo = ({ item }) => (
-        <TouchableOpacity 
-            style={styles.videoCard} 
-            activeOpacity={0.9}
-            onPress={() => setSelectedVideo(item)}
-        >
-            <View style={styles.thumbnailContainer}>
-                <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
-                <View style={styles.playOverlay}>
-                    <PlayCircle size={40} color={Colors.white} />
+    const renderVideo = ({ item }) => {
+        const channelName = "AlloteMe Guidance";
+        const channelInitial = "A";
+        
+        return (
+            <TouchableOpacity 
+                style={[
+                    styles.videoCard, 
+                    isDesktop && { 
+                        flex: 1, 
+                        minWidth: 250, 
+                        maxWidth: isDesktop ? (Math.min(windowWidth, 1200) - 48 - 40) / 3 : '100%', 
+                        marginBottom: 0 
+                    }
+                ]} 
+                activeOpacity={0.9}
+                onPress={() => setSelectedVideo(item)}
+            >
+                <View style={styles.thumbnailContainer}>
+                    <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
+                    <View style={styles.playOverlay}>
+                        <PlayCircle size={40} color={Colors.white} fill="rgba(0, 0, 0, 0.4)" />
+                    </View>
+                    <View style={styles.durationBadge}>
+                        <Text style={styles.durationText}>12:45</Text>
+                    </View>
                 </View>
-            </View>
-            <View style={styles.videoInfo}>
-                <Text style={styles.videoTitle} numberOfLines={2}>{item.title}</Text>
-                <View style={styles.videoMeta}>
-                    <Text style={styles.videoMetaText}>{item.views} • {item.uploadDate}</Text>
+                
+                <View style={styles.videoDetailsContainer}>
+                    <View style={styles.channelAvatar}>
+                        <Text style={styles.avatarText}>{channelInitial}</Text>
+                    </View>
+                    <View style={styles.videoTextDetails}>
+                        <Text style={styles.videoTitle} numberOfLines={2}>{item.title}</Text>
+                        <Text style={styles.channelName}>{channelName}</Text>
+                        <Text style={styles.videoMetaText}>
+                            {item.views || '150K'} views • {item.uploadDate || 'recently'}
+                        </Text>
+                    </View>
                 </View>
-            </View>
-        </TouchableOpacity>
-    );
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <MainLayout title="Videos">
@@ -138,10 +163,13 @@ const VideosScreen = () => {
                 </View>
             ) : (
                 <FlatList
+                    key={isDesktop ? 'desktop-videos-grid' : 'mobile-videos-list'}
+                    numColumns={isDesktop ? 3 : 1}
                     data={videos}
                     renderItem={renderVideo}
                     keyExtractor={item => item._id}
-                    contentContainerStyle={styles.list}
+                    contentContainerStyle={[styles.list, isDesktop && { maxWidth: 1200, width: '100%', alignSelf: 'center', padding: 24, rowGap: 24 }]}
+                    columnWrapperStyle={isDesktop ? { gap: 20 } : null}
                     showsVerticalScrollIndicator={false}
                 />
             )}
@@ -152,26 +180,78 @@ const VideosScreen = () => {
 const styles = StyleSheet.create({
     list: { padding: 16 },
     videoCard: { 
-        backgroundColor: Colors.white, 
-        borderRadius: 20, 
-        marginBottom: 20,
+        backgroundColor: 'transparent', 
+        marginBottom: 24,
         overflow: 'hidden',
-        ...Shadows.sm,
-        borderWidth: 1,
-        borderColor: '#F1F5F9'
     },
-    thumbnailContainer: { width: '100%', height: 200, backgroundColor: '#eee' },
+    thumbnailContainer: { 
+        width: '100%', 
+        aspectRatio: 16/9, 
+        backgroundColor: '#f1f5f9',
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative'
+    },
     thumbnail: { width: '100%', height: '100%' },
     playOverlay: { 
         ...StyleSheet.absoluteFillObject, 
-        backgroundColor: 'rgba(0,0,0,0.2)',
+        backgroundColor: 'rgba(0,0,0,0.15)',
         justifyContent: 'center', 
         alignItems: 'center' 
     },
-    videoInfo: { padding: 16 },
-    videoTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text.primary, marginBottom: 6 },
-    videoMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    videoMetaText: { fontSize: 12, color: Colors.text.tertiary },
+    durationBadge: {
+        position: 'absolute',
+        bottom: 8,
+        right: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    durationText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600'
+    },
+    videoDetailsContainer: {
+        flexDirection: 'row',
+        marginTop: 12,
+        paddingHorizontal: 4
+    },
+    channelAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12
+    },
+    avatarText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: 'bold'
+    },
+    videoTextDetails: {
+        flex: 1
+    },
+    videoTitle: { 
+        fontSize: 14, 
+        fontWeight: '600', 
+        color: Colors.text.primary, 
+        lineHeight: 18 
+    },
+    channelName: {
+        fontSize: 12,
+        color: Colors.text.tertiary,
+        marginTop: 4,
+        fontWeight: '500'
+    },
+    videoMetaText: { 
+        fontSize: 12, 
+        color: Colors.text.tertiary, 
+        marginTop: 2 
+    },
     
     fullScreenOverlay: { 
         flex: 1, 

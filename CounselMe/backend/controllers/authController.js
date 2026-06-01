@@ -107,11 +107,14 @@ const loginUser = async (req, res) => {
             expectedRegion: user.expectedRegion,
             bannerUrl: user.bannerUrl,
             preferences: user.preferences,
-            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
-            savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
+            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university category')).savedColleges || [],
+            savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode category')).savedPredictions || [],
             subscription: user.subscription,
             token: generateToken(user._id),
             groqApiKey: user.groqApiKey,
+            admissionCategory: user.admissionCategory || 'OPEN',
+            documentChecklist: user.documentChecklist || {},
+            documents: user.documents || {},
             showAvatarPopup: !user.preferences?.hasConfirmedAvatar
         });
     } else {
@@ -182,12 +185,15 @@ const getUserProfile = async (req, res) => {
                 expectedRegion: user.expectedRegion,
                 bannerUrl: user.bannerUrl,
                 preferences: user.preferences,
-                savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
-                savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
+                savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university category')).savedColleges || [],
+                savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode category')).savedPredictions || [],
                 subscription: user.subscription,
                 groqApiKey: user.groqApiKey,
                 isVerified: user.isVerified,
-                phoneNumber: user.phoneNumber
+                phoneNumber: user.phoneNumber,
+                admissionCategory: user.admissionCategory || 'OPEN',
+                documentChecklist: user.documentChecklist || {},
+                documents: user.documents || {}
             };
 
             await redis.set(cacheKey, JSON.stringify(profileData), { EX: 3600 }); // Cache for 1 hour
@@ -251,6 +257,9 @@ const updateUserProfile = async (req, res) => {
         if (req.body.preferences) user.preferences = req.body.preferences;
         if (req.body.savedPredictions) user.savedPredictions = req.body.savedPredictions;
         if (req.body.subscription) user.subscription = req.body.subscription;
+        if (req.body.admissionCategory !== undefined) user.admissionCategory = req.body.admissionCategory;
+        if (req.body.documentChecklist !== undefined) user.documentChecklist = req.body.documentChecklist;
+        if (req.body.documents !== undefined) user.documents = req.body.documents;
 
         // Handle Groq API Key (can be null if removed)
         if (req.body.groqApiKey !== undefined) {
@@ -268,10 +277,11 @@ const updateUserProfile = async (req, res) => {
 
         // Return populated user including saved entities
         const finalUser = await User.findById(updatedUser._id)
-            .populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')
-            .populate('savedPredictions.collegeId', 'name location dteCode');
+            .populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university category')
+            .populate('savedPredictions.collegeId', 'name location dteCode category');
 
-        res.json({
+        // Push update via Socket for real-time smoothness
+        const profileResponse = {
             _id: finalUser._id,
             displayName: finalUser.displayName,
             email: finalUser.email,
@@ -290,8 +300,19 @@ const updateUserProfile = async (req, res) => {
             groqApiKey: finalUser.groqApiKey,
             isVerified: finalUser.isVerified,
             phoneNumber: finalUser.phoneNumber,
+            admissionCategory: finalUser.admissionCategory || 'OPEN',
+            documentChecklist: finalUser.documentChecklist || {},
+            documents: finalUser.documents || {},
             token: generateToken(finalUser._id)
-        });
+        };
+
+        if (req.io) {
+            console.log(`[Socket] Emitting user:updated to room: ${finalUser._id}`);
+            req.io.to(finalUser._id.toString()).emit('user:updated', profileResponse);
+            req.io.emit('student:document_updated', profileResponse);
+        }
+
+        res.json(profileResponse);
     } else {
         res.status(404).json({ message: 'User not found' });
     }
@@ -329,7 +350,7 @@ const toggleSaveCollege = async (req, res) => {
         await redis.del(`user_profile_${req.user._id}`);
 
         // Return populated saved colleges to sync frontend state
-        const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university');
+        const updatedUser = await User.findById(req.user._id).populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university category');
         
         // Push update via Socket for real-time smoothness
         if (req.io) {
@@ -371,7 +392,7 @@ const toggleSavePrediction = async (req, res) => {
         await redis.del(`user_profile_${req.user._id}`);
 
         // Return populated saved predictions to sync frontend state
-        const updatedUser = await User.findById(req.user._id).populate('savedPredictions.collegeId', 'name location dteCode');
+        const updatedUser = await User.findById(req.user._id).populate('savedPredictions.collegeId', 'name location dteCode category');
         
         // Push update via Socket for real-time smoothness
         if (req.io) {
@@ -462,15 +483,52 @@ const updateUserRole = async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (user) {
-        if (user._id.toString() === req.user._id.toString()) {
-            return res.status(400).json({ message: 'You cannot change your own role' });
+        if (req.body.role !== undefined) {
+            if (user._id.toString() === req.user._id.toString()) {
+                return res.status(400).json({ message: 'You cannot change your own role' });
+            }
+            user.role = req.body.role;
         }
-        user.role = req.body.role || user.role;
+        
+        if (req.body.documents !== undefined) {
+            user.documents = req.body.documents;
+            
+            // Auto mark verified/accepted documents as checked (true) in the student's checklist
+            if (user.documentChecklist) {
+                for (const [docName, doc] of Object.entries(req.body.documents)) {
+                    if (doc && (doc.status === 'accepted' || doc.status === 'verified')) {
+                        user.documentChecklist.set(docName, true);
+                    }
+                }
+            } else {
+                user.documentChecklist = new Map();
+                for (const [docName, doc] of Object.entries(req.body.documents)) {
+                    if (doc && (doc.status === 'accepted' || doc.status === 'verified')) {
+                        user.documentChecklist.set(docName, true);
+                    }
+                }
+            }
+        }
+
         const updatedUser = await user.save();
+
+        // Invalidate Redis cache for student profile
+        const { client: redis } = require('../config/redis');
+        await redis.del(`user_profile_${updatedUser._id}`);
+
+        // Push real-time update via socket to the student's room
+        if (req.io) {
+            console.log(`[Socket] Broadcasting real-time profile update to user: ${updatedUser._id}`);
+            req.io.to(updatedUser._id.toString()).emit('user:updated', updatedUser);
+            req.io.emit('student:document_updated', updatedUser);
+        }
+
         res.json({
             _id: updatedUser._id,
             displayName: updatedUser.displayName,
-            role: updatedUser.role
+            role: updatedUser.role,
+            documents: updatedUser.documents,
+            documentChecklist: updatedUser.documentChecklist
         });
     } else {
         res.status(404).json({ message: 'User not found' });
@@ -950,8 +1008,8 @@ const googleLogin = async (req, res) => {
             expectedRegion: user.expectedRegion,
             bannerUrl: user.bannerUrl,
             preferences: user.preferences,
-            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university')).savedColleges || [],
-            savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode')).savedPredictions || [],
+            savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university category')).savedColleges || [],
+            savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode category')).savedPredictions || [],
             subscription: user.subscription,
             token: generateToken(user._id),
             showAvatarPopup: !user.preferences?.hasConfirmedAvatar,
