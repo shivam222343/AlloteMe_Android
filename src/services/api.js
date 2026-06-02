@@ -116,7 +116,7 @@ export const notificationsAPI = {
 };
 
 export const aiAPI = {
-    counsel: (data) => api.post('ai/counsel', data),
+    counsel: (data, config) => api.post('ai/counsel', data, config),
     getChats: () => api.get('ai/chats'),
     saveChat: (data) => api.post('ai/chats', data),
     getFrequentQuestions: () => api.get('ai/frequent-questions'),

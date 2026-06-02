@@ -7,7 +7,8 @@ const {
     trainAI,
     getFrequentQuestions,
     setFrequentQuestion,
-    generateReview
+    generateReview,
+    getDailyMetrics
 } = require('../controllers/aiController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -21,5 +22,6 @@ router.post('/generate-review', protect, generateReview);
 // Admin routes
 router.post('/train', protect, trainAI);
 router.post('/frequent-questions', protect, setFrequentQuestion);
+router.get('/metrics', protect, getDailyMetrics);
 
 module.exports = router;

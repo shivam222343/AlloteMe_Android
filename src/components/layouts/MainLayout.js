@@ -4,7 +4,7 @@ import {
     StatusBar, Platform, KeyboardAvoidingView, Modal, FlatList,
     Alert, Pressable, ActivityIndicator, ScrollView, Image, useWindowDimensions
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Colors, Shadows } from '../../constants/theme';
 import { Menu, ChevronLeft, Bell, X, CheckCheck, Trash2, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPadding = false, style, botSafe = false, scrollable = false }) => {
     const navigation = useNavigation();
+    const route = useRoute();
     const {
         user,
         unreadCount,
@@ -30,43 +31,63 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
     const { width } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && width > 768;
 
-    const desktopTabs = user?.role === 'admin' ? [
-        { name: 'Dashboard', label: 'Admin Console' },
-        { name: 'UploadCutoff', label: 'Upload' },
-        { name: 'BrowseColleges', label: 'Browse Institutes' },
-        { name: 'SystemAnalytics', label: 'Analytics' },
-    ] : [
-        { name: 'Dashboard', label: 'Home' },
-        { name: 'BrowseColleges', label: 'Browse' },
-        { name: 'AICounselor', label: 'ETA AI' },
-        { name: 'Counselors', label: 'Experts' },
-        { name: 'DocumentVerification', label: 'Documents' },
+    const allStudentTabs = [
+        { name: 'Dashboard', label: 'Home', priority: 1 },
+        { name: 'BrowseColleges', label: 'Browse', priority: 1 },
+        { name: 'AICounselor', label: 'ETA AI', priority: 1 },
+        { name: 'Predictor', label: 'Predictor', priority: 2 },
+        { name: 'OptionFormList', label: 'Option Form', priority: 2 },
+        { name: 'Counselors', label: 'Experts', priority: 3 },
+        { name: 'DocumentVerification', label: 'Documents', priority: 3 },
+        { name: 'Videos', label: 'Videos', priority: 4 },
     ];
 
+    const allAdminTabs = [
+        { name: 'Dashboard', label: 'Admin Console', priority: 1 },
+        { name: 'UploadCutoff', label: 'Upload', priority: 1 },
+        { name: 'BrowseColleges', label: 'Browse Institutes', priority: 1 },
+        { name: 'SystemAnalytics', label: 'Analytics', priority: 2 },
+        { name: 'AITraining', label: 'Train AI', priority: 2 },
+        { name: 'FrequentQuestionsManager', label: 'FAQ Manager', priority: 3 },
+        { name: 'AdminUsers', label: 'Manage Users', priority: 3 },
+        { name: 'AdminVideos', label: 'Manage Videos', priority: 4 },
+    ];
+
+    let maxPriority = 4;
+    if (width < 900) {
+        maxPriority = 1;
+    } else if (width < 1050) {
+        maxPriority = 2;
+    } else if (width < 1250) {
+        maxPriority = 3;
+    } else {
+        maxPriority = 4;
+    }
+
+    const rawTabs = user?.role === 'admin' ? allAdminTabs : allStudentTabs;
+    const desktopTabs = rawTabs.filter(tab => tab.priority <= maxPriority);
+
     const isTabActive = (tabName) => {
-        if (!title) return false;
-        const lowerTitle = title.toLowerCase();
-        if (tabName === 'Dashboard') {
-            return lowerTitle.includes('dashboard') || lowerTitle.includes('admin console');
+        const currentName = route.name;
+        if (currentName === tabName) return true;
+
+        // Parent tab associations for detail or sub-screens
+        if (tabName === 'BrowseColleges' && (currentName === 'CollegeDetail' || currentName === 'BranchCutoffDetail' || currentName === 'NearbyColleges' || currentName === 'FeaturedColleges')) {
+            return true;
         }
-        if (tabName === 'BrowseColleges') {
-            return lowerTitle.includes('browse') || lowerTitle.includes('college') || lowerTitle.includes('institute') || lowerTitle.includes('explore');
+        if (tabName === 'Predictor' && currentName === 'PredictionResults') {
+            return true;
         }
-        if (tabName === 'AICounselor') {
-            return lowerTitle.includes('ai') || lowerTitle.includes('counselor');
+        if (tabName === 'Counselors' && currentName === 'CounselorDetail') {
+            return true;
         }
-        if (tabName === 'Counselors') {
-            return lowerTitle.includes('expert') || lowerTitle.includes('connect') || lowerTitle.includes('counselor');
+        if (tabName === 'AdminUsers' && currentName === 'AdminUserDetail') {
+            return true;
         }
-        if (tabName === 'DocumentVerification') {
-            return lowerTitle.includes('document') || lowerTitle.includes('checklist') || lowerTitle.includes('कागदपत्रे');
+        if (tabName === 'OptionFormList' && currentName === 'OptionFormView') {
+            return true;
         }
-        if (tabName === 'UploadCutoff') {
-            return lowerTitle.includes('upload');
-        }
-        if (tabName === 'SystemAnalytics') {
-            return lowerTitle.includes('analytics') || lowerTitle.includes('intelligence');
-        }
+
         return false;
     };
 
@@ -117,7 +138,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         ]}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.white} translucent={false} />
 
-            {showHeader && (
+            {(showHeader || isDesktop) && (
                 <View style={[styles.header, { paddingTop: topPadding }]}>
                     <View style={styles.headerInner}>
                         <View style={[styles.leftRow, isDesktop && { flex: 0, marginRight: 24 }]}>
@@ -328,6 +349,8 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
+        height: Platform.OS === 'web' ? '100vh' : '100%',
+        overflow: 'hidden',
     },
     header: {
         backgroundColor: Colors.white,

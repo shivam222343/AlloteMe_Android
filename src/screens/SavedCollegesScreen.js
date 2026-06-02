@@ -96,7 +96,7 @@ const SavedCollegesScreen = ({ navigation }) => {
                 {item.rating?.value && (
                     <View style={styles.nirfBadgeMini}>
                         <Star size={12} color="#B8860B" fill="#B8860B" />
-                        <Text style={styles.nirfTextMini}>{item.rating.value} {item.rating.platform}</Text>
+                        <Text style={styles.nirfTextMini}>{item.rating.value}</Text>
                     </View>
                 )}
                 <View style={{ flex: 1 }} />
@@ -117,7 +117,7 @@ const SavedCollegesScreen = ({ navigation }) => {
                     <Text style={styles.itemLocText}>{item.location?.city}, {item.location?.region}</Text>
                 </View>
                 <View style={styles.itemFooterRight}>
-                    <Text style={styles.itemFees}>₹{item.feesPerYear?.toLocaleString()}/yr</Text>
+                    <Text style={styles.itemFees}>Approx ₹{item.feesPerYear?.toLocaleString()}/yr</Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: Colors.white,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.divider
+        borderBottomColor: Colors.green
     },
     itemHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 14 },
     itemThumbnail: { width: 60, height: 60, borderRadius: 12, backgroundColor: Colors.divider },

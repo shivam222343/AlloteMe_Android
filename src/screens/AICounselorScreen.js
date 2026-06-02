@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, Modal, ScrollView, ActivityIndicator, Animated, Easing, Keyboard, TouchableWithoutFeedback, Linking } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, Modal, ScrollView, ActivityIndicator, Animated, Easing, Keyboard, TouchableWithoutFeedback, Linking, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MainLayout from '../components/layouts/MainLayout';
 import { aiAPI, authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
-import { Send, User, Bot, Mic, MicOff, X, Sparkles, Key, Image as ImageIcon } from 'lucide-react-native';
+import { Send, User, Bot, Mic, MicOff, X, Sparkles, Key, Image as ImageIcon, Plus } from 'lucide-react-native';
 import Voice from '@react-native-voice/voice';
 import Markdown from 'react-native-markdown-display';
 import GradientBorder from '../components/ui/GradientBorder';
@@ -257,7 +257,7 @@ const ChatHeader = React.memo(({ navigation, startNewChat, openHistory }) => (
                 <History size={20} color={Colors.text.secondary} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.newChatBtn} onPress={startNewChat}>
-                <Sparkles size={16} color={Colors.primary} />
+                <Plus size={18} color={Colors.primary} />
             </TouchableOpacity>
         </View>
     </View>
@@ -304,11 +304,12 @@ const FAQMarquee = React.memo(({ data, handleSend, tagListRef, setTagContentWidt
     </View>
 ));
 
-const ChatInput = React.memo(({ loading, isListening, startListening, stopListening, handleSend, input, setInput }) => (
+const ChatInput = React.memo(({ loading, isListening, startListening, stopListening, handleSend, handleCancel, input, setInput }) => (
     <View style={styles.inputArea}>
         <TouchableOpacity
             style={[styles.voiceBtn, isListening && styles.voiceBtnActive]}
             onPress={isListening ? stopListening : startListening}
+            disabled={loading}
         >
             {isListening ? (
                 <MicOff size={20} color={Colors.white} />
@@ -323,16 +324,27 @@ const ChatInput = React.memo(({ loading, isListening, startListening, stopListen
             value={input}
             onChangeText={setInput}
             multiline
+            editable={!loading}
         />
 
-        <TouchableOpacity style={styles.sendBtn} onPress={() => handleSend()} disabled={loading || !input.trim()}>
-            <Send size={20} color={Colors.white} />
+        <TouchableOpacity 
+            style={[styles.sendBtn, loading && styles.stopBtn]} 
+            onPress={loading ? handleCancel : () => handleSend()} 
+            disabled={!loading && !input.trim()}
+        >
+            {loading ? (
+                <View style={styles.stopSquare} />
+            ) : (
+                <Send size={20} color={Colors.white} />
+            )}
         </TouchableOpacity>
     </View>
 ));
 
 const AICounselorScreen = ({ navigation }) => {
     const { user, refreshUser, checkLimit, incrementUsage } = useAuth();
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width > 768;
 
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -374,6 +386,7 @@ const AICounselorScreen = ({ navigation }) => {
 
     const flatListRef = useRef();
     const tagListRef = useRef();
+    const abortControllerRef = useRef(null);
     const [tagContentWidth, setTagContentWidth] = useState(0);
 
     React.useEffect(() => {
@@ -531,6 +544,14 @@ const AICounselorScreen = ({ navigation }) => {
         }
     }, []);
 
+    const handleCancel = React.useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setLoading(false);
+    }, []);
+
     const handleSend = React.useCallback(async (overrideInput = null) => {
         const textToSend = typeof overrideInput === 'string' ? overrideInput : inputRef.current;
         if (!textToSend || !textToSend.trim() || loading) return;
@@ -556,6 +577,10 @@ const AICounselorScreen = ({ navigation }) => {
             }
             return newCount;
         });
+
+        // Initialize abort controller
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         const isDeepQuery = DEEP_QUERY_REGEX.test(textToSend);
         let statusInterval;
@@ -598,6 +623,8 @@ const AICounselorScreen = ({ navigation }) => {
                     location: user?.location,
                     expectedRegion: user?.expectedRegion
                 }
+            }, {
+                signal: controller.signal
             });
 
             if (!res.data || !(res.data.message || res.data.reply)) {
@@ -617,6 +644,19 @@ const AICounselorScreen = ({ navigation }) => {
             // Increment Usage on success
             incrementUsage('aiPrompts');
         } catch (error) {
+            if (error.name === 'AbortError' || error.message === 'canceled' || error.code === 'ERR_CANCELED') {
+                console.log('[AICounselor] Request canceled by user.');
+                const cancelMsg = {
+                    id: Date.now().toString(),
+                    text: '⚠️ *Counseling response stopped by user.*',
+                    sender: 'bot',
+                    timestamp: new Date().toISOString(),
+                    isNew: true
+                };
+                setMessages(prev => [...prev, cancelMsg]);
+                return;
+            }
+
             const status = error.response?.status;
             const serverMsg = error.response?.data?.message || '';
 
@@ -633,7 +673,6 @@ const AICounselorScreen = ({ navigation }) => {
             } else if (!error.response || error.message?.toLowerCase().includes('network')) {
                 friendlyMessage = `📶 **Network Error**\n\nEta couldn't reach the server. Please check your internet connection.\n\n*Error Detail: ${error.message || 'No internet or backend unreachable'}*`;
             } else {
-                // Generic server error — show key popup too, might be API key issue
                 friendlyMessage = `😕 **Something went wrong**\n\nEta ran into an issue: ${serverMsg || error.message || 'Unknown error'}\n\n*If the problem persists, try updating your API key or starting a new chat.*`;
                 setPopupType('error');
                 setShowKeyPopup(true);
@@ -650,6 +689,7 @@ const AICounselorScreen = ({ navigation }) => {
             setMessages(prev => [...prev.filter(m => m.id !== 'bot-error'), errorMsg]);
         } finally {
             if (statusInterval) clearInterval(statusInterval);
+            abortControllerRef.current = null;
             setLoading(false);
         }
     }, [loading, messages, chatId, user]);
@@ -741,69 +781,113 @@ const AICounselorScreen = ({ navigation }) => {
     };
 
     return (
-        <MainLayout scrollable={false} showHeader={false} noPadding={true} botSafe={true}>
+        <MainLayout scrollable={false} showHeader={isDesktop} noPadding={true} botSafe={true} title="ETA AI Counselor">
             <View style={styles.container}>
-                <ChatHeader
-                    navigation={navigation}
-                    startNewChat={startNewChat}
-                    openHistory={() => setShowHistoryModal(true)}
-                />
+                {!isDesktop && (
+                    <ChatHeader
+                        navigation={navigation}
+                        startNewChat={startNewChat}
+                        openHistory={() => setShowHistoryModal(true)}
+                    />
+                )}
 
-                <UsageCounter 
-                    current={user?.subscription?.usage?.aiPrompts || 0} 
-                    limit={SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts} 
-                />
+                <View style={isDesktop ? styles.desktopLayout : styles.mobileLayout}>
+                    {isDesktop && (
+                        <View style={styles.sidebar}>
+                            <TouchableOpacity style={styles.sidebarNewChatBtn} onPress={startNewChat}>
+                                <Plus size={16} color={Colors.white} />
+                                <Text style={styles.sidebarNewChatText}>New Chat</Text>
+                            </TouchableOpacity>
 
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    keyExtractor={item => item.id}
-                    renderItem={({ item }) => (
-                        <MessageItem
-                            item={item}
-                            user={user}
-                            onDelete={deleteMessage}
-                        />
-                    )}
-                    onTouchStart={() => Keyboard.dismiss()}
-                    ListFooterComponent={loading && (
-                        <View style={[styles.messageContainer, styles.botContainer, { marginBottom: 20 }]}>
-                            <View style={[styles.bubble, styles.botBubble, { padding: 15, width: 220, alignItems: 'flex-start' }]}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                    <ActivityIndicator size="small" color={Colors.primary} />
-                                    <Text style={[styles.loadingText, { color: Colors.primary, fontSize: 13, fontWeight: 'bold' }]}>
-                                        {loadingStatus}
-                                    </Text>
+                            <Text style={styles.sidebarSectionTitle}>Conversations</Text>
+
+                            {pastChats.length > 0 ? (
+                                <FlatList
+                                    data={pastChats}
+                                    keyExtractor={item => item.id || item._id}
+                                    renderItem={({ item }) => {
+                                        const isActive = (item.id || item._id) === chatId;
+                                        return (
+                                            <TouchableOpacity
+                                                style={[styles.sidebarHistoryItem, isActive && styles.sidebarHistoryItemActive]}
+                                                onPress={() => openPastChat(item.id || item._id)}
+                                            >
+                                                <Calendar size={14} color={isActive ? Colors.primary : Colors.text.secondary} />
+                                                <Text style={[styles.sidebarHistoryText, isActive && styles.sidebarHistoryTextActive]} numberOfLines={1}>
+                                                    {item.title || 'History Chat'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    }}
+                                />
+                            ) : (
+                                <View style={styles.sidebarEmptyHistory}>
+                                    <Clock size={24} color={Colors.text.tertiary} />
+                                    <Text style={styles.sidebarEmptyText}>No chats yet</Text>
                                 </View>
-                            </View>
+                            )}
                         </View>
                     )}
-                    contentContainerStyle={styles.chatContent}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-                />
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-                >
-                    <FAQMarquee
-                        data={marqueeData}
-                        handleSend={handleSend}
-                        tagListRef={tagListRef}
-                        setTagContentWidth={setTagContentWidth}
-                        tagContentWidth={tagContentWidth}
-                    />
+                    <View style={styles.chatArea}>
+                        <UsageCounter
+                            current={user?.subscription?.usage?.aiPrompts || 0}
+                            limit={SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.aiPrompts}
+                        />
 
-                    <ChatInput
-                        loading={loading}
-                        isListening={isListening}
-                        startListening={startListening}
-                        stopListening={stopListening}
-                        handleSend={handleSend}
-                        input={input}
-                        setInput={setInput}
-                    />
-                </KeyboardAvoidingView>
+                        <FlatList
+                            ref={flatListRef}
+                            data={messages}
+                            keyExtractor={item => item.id}
+                            renderItem={({ item }) => (
+                                <MessageItem
+                                    item={item}
+                                    user={user}
+                                    onDelete={deleteMessage}
+                                />
+                            )}
+                            onTouchStart={() => Keyboard.dismiss()}
+                            ListFooterComponent={loading && (
+                                <View style={[styles.messageContainer, styles.botContainer, { marginBottom: 20 }]}>
+                                    <View style={[styles.bubble, styles.botBubble, { padding: 15, width: 220, alignItems: 'flex-start' }]}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <ActivityIndicator size="small" color={Colors.primary} />
+                                            <Text style={[styles.loadingText, { color: Colors.primary, fontSize: 13, fontWeight: 'bold' }]}>
+                                                {loadingStatus}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+                            contentContainerStyle={styles.chatContent}
+                            onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+                        />
+
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+                        >
+                            <FAQMarquee
+                                data={marqueeData}
+                                handleSend={handleSend}
+                                tagListRef={tagListRef}
+                                setTagContentWidth={setTagContentWidth}
+                                tagContentWidth={tagContentWidth}
+                            />
+
+                            <ChatInput
+                                loading={loading}
+                                isListening={isListening}
+                                startListening={startListening}
+                                stopListening={stopListening}
+                                handleSend={handleSend}
+                                handleCancel={handleCancel}
+                                input={input}
+                                setInput={setInput}
+                            />
+                        </KeyboardAvoidingView>
+                    </View>
+                </View>
 
                 {/* History Modal */}
                 <Modal
@@ -1005,6 +1089,83 @@ const AICounselorScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.white },
+    desktopLayout: {
+        flexDirection: 'row',
+        flex: 1,
+        height: '100%',
+    },
+    mobileLayout: {
+        flex: 1,
+    },
+    sidebar: {
+        width: 280,
+        backgroundColor: '#F8FAFC',
+        borderRightWidth: 1,
+        borderRightColor: Colors.divider,
+        padding: 16,
+        height: '100%',
+    },
+    chatArea: {
+        flex: 1,
+        backgroundColor: Colors.white,
+        height: '100%',
+    },
+    sidebarNewChatBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.primary,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        gap: 8,
+        marginBottom: 20,
+        ...Shadows.sm,
+    },
+    sidebarNewChatText: {
+        color: Colors.white,
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    sidebarSectionTitle: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: Colors.text.tertiary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 12,
+        paddingLeft: 4,
+    },
+    sidebarHistoryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 10,
+        marginBottom: 4,
+    },
+    sidebarHistoryItemActive: {
+        backgroundColor: Colors.primary + '10',
+    },
+    sidebarHistoryText: {
+        fontSize: 13,
+        color: Colors.text.secondary,
+        flex: 1,
+    },
+    sidebarHistoryTextActive: {
+        color: Colors.primary,
+        fontWeight: '600',
+    },
+    sidebarEmptyHistory: {
+        padding: 24,
+        alignItems: 'center',
+        gap: 8,
+    },
+    sidebarEmptyText: {
+        fontSize: 12,
+        color: Colors.text.tertiary,
+    },
     header: {
         paddingHorizontal: Spacing.md,
         paddingVertical: 12,
@@ -1113,6 +1274,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginLeft: 10,
         ...Shadows.sm
+    },
+    stopBtn: {
+        backgroundColor: Colors.white,
+        borderWidth: 2,
+        borderColor: Colors.error || '#EF4444'
+    },
+    stopSquare: {
+        width: 14,
+        height: 14,
+        backgroundColor: Colors.error || '#EF4444',
+        borderRadius: 2
     },
 
     // Popup Styles

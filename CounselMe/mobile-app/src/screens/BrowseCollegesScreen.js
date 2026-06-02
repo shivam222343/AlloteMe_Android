@@ -66,7 +66,7 @@ const BrowseCollegesScreen = ({ navigation }) => {
                         <MapPin size={14} color={Colors.text.tertiary} />
                         <Text style={styles.locText}>{item.location.city}, {item.location.region}</Text>
                     </View>
-                    <Text style={styles.fees}>₹{item.feesPerYear}/yr</Text>
+                    <Text style={styles.fees}>Approx ₹{item.feesPerYear}/yr</Text>
                 </View>
             </Card>
         </TouchableOpacity>

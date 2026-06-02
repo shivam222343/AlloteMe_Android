@@ -426,30 +426,13 @@ const OptionFormViewScreen = ({ route, navigation }) => {
             <View style={styles.topHeader}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><ChevronLeft size={24} color={Colors.text.primary} /></TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.title}>{preset?.percentile}%ile Option List</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.subtitle}>{preset?.category} List • {processedResults.length} Colleges</Text>
-                        <View style={styles.sep} />
-                        <Text style={styles.usageSmall}>
-                            Exports: {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.exports || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports)}
-                        </Text>
-                    </View>
+                    <Text style={styles.title} numberOfLines={1}>{preset?.percentile}%ile Option List</Text>
+                    <Text style={styles.subtitle} numberOfLines={1}>
+                        {preset?.category} List • {processedResults.length} Colleges • Exports: {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.exports || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports)}
+                    </Text>
                 </View>
                 <View style={styles.headerActions}>
-                    <TouchableOpacity
-                        style={[styles.rearrangeBtn, isReordering && styles.rearrangeBtnActive]}
-                        onPress={() => {
-                            if (searchText) {
-                                Alert.alert("Search Active", "Please clear search to rearrange.");
-                                return;
-                            }
-                            setIsReordering(!isReordering);
-                        }}
-                    >
-                        <Text style={[styles.rearrangeBtnText, isReordering && styles.rearrangeBtnTextActive]}>
-                            {isReordering ? "Done" : "Rearrange"}
-                        </Text>
-                    </TouchableOpacity>
+
                     <TouchableOpacity onPress={() => setIsSearchVisible(!isSearchVisible)} style={styles.actionIcon}><Search size={20} color={Colors.text.secondary} /></TouchableOpacity>
                     <TouchableOpacity style={styles.exportBtn} onPress={exportToPDF} disabled={exportingPDF}>{exportingPDF ? <ActivityIndicator size="small" color={Colors.primary} /> : <FileText size={18} color={Colors.primary} />}</TouchableOpacity>
                     <TouchableOpacity style={styles.exportBtn} onPress={exportToCSV} disabled={exportingCSV}>{exportingCSV ? <ActivityIndicator size="small" color={Colors.primary} /> : <Download size={18} color={Colors.primary} />}</TouchableOpacity>

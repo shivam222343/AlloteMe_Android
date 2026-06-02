@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const LOCAL_URL = 'http://192.168.1.29:5100/api';
+const LOCAL_URL = 'http://[IP_ADDRESS]/api';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api';
 const API_BASE_URL = RENDER_URL; // Update with your local IP for dev when testing locally
 
@@ -46,7 +46,7 @@ export const cutoffAPI = {
 };
 
 export const aiAPI = {
-    counsel: (message, context) => api.post('/ai/counsel', { message, context }),
+    counsel: (message, context, config) => api.post('/ai/counsel', { message, context }, config),
 };
 
 export default api;

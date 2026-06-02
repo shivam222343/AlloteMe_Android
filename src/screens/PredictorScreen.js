@@ -87,7 +87,7 @@ const PredictorScreen = ({ navigation }) => {
     const [percentile, setPercentile] = useState(user?.percentile?.toString() || '');
     const [rank, setRank] = useState(user?.rank?.toString() || '');
     const [category, setCategory] = useState(user?.category || 'OPEN');
-    const [pTolerance, setPTolerance] = useState(10);
+    const [pTolerance, setPTolerance] = useState(2);
     const [rTolerance, setRTolerance] = useState(500);
     const [isFemale, setIsFemale] = useState(false);
     const [useTFWS, setUseTFWS] = useState(false);
@@ -276,10 +276,11 @@ const PredictorScreen = ({ navigation }) => {
                     </View>
                     <View style={styles.usageChip}>
                         <Text style={styles.usageText}>
-                            Predictions: <Text style={styles.usageBold}>
+                            Predictions:{' '}
+                            <Text style={styles.usageBold}>
                                 {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.predictions || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.predictions)}
                             </Text>
-                            Used.
+                            {' '}Used.
                         </Text>
                     </View>
                 </View>
@@ -420,6 +421,8 @@ const PredictorScreen = ({ navigation }) => {
                         />
                     </View>
 
+                    {renderMultiSelect(CATEGORICAL_BRANCHES[admissionPath] || CATEGORICAL_BRANCHES['MHTCET'], selectedBranches, setSelectedBranches, GitBranch, "Preferred Branches")}
+
                     {/* Advanced Settings Toggle */}
                     <TouchableOpacity style={styles.advanceToggle} onPress={toggleAdvance}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -431,7 +434,6 @@ const PredictorScreen = ({ navigation }) => {
 
                     {showAdvance && (
                         <View style={styles.advancePanel}>
-                            {renderMultiSelect(CATEGORICAL_BRANCHES[admissionPath] || CATEGORICAL_BRANCHES['MHTCET'], selectedBranches, setSelectedBranches, GitBranch, "Preferred Branches")}
                             {renderMultiSelect(REGIONS, selectedRegions, setSelectedRegions, MapPin, "Target Regions")}
                             {renderMultiSelect(INSTITUTION_TYPES, selectedTypes, setSelectedTypes, ShieldCheck, "Institution Type & Autonomy")}
                             {renderMultiSelect(SEAT_TYPES, selectedSeatTypes, setSelectedSeatTypes, CheckCircle2, "Seat Type Preference")}
@@ -554,7 +556,7 @@ const PredictorScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFC' },
-    topHeader: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 20, backgroundColor: Colors.white, ...Shadows.sm },
+    topHeader: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 16 : 12, paddingBottom: 16, backgroundColor: Colors.white, ...Shadows.sm, gap: 6 },
     title: { fontSize: 28, fontWeight: 'bold', color: Colors.text.primary },
     subtitle: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
 
@@ -639,7 +641,9 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: Colors.primary + '20'
+        borderColor: Colors.primary + '20',
+        alignSelf: 'flex-start',
+        marginTop: 6
     },
     usageText: {
         fontSize: 11,

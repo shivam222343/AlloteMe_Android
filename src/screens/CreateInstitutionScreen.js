@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Modal, Image, TouchableOpacity, ActivityIndicator, Platform, Linking } from 'react-native';
+import * as ExpoClipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
@@ -8,7 +10,8 @@ import { institutionAPI, uploadAPI } from '../services/api';
 import { Colors, Typography, Spacing, Shadows, BorderRadius } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, X, Plus, Image as ImageIcon, Globe, MapPin, Hash, ShieldCheck, Award, Bot } from 'lucide-react-native';
+import { useClipboardPaste } from '../hooks/useClipboardPaste';
+import { Camera, X, Plus, Image as ImageIcon, Globe, MapPin, Hash, ShieldCheck, Award, Bot, ClipboardPaste } from 'lucide-react-native';
 
 const CreateInstitutionScreen = ({ navigation }) => {
     const { admissionPath } = useAuth();
@@ -62,11 +65,17 @@ const CreateInstitutionScreen = ({ navigation }) => {
             selectionLimit: 5,
             quality: 0.7,
         });
-
         if (!result.canceled) {
             handleUploadMultiple(result.assets.map(a => a.uri));
         }
     };
+
+    // ── Clipboard paste (cross-platform) ──────────────────────────────────────
+    const { pasteLoading, clipboardHasImage, handlePasteImage } = useClipboardPaste({
+        onUpload: (fd) => uploadAPI.upload(fd),
+        onSuccess: (url) => setFormData(prev => ({ ...prev, galleryImages: [...prev.galleryImages, url] })),
+        disabled: formData.galleryImages.length >= 5,
+    });
 
     const handleUploadMultiple = async (uris) => {
         setLoading(true);
@@ -365,6 +374,12 @@ const CreateInstitutionScreen = ({ navigation }) => {
                     </View>
 
                     <Text style={styles.label}>Gallery Images (Max 5)</Text>
+                    {Platform.OS === 'web' && formData.galleryImages.length < 5 && (
+                        <View style={styles.webPasteBanner}>
+                            <ClipboardPaste size={13} color={Colors.primary} />
+                            <Text style={styles.webPasteBannerText}>Press Ctrl+V / Cmd+V anywhere to paste an image</Text>
+                        </View>
+                    )}
                     <View style={styles.imageGallery}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                             {formData.galleryImages.map((img, index) => (
@@ -376,10 +391,20 @@ const CreateInstitutionScreen = ({ navigation }) => {
                                 </View>
                             ))}
                             {formData.galleryImages.length < 5 && (
-                                <TouchableOpacity style={styles.addImgBtn} onPress={pickImages} disabled={loading}>
-                                    {loading ? <ActivityIndicator color={Colors.primary} /> : <Plus size={24} color={Colors.primary} />}
-                                    <Text style={styles.addImgText}>Add</Text>
-                                </TouchableOpacity>
+                                <>
+                                    <TouchableOpacity style={styles.addImgBtn} onPress={pickImages} disabled={loading || pasteLoading}>
+                                        {loading ? <ActivityIndicator color={Colors.primary} /> : <Plus size={22} color={Colors.primary} />}
+                                        <Text style={styles.addImgText}>Gallery</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.pasteImgBtn, Platform.OS !== 'web' && !clipboardHasImage && { opacity: 0.45 }]}
+                                        onPress={handlePasteImage}
+                                        disabled={loading || pasteLoading}
+                                    >
+                                        {pasteLoading ? <ActivityIndicator color="#fff" size="small" /> : <ClipboardPaste size={22} color="#fff" />}
+                                        <Text style={styles.pasteImgText}>Paste</Text>
+                                    </TouchableOpacity>
+                                </>
                             )}
                         </ScrollView>
                     </View>
@@ -633,6 +658,7 @@ const CreateInstitutionScreen = ({ navigation }) => {
                 />
             </ScrollView>
 
+
             {/* AI Modal */}
             <Modal visible={showAiModal} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
@@ -695,6 +721,8 @@ const styles = StyleSheet.create({
     addImgBtn: { width: 80, height: 80, borderRadius: 12, borderStyle: 'dashed', borderWidth: 2, borderColor: Colors.primary, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary + '05' },
     addImgText: { fontSize: 10, color: Colors.primary, fontWeight: 'bold', marginTop: 4 },
     saveBtn: { marginTop: 24, marginBottom: 40, marginHorizontal: 16 },
+    pasteImgBtn: { width: 80, height: 80, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.primary, marginLeft: 8 },
+    pasteImgText: { fontSize: 10, color: '#fff', fontWeight: 'bold', marginTop: 4 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
     modalContent: { backgroundColor: Colors.white, borderRadius: 20, padding: 24, ...Shadows.lg },
     modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 8, color: Colors.text.primary },
@@ -720,6 +748,8 @@ const styles = StyleSheet.create({
     templateNoteText: { fontSize: 11, color: '#0EA5E9', lineHeight: 16 },
     coordHelper: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 15, padding: 10, borderRadius: 10, backgroundColor: Colors.primary + '08', borderColor: Colors.primary + '20', borderWidth: 1, borderStyle: 'dashed', justifyContent: 'center' },
     coordHelperText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
+    webPasteBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, padding: 8, borderRadius: 8, backgroundColor: Colors.primary + '10', borderWidth: 1, borderColor: Colors.primary + '25', borderStyle: 'dashed' },
+    webPasteBannerText: { fontSize: 11, color: Colors.primary, fontWeight: '600', flex: 1 },
 });
 
 export default CreateInstitutionScreen;

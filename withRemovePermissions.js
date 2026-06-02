@@ -17,7 +17,9 @@ module.exports = function withRemovePermissions(config) {
       'android.permission.ACCESS_MEDIA_LOCATION',
       'android.permission.READ_EXTERNAL_STORAGE',
       'android.permission.WRITE_EXTERNAL_STORAGE',
-      'android.permission.MANAGE_EXTERNAL_STORAGE'
+      'android.permission.MANAGE_EXTERNAL_STORAGE',
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.NOTIFICATIONS'
     ];
 
     // Ensure the permissions array exists

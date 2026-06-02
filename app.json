@@ -2,7 +2,7 @@
   "expo": {
     "name": "AlloteMe",
     "slug": "alloteme0077",
-    "version": "1.0.2",
+    "version": "2.0.3",
     "scheme": "alloteme0077",
     "orientation": "portrait",
     "icon": "./imgs/logo.png",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.alloteme0077.app",
+      "bundleIdentifier": "com.alloteme.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -25,7 +25,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.alloteme0077.app",
-      "versionCode": 4,
+      "versionCode": 8,
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "intentFilters": [
@@ -44,7 +44,7 @@
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
-        "NOTIFICATIONS",
+        "POST_NOTIFICATIONS",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -54,6 +54,17 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.NOTIFICATIONS"
       ],
       "notification": {
         "icon": "./imgs/logo.png",
@@ -79,15 +90,6 @@
           },
           "android": {
             "enableJetifier": true,
-            "blockPermissions": [
-              "android.permission.READ_MEDIA_IMAGES",
-              "android.permission.READ_MEDIA_VIDEO",
-              "android.permission.READ_MEDIA_AUDIO",
-              "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-              "android.permission.ACCESS_MEDIA_LOCATION",
-              "android.permission.READ_EXTERNAL_STORAGE",
-              "android.permission.WRITE_EXTERNAL_STORAGE"
-            ],
             "packagingOptions": {
               "pickFirst": [
                 "**/INotificationSideChannel.aidl",

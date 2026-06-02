@@ -29,6 +29,7 @@ export const Colors = {
     // Border
     border: '#E5E7EB',
     divider: '#F3F4F6',
+    green: '#00C853',
 };
 
 export const Typography = {

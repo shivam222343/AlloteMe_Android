@@ -196,23 +196,25 @@ const BrowseCollegesScreen = ({ navigation }) => {
                         </View>
                         <View style={styles.subInfoRow}>
                             <Text style={styles.itemUniversity}>{item.university || 'Affiliated'}</Text>
-                            {item.dteCode && (
-                                <View style={styles.dteMiniBadge}>
-                                    <Text style={styles.dteMiniText}>DTE: {item.dteCode}</Text>
-                                </View>
-                            )}
+
                         </View>
                     </View>
                 </View>
 
                 <View style={styles.badgeRow}>
                     <View style={styles.professionTag}><Text style={styles.professionTagText}>{item.type}</Text></View>
+                    {item.dteCode && (
+                        <View style={styles.dteMiniBadge}>
+                            <Text style={styles.dteMiniText}>DTE: {item.dteCode}</Text>
+                        </View>
+                    )}
                     {item.rating?.value && (
                         <View style={styles.nirfBadgeMini}>
                             <Star size={12} color="#B8860B" fill="#B8860B" />
-                            <Text style={styles.nirfTextMini}>{item.rating.value} {item.rating.platform}</Text>
+                            <Text style={styles.nirfTextMini}>{item.rating.value}</Text>
                         </View>
                     )}
+
                 </View>
 
                 <View style={styles.itemFooter}>
@@ -221,7 +223,7 @@ const BrowseCollegesScreen = ({ navigation }) => {
                         <Text style={styles.itemLocText}>{item.location.city}, {item.location.region}</Text>
                     </View>
                     <View style={styles.itemFooterRight}>
-                        <Text style={styles.itemFees}>₹{item.feesPerYear?.toLocaleString()}/yr</Text>
+                        <Text style={styles.itemFees}>Approx ₹{item.feesPerYear?.toLocaleString()}/yr</Text>
                         {isAdmin && (
                             <View style={{ flexDirection: 'row', gap: 8 }}>
                                 <TouchableOpacity
@@ -286,7 +288,7 @@ const BrowseCollegesScreen = ({ navigation }) => {
                             value={search}
                             onChangeText={(t) => handleFilter(t)}
                         />
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.searchFilterBtn}
                             onPress={() => setShowFilterModal(true)}
                         >
@@ -363,8 +365,8 @@ const BrowseCollegesScreen = ({ navigation }) => {
                             <Text style={styles.filterLabel}>Institution Type</Text>
                             <View style={styles.filterGrid}>
                                 {tabs.map(type => (
-                                    <TouchableOpacity 
-                                        key={type} 
+                                    <TouchableOpacity
+                                        key={type}
                                         style={[styles.filterChip, selectedType === type && styles.filterChipActive]}
                                         onPress={() => handleFilter(search, type)}
                                     >
@@ -376,8 +378,8 @@ const BrowseCollegesScreen = ({ navigation }) => {
                             <Text style={styles.filterLabel}>Sort By</Text>
                             <View style={styles.filterGrid}>
                                 {sortOptions.map(opt => (
-                                    <TouchableOpacity 
-                                        key={opt.id} 
+                                    <TouchableOpacity
+                                        key={opt.id}
                                         style={[styles.filterChip, sortBy === opt.id && styles.filterChipActive]}
                                         onPress={() => handleFilter(search, selectedType, opt.id)}
                                     >
@@ -390,8 +392,8 @@ const BrowseCollegesScreen = ({ navigation }) => {
                             <Text style={styles.filterLabel}>Select City</Text>
                             <View style={styles.filterGrid}>
                                 {cities.map(city => (
-                                    <TouchableOpacity 
-                                        key={city} 
+                                    <TouchableOpacity
+                                        key={city}
                                         style={[styles.filterChip, activeCity === city && styles.filterChipActive]}
                                         onPress={() => handleFilter(search, selectedType, sortBy, city)}
                                     >
@@ -400,12 +402,12 @@ const BrowseCollegesScreen = ({ navigation }) => {
                                 ))}
                             </View>
 
-                            <Button 
-                                title="Apply Filters" 
+                            <Button
+                                title="Apply Filters"
                                 onPress={() => setShowFilterModal(false)}
                                 style={{ marginTop: 30 }}
                             />
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.clearAllBtn}
                                 onPress={() => {
                                     handleFilter('', 'All', 'default', 'All Cities');
@@ -428,23 +430,23 @@ const styles = StyleSheet.create({
     titleRow: { marginBottom: 12 },
     title: { fontSize: 26, fontWeight: 'bold', color: Colors.text.primary },
     subtitle: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
-    
-    stickySearchContainer: { 
-        backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 12, ...Shadows.sm 
+
+    stickySearchContainer: {
+        backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 12, ...Shadows.sm
     },
-    searchBar: { 
-        flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', 
-        borderRadius: 16, paddingHorizontal: 16, height: 56, gap: 12 
+    searchBar: {
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9',
+        borderRadius: 16, paddingHorizontal: 16, height: 56, gap: 12
     },
     searchInput: { flex: 1, fontSize: 16, color: Colors.text.primary, height: '100%' },
     searchFilterBtn: { padding: 8, position: 'relative' },
-    filterDot: { 
-        position: 'absolute', top: 4, right: 4, width: 8, height: 8, 
-        borderRadius: 4, backgroundColor: Colors.primary, borderWidth: 1.5, borderColor: '#F1F5F9' 
+    filterDot: {
+        position: 'absolute', top: 4, right: 4, width: 8, height: 8,
+        borderRadius: 4, backgroundColor: Colors.primary, borderWidth: 1.5, borderColor: '#F1F5F9'
     },
 
-    citySectionHeader: { 
-        flexDirection: 'row', alignItems: 'center', gap: 8, 
+    citySectionHeader: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: '#F8FAFC', paddingHorizontal: 16, paddingVertical: 12,
         marginTop: 8
     },
@@ -456,7 +458,7 @@ const styles = StyleSheet.create({
         padding: 16,
         backgroundColor: Colors.white,
         borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9'
+        borderBottomColor: Colors.green
     },
     itemHeader: { flexDirection: 'row', gap: 12, marginBottom: 12 },
     itemThumbnail: { width: 50, height: 50, borderRadius: 10, backgroundColor: '#F1F5F9' },
@@ -483,19 +485,19 @@ const styles = StyleSheet.create({
     deleteBtn: { padding: 4 },
 
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContentExtended: { 
-        backgroundColor: Colors.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, 
-        padding: 24, maxHeight: '85%', ...Shadows.lg 
+    modalContentExtended: {
+        backgroundColor: Colors.white, borderTopLeftRadius: 32, borderTopRightRadius: 32,
+        padding: 24, maxHeight: '85%', ...Shadows.lg
     },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: Colors.text.primary },
     closeBtn: { padding: 4 },
     filterLabel: { fontSize: 14, fontWeight: 'bold', color: Colors.text.primary, marginTop: 24, marginBottom: 12 },
     filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    filterChip: { 
+    filterChip: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
-        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, 
-        backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' 
+        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+        backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0'
     },
     filterChipActive: { backgroundColor: Colors.primary + '15', borderColor: Colors.primary },
     filterChipText: { fontSize: 13, fontWeight: '600', color: Colors.text.secondary },

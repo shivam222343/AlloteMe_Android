@@ -650,14 +650,10 @@ const PredictionResultsScreen = ({ route, navigation }) => {
             <View style={styles.topHeader}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><ChevronLeft size={24} color={Colors.text.primary} /></TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.title}>Prediction Results</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.subtitle}>{processedResults.length} colleges found</Text>
-                        <View style={styles.sep} />
-                        <Text style={styles.usageSmall}>
-                            Exports: {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.exports || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports)}
-                        </Text>
-                    </View>
+                    <Text style={styles.title} numberOfLines={1}>Prediction Results</Text>
+                    <Text style={styles.subtitle} numberOfLines={1}>
+                        {processedResults.length} colleges found • Exports: {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.exports || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports)}
+                    </Text>
                 </View>
                 <View style={styles.headerActions}>
                     {user?.role === 'admin' && (
