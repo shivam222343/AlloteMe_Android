@@ -1010,6 +1010,25 @@ const getDailyMetrics = async (req, res) => {
     }
 };
 
+// @desc    Admin: Delete Frequent Question
+// @route   DELETE /api/ai/frequent-questions/:id
+// @access  Private/Admin
+const deleteFrequentQuestion = async (req, res) => {
+    try {
+        const question = await Knowledge.findById(req.params.id);
+        if (!question) {
+            return res.status(404).json({ message: 'Frequent question not found' });
+        }
+        if (question.type !== 'frequent_question') {
+            return res.status(400).json({ message: 'Not a frequent question' });
+        }
+        await Knowledge.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Frequent question removed' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 module.exports = {
     getAICounsel,
     saveChat,
@@ -1018,5 +1037,6 @@ module.exports = {
     getFrequentQuestions,
     setFrequentQuestion,
     generateReview,
-    getDailyMetrics
+    getDailyMetrics,
+    deleteFrequentQuestion
 };

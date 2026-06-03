@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, TextInput, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator, TextInput, Alert, Animated, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI } from '../services/api';
@@ -147,7 +147,24 @@ const AdminUsersScreen = ({ navigation }) => {
                     style={styles.deleteBtn}
                     onPress={(e) => {
                         e.stopPropagation();
-                        Alert.alert('Delete User', `Permanently delete ${item.displayName}?`, [
+                        const title = 'Delete User';
+                        const message = `Permanently delete ${item.displayName}?`;
+
+                        if (Platform.OS === 'web') {
+                            if (window.confirm(`${title}\n\n${message}`)) {
+                                (async () => {
+                                    try {
+                                        await authAPI.deleteUser(item._id);
+                                        fetchUsers();
+                                    } catch (e) {
+                                        alert('Failed to delete user');
+                                    }
+                                })();
+                            }
+                            return;
+                        }
+
+                        Alert.alert(title, message, [
                             { text: 'Cancel', style: 'cancel' },
                             {
                                 text: 'Delete',

@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, LayoutAnimation, Platform, TextInput } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
-import { MapPin, Layers, Calendar, GripVertical, ChevronLeft, Trash2, X, ShieldCheck, Bookmark, FileText, Download, Search } from 'lucide-react-native';
+import { MapPin, Layers, Calendar, GripVertical, ChevronLeft, ChevronRight, Trash2, X, ShieldCheck, Bookmark, FileText, Download, Search } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
-import DraggableFlatList from 'react-native-draggable-flatlist';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import { TouchableOpacity as GestureHandlerTouchableOpacity } from 'react-native-gesture-handler';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
@@ -40,93 +41,104 @@ const SavedPredictionRow = React.memo(({
     const college = item.collegeId && typeof item.collegeId === 'object' ? item.collegeId : { name: 'Loading...' };
 
     return (
-        <TouchableOpacity
-            onLongPress={searchText ? null : drag}
-            delayLongPress={Platform.OS === 'web' ? 80 : 150}
-            onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
-            disabled={isActive}
-            activeOpacity={0.9}
-            style={[
-                styles.fullWidthItem,
-                Platform.OS === 'web' && { cursor: isActive ? 'grabbing' : 'grab' }
-            ]}
-        >
-            <Animated.View style={animatedStyle}>
-                <Card style={[styles.resultCard, isActive && styles.activeCard]}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.numberTag}>
-                            <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
-                        </View>
-                        <View style={styles.instHeader}>
-                            <View style={styles.instBasicRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.instName} numberOfLines={2}>
-                                        {college.name}
-                                    </Text>
-                                    <View style={styles.locRow}>
-                                        <MapPin size={10} color={Colors.text.tertiary} />
-                                        <Text style={styles.locText}>{college.location?.city || 'Verified'}</Text>
-                                        <View style={styles.sep} />
-                                        <Text style={styles.dteText}>DTE: {college.dteCode || '—'}</Text>
+        <ScaleDecorator>
+            <GestureHandlerTouchableOpacity
+                onLongPress={searchText ? null : drag}
+                delayLongPress={Platform.OS === 'web' ? 80 : 150}
+                onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
+                disabled={isActive}
+                activeOpacity={0.9}
+                style={[
+                    styles.fullWidthItem,
+                    Platform.OS === 'web' && { cursor: isActive ? 'grabbing' : 'grab' }
+                ]}
+            >
+                <Animated.View style={animatedStyle}>
+                    <Card style={[styles.resultCard, isActive && styles.activeCard]}>
+                        <View style={styles.cardHeader}>
+                            <View style={styles.numberTag}>
+                                <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
+                            </View>
+                            <View style={styles.instHeader}>
+                                <View style={styles.instBasicRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.instName} numberOfLines={2}>
+                                            {college.name}
+                                        </Text>
+                                        <View style={styles.locRow}>
+                                            <MapPin size={10} color={Colors.text.tertiary} />
+                                            <Text style={styles.locText}>{college.location?.city || 'Verified'}</Text>
+                                            <View style={styles.sep} />
+                                            <Text style={styles.dteText}>DTE: {college.dteCode || '—'}</Text>
+                                        </View>
                                     </View>
                                 </View>
                             </View>
+
+                            <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: (item.chanceColor || '#0A66C2') + '10' }]}>
+                                <Text style={[styles.matchPercent, { color: item.chanceColor || '#0A66C2' }]}>{item.chanceLabel || 'Saved'}</Text>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={() => handleRemove(item)}
+                                style={styles.deleteBtn}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Trash2 size={18} color="#ef4444" />
+                            </TouchableOpacity>
                         </View>
 
-                        <View style={[styles.matchBadge, { borderColor: item.chanceColor, backgroundColor: (item.chanceColor || '#0A66C2') + '10' }]}>
-                            <Text style={[styles.matchPercent, { color: item.chanceColor || '#0A66C2' }]}>{item.chanceLabel || 'Saved'}</Text>
+                        <View style={styles.branchSection}>
+                            <Text style={styles.branchName}>{item.branch}</Text>
+                            <View style={styles.badgeRow}>
+                                <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
+                                <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
+                                {item.category && (
+                                    <View style={[
+                                        styles.badge,
+                                        { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
+                                    ]}>
+                                        <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
+                                        <Text style={[
+                                            styles.badgeText,
+                                            { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
+                                        ]}>{item.category}</Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
 
-                        <TouchableOpacity
-                            onPress={() => handleRemove(item)}
-                            style={styles.deleteBtn}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                            <Trash2 size={18} color="#ef4444" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.branchSection}>
-                        <Text style={styles.branchName}>{item.branch}</Text>
-                        <View style={styles.badgeRow}>
-                            <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
-                            <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
-                            {item.category && (
-                                <View style={[
-                                    styles.badge,
-                                    { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
-                                ]}>
-                                    <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
-                                    <Text style={[
-                                        styles.badgeText,
-                                        { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
-                                    ]}>{item.category}</Text>
+                        {item.percentile && (
+                            <View style={styles.statsRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.statLabel}>PERCENTILE</Text>
+                                    <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
                                 </View>
-                            )}
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.statLabel}>RANK</Text>
+                                    <Text style={styles.statVal}>
+                                        {item.rank || (item.percentile ? Math.round(((100 - item.percentile) / 100) * 380000) : '—')}
+                                    </Text>
+                                </View>
+                                <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                                    <Text style={styles.statLabel}>CHANCE</Text>
+                                    <Text style={[styles.statVal, { color: item.chanceColor, fontSize: 13 }]}>{item.chanceLabel}</Text>
+                                </View>
+                            </View>
+                        )}
+                        <View style={styles.cardFooter}>
+                            <TouchableOpacity 
+                                style={styles.infoLink} 
+                                onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
+                            >
+                                <Text style={styles.infoLinkText}>View College Info</Text>
+                                <ChevronRight size={12} color={Colors.primary} />
+                            </TouchableOpacity>
                         </View>
-                    </View>
-
-                    {item.percentile && (
-                        <View style={styles.statsRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.statLabel}>PERCENTILE</Text>
-                                <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.statLabel}>RANK</Text>
-                                <Text style={styles.statVal}>
-                                    {item.rank || (item.percentile ? Math.round(((100 - item.percentile) / 100) * 380000) : '—')}
-                                </Text>
-                            </View>
-                            <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                                <Text style={styles.statLabel}>CHANCE</Text>
-                                <Text style={[styles.statVal, { color: item.chanceColor, fontSize: 13 }]}>{item.chanceLabel}</Text>
-                            </View>
-                        </View>
-                    )}
-                </Card>
-            </Animated.View>
-        </TouchableOpacity>
+                    </Card>
+                </Animated.View>
+            </GestureHandlerTouchableOpacity>
+        </ScaleDecorator>
     );
 });
 
@@ -370,7 +382,7 @@ const SavedPredictionsScreen = ({ navigation }) => {
         }
     };
 
-    const getItemKey = (item) => item._id || `${getCollegeId(item.collegeId)}_${item.branch}`;
+    const getItemKey = (item) => item._id || `${getCollegeId(item.collegeId)}_${item.branch}_${item.year}_${item.round}_${item.category || ''}_${item.seatType || ''}`;
 
     const handleDragEnd = async (data) => {
         if (searchText) {
@@ -456,7 +468,7 @@ const SavedPredictionsScreen = ({ navigation }) => {
                 <DraggableFlatList
                     data={savedList}
                     onDragEnd={({ data }) => handleDragEnd(data)}
-                    keyExtractor={(item) => item._id || `${getCollegeId(item.collegeId)}_${item.branch}`}
+                    keyExtractor={getItemKey}
                     renderItem={renderItem}
                     activationDistance={5}
                     dragItemOverflow={false}
@@ -549,7 +561,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4
-    }
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 10,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    infoLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    infoLinkText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: Colors.primary,
+    },
 });
 
 export default SavedPredictionsScreen;

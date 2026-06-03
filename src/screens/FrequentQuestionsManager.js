@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, ActivityIndicator, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows, Spacing, BorderRadius } from '../constants/theme';
 import { aiAPI } from '../services/api';
@@ -38,13 +38,49 @@ const FrequentQuestionsManager = ({ navigation }) => {
         }
     };
 
+    const handleDelete = async (id) => {
+        const title = 'Delete Question';
+        const message = 'Are you sure you want to delete this frequent question?';
+
+        const executeDelete = async () => {
+            try {
+                setLoading(true);
+                await aiAPI.deleteFrequentQuestion(id);
+                loadQuestions();
+            } catch (error) {
+                Alert.alert('Error', 'Failed to delete question');
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                await executeDelete();
+            }
+            return;
+        }
+
+        Alert.alert(
+            title,
+            message,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: executeDelete
+                }
+            ]
+        );
+    };
+
     const QuestionItem = ({ item }) => (
         <View style={styles.item}>
             <View style={styles.itemContent}>
                 <MessageSquare size={16} color={Colors.primary} />
                 <Text style={styles.itemText}>{item.question}</Text>
             </View>
-            <TouchableOpacity onPress={() => {/* Implement delete */}}>
+            <TouchableOpacity onPress={() => handleDelete(item._id)}>
                 <Trash2 size={16} color={Colors.error} />
             </TouchableOpacity>
         </View>

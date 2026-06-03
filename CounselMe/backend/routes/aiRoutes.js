@@ -8,7 +8,8 @@ const {
     getFrequentQuestions,
     setFrequentQuestion,
     generateReview,
-    getDailyMetrics
+    getDailyMetrics,
+    deleteFrequentQuestion
 } = require('../controllers/aiController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -22,6 +23,7 @@ router.post('/generate-review', protect, generateReview);
 // Admin routes
 router.post('/train', protect, trainAI);
 router.post('/frequent-questions', protect, setFrequentQuestion);
+router.delete('/frequent-questions/:id', protect, deleteFrequentQuestion);
 router.get('/metrics', protect, getDailyMetrics);
 
 module.exports = router;

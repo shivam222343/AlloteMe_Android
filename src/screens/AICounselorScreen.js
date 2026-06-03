@@ -695,9 +695,20 @@ const AICounselorScreen = ({ navigation }) => {
     }, [loading, messages, chatId, user]);
 
     const deleteMessage = React.useCallback((id) => {
+        const title = "Delete Message";
+        const message = "Are you sure you want to remove this message?";
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                setMessages(prev => prev.filter(m => m.id !== id));
+                setIsDirty(true);
+            }
+            return;
+        }
+
         Alert.alert(
-            "Delete Message",
-            "Are you sure you want to remove this message?",
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 {

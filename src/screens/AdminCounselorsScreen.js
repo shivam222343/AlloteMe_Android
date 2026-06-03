@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    TextInput, Image, ActivityIndicator, Alert, Modal, FlatList
+    TextInput, Image, ActivityIndicator, Alert, Modal, FlatList, Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Plus, Trash2, Camera, X, User as UserIcon, MapPin, Briefcase, Phone, Mail, Award } from 'lucide-react-native';
@@ -114,7 +114,20 @@ const AdminCounselorsScreen = ({ navigation }) => {
     };
 
     const handleDelete = (id) => {
-        Alert.alert("Delete", "Are you sure you want to remove this counselor?", [
+        const title = "Delete";
+        const message = "Are you sure you want to remove this counselor?";
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                (async () => {
+                    await counselorAPI.delete(id);
+                    fetchCounselors();
+                })();
+            }
+            return;
+        }
+
+        Alert.alert(title, message, [
             { text: "Cancel", style: "cancel" },
             {
                 text: "Delete", style: 'destructive', onPress: async () => {

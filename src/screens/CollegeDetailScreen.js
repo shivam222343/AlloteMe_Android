@@ -256,25 +256,39 @@ const CollegeDetailScreen = ({ route, navigation }) => {
     };
 
     const handleDelete = async () => {
+        const title = "Delete Institution";
+        const message = "This will permanently remove this institution and ALL its cutoff data. Continue?";
+
+        const action = async () => {
+            try {
+                setLoading(true);
+                await institutionAPI.delete(id);
+                if (Platform.OS === 'web') alert("Institution deleted.");
+                else Alert.alert("Success", "Institution deleted.");
+                navigation.navigate('Dashboard');
+            } catch (error) {
+                if (Platform.OS === 'web') alert("Failed to delete.");
+                else Alert.alert("Error", "Failed to delete.");
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                action();
+            }
+            return;
+        }
+
         Alert.alert(
-            "Delete Institution",
-            "This will permanently remove this institution and ALL its cutoff data. Continue?",
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 {
                     text: "Delete",
                     style: "destructive",
-                    onPress: async () => {
-                        try {
-                            setLoading(true);
-                            await institutionAPI.delete(id);
-                            Alert.alert("Success", "Institution deleted.");
-                            navigation.navigate('Dashboard');
-                        } catch (error) {
-                            Alert.alert("Error", "Failed to delete.");
-                            setLoading(false);
-                        }
-                    }
+                    onPress: action
                 }
             ]
         );
@@ -348,22 +362,36 @@ const CollegeDetailScreen = ({ route, navigation }) => {
                                 <TouchableOpacity
                                     style={styles.deleteBranchBtn}
                                     onPress={() => {
-                                        Alert.alert("Delete Branch", "Are you sure you want to remove " + b.name + "? This will permanently delete the branch AND all associated cutoff data for this institution.", [
+                                        const title = "Delete Branch";
+                                        const message = "Are you sure you want to remove " + b.name + "? This will permanently delete the branch AND all associated cutoff data for this institution.";
+
+                                        const action = async () => {
+                                            try {
+                                                const res = await institutionAPI.deleteBranch(inst._id, b.name);
+                                                setInst({ ...inst, branches: res.data.branches });
+                                                if (Platform.OS === 'web') alert("Branch and its cutoffs removed.");
+                                                else Alert.alert("Success", "Branch and its cutoffs removed.");
+                                            } catch (e) {
+                                                if (Platform.OS === 'web') alert("Failed to delete branch");
+                                                else Alert.alert("Error", "Failed to delete branch");
+                                            }
+                                        };
+
+                                        if (Platform.OS === 'web') {
+                                            if (window.confirm(`${title}\n\n${message}`)) {
+                                                action();
+                                            }
+                                            return;
+                                        }
+
+                                        Alert.alert(title, message, [
                                             { text: "Cancel" },
                                             {
                                                 text: "Delete",
                                                 style: "destructive",
-                                                onPress: async () => {
-                                                    try {
-                                                        const res = await institutionAPI.deleteBranch(inst._id, b.name);
-                                                        setInst({ ...inst, branches: res.data.branches });
-                                                        Alert.alert("Success", "Branch and its cutoffs removed.");
-                                                    } catch (e) {
-                                                        Alert.alert("Error", "Failed to delete branch");
-                                                    }
-                                                }
+                                                onPress: action
                                             }
-                                        ])
+                                        ]);
                                     }}
                                 >
                                     <Trash2 size={16} color={Colors.error} />

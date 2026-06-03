@@ -11,7 +11,8 @@ import {
     Modal,
     ScrollView,
     Image,
-    Dimensions
+    Dimensions,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
@@ -139,7 +140,24 @@ const FormResponsesScreen = ({ route, navigation }) => {
     };
 
     const handleDeleteResponse = (responseId) => {
-        Alert.alert('Delete Response', 'Permanently delete this response?', [
+        const title = 'Delete Response';
+        const message = 'Permanently delete this response?';
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                (async () => {
+                    try {
+                        await customFormsAPI.deleteResponse(responseId);
+                        fetchData();
+                    } catch (error) {
+                        alert('Failed to delete response');
+                    }
+                })();
+            }
+            return;
+        }
+
+        Alert.alert(title, message, [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Delete', style: 'destructive', onPress: async () => {

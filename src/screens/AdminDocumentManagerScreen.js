@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    TextInput, Alert, Modal, ActivityIndicator, FlatList
+    TextInput, Alert, Modal, ActivityIndicator, FlatList, Platform
 } from 'react-native';
 import { Colors, Shadows, Spacing } from '../constants/theme';
 import MainLayout from '../components/layouts/MainLayout';
@@ -39,9 +39,20 @@ const AdminDocumentManagerScreen = () => {
     };
 
     const handleDeleteDoc = (name) => {
+        const title = "Delete Document";
+        const message = `Are you sure you want to remove "${name}" from the ${selectedCat} list?`;
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                const updated = { ...docData, [selectedCat]: docData[selectedCat].filter(d => d !== name) };
+                setDocData(updated);
+            }
+            return;
+        }
+
         Alert.alert(
-            "Delete Document",
-            `Are you sure you want to remove "${name}" from the ${selectedCat} list?`,
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 { 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, FlatList, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Card from '../components/ui/Card';
 import { cutoffAPI } from '../services/api';
@@ -69,30 +69,44 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
     };
 
     const handleDelete = async () => {
+        const title = "Delete Cutoffs";
+        const message = `Are you sure you want to delete all cutoffs for ${branchName} - Round ${selectedRound} (${selectedYear})? This cannot be undone.`;
+
+        const action = async () => {
+            try {
+                setLoading(true);
+                await cutoffAPI.delete(institutionId, branchName, {
+                    examType: selectedExamType,
+                    year: selectedYear,
+                    round: selectedRound
+                });
+                if (Platform.OS === 'web') alert("Cutoffs deleted successfully");
+                else Alert.alert("Success", "Cutoffs deleted successfully");
+                fetchData();
+            } catch (error) {
+                if (Platform.OS === 'web') alert("Failed to delete cutoffs");
+                else Alert.alert("Error", "Failed to delete cutoffs");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                action();
+            }
+            return;
+        }
+
         Alert.alert(
-            "Delete Cutoffs",
-            `Are you sure you want to delete all cutoffs for ${branchName} - Round ${selectedRound} (${selectedYear})? This cannot be undone.`,
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 {
                     text: "Delete",
                     style: "destructive",
-                    onPress: async () => {
-                        try {
-                            setLoading(true);
-                            await cutoffAPI.delete(institutionId, branchName, {
-                                examType: selectedExamType,
-                                year: selectedYear,
-                                round: selectedRound
-                            });
-                            Alert.alert("Success", "Cutoffs deleted successfully");
-                            fetchData();
-                        } catch (error) {
-                            Alert.alert("Error", "Failed to delete cutoffs");
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
+                    onPress: action
                 }
             ]
         );

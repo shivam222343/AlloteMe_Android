@@ -11,7 +11,10 @@
     "serve": "npx serve dist",
     "deploy": "npm run build:web",
     "deploy:netlify": "node deploy.js",
-    "build:apk": "eas build --platform android --profile preview"
+    "build:apk": "eas build --platform android --profile preview",
+    "build:apk:prod": "eas build --platform android --profile production",
+    "build:apk:local": "eas build --platform android --profile preview --local",
+    "android:build": "cd android && gradlew assembleRelease"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

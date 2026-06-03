@@ -2,10 +2,11 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
-import { MapPin, Layers, Calendar, Download, GripVertical, ChevronLeft, FileText, Search, X, ShieldCheck, Bookmark } from 'lucide-react-native';
+import { MapPin, Layers, Calendar, Download, GripVertical, ChevronLeft, ChevronRight, FileText, Search, X, ShieldCheck, Bookmark } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
-import DraggableFlatList from 'react-native-draggable-flatlist';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import { TouchableOpacity as GestureHandlerTouchableOpacity } from 'react-native-gesture-handler';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
@@ -43,106 +44,117 @@ const OptionPresetRow = React.memo(({
     const college = item.collegeId && typeof item.collegeId === 'object' ? item.collegeId : { name: 'Unknown Institution' };
 
     return (
-        <TouchableOpacity
-            onLongPress={isReordering && !searchText ? drag : null}
-            delayLongPress={Platform.OS === 'web' ? 80 : 150}
-            onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
-            disabled={isActive}
-            activeOpacity={0.9}
-            style={[
-                styles.fullWidthItem,
-                Platform.OS === 'web' && { cursor: isActive ? 'grabbing' : isReordering ? 'grab' : 'pointer' }
-            ]}
-        >
-            <Animated.View style={animatedStyle}>
-                <Card style={[styles.resultCard, isActive && styles.activeCard]}>
-                    <View style={styles.cardHeader}>
-                        {isReordering && (
-                            <View style={styles.dragHandle}>
-                                <GripVertical size={16} color="#94a3b8" />
+        <ScaleDecorator>
+            <GestureHandlerTouchableOpacity
+                onLongPress={isReordering && !searchText ? drag : null}
+                delayLongPress={Platform.OS === 'web' ? 80 : 150}
+                onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
+                disabled={isActive}
+                activeOpacity={0.9}
+                style={[
+                    styles.fullWidthItem,
+                    Platform.OS === 'web' && { cursor: isActive ? 'grabbing' : isReordering ? 'grab' : 'pointer' }
+                ]}
+            >
+                <Animated.View style={animatedStyle}>
+                    <Card style={[styles.resultCard, isActive && styles.activeCard]}>
+                        <View style={styles.cardHeader}>
+                            {isReordering && (
+                                <View style={styles.dragHandle}>
+                                    <GripVertical size={16} color="#94a3b8" />
+                                </View>
+                            )}
+                            <View style={styles.numberTag}>
+                                <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
                             </View>
-                        )}
-                        <View style={styles.numberTag}>
-                            <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
-                        </View>
-                        <View style={styles.instHeader}>
-                            <View style={styles.instBasicRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.instName} numberOfLines={2}>
-                                        {college.name}
-                                    </Text>
-                                    <View style={styles.locRow}>
-                                        <MapPin size={10} color={Colors.text.tertiary} />
-                                        <Text style={styles.locText}>{college.location?.city || 'Verified'}</Text>
-                                        <View style={styles.sep} />
-                                        <Text style={styles.dteText}>DTE: {college.dteCode || '—'}</Text>
+                            <View style={styles.instHeader}>
+                                <View style={styles.instBasicRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.instName} numberOfLines={2}>
+                                            {college.name}
+                                        </Text>
+                                        <View style={styles.locRow}>
+                                            <MapPin size={10} color={Colors.text.tertiary} />
+                                            <Text style={styles.locText}>{college.location?.city || 'Verified'}</Text>
+                                            <View style={styles.sep} />
+                                            <Text style={styles.dteText}>DTE: {college.dteCode || '—'}</Text>
+                                        </View>
                                     </View>
                                 </View>
                             </View>
-                        </View>
 
-                        <View style={[
-                            styles.matchBadge,
-                            {
-                                borderColor: isSaved ? Colors.primary : item.chanceColor || '#f59e0b',
-                                backgroundColor: isSaved ? Colors.primary + '15' : (item.chanceColor || '#f59e0b') + '10'
-                            }
-                        ]}>
-                            <Text style={[
-                                styles.matchPercent,
-                                { color: isSaved ? Colors.primary : (item.chanceColor || '#f59e0b') }
+                            <View style={[
+                                styles.matchBadge,
+                                {
+                                    borderColor: isSaved ? Colors.primary : item.chanceColor || '#f59e0b',
+                                    backgroundColor: isSaved ? Colors.primary + '15' : (item.chanceColor || '#f59e0b') + '10'
+                                }
                             ]}>
-                                {isSaved ? 'SAVED' : item.chanceLabel || 'Medium'}
-                            </Text>
+                                <Text style={[
+                                    styles.matchPercent,
+                                    { color: isSaved ? Colors.primary : (item.chanceColor || '#f59e0b') }
+                                ]}>
+                                    {isSaved ? 'SAVED' : item.chanceLabel || 'Medium'}
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={() => handleSavePrediction(item)}
+                                style={styles.saveBtn}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Bookmark size={18} color={isSaved ? Colors.primary : '#94a3b8'} fill={isSaved ? Colors.primary : 'transparent'} />
+                            </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity
-                            onPress={() => handleSavePrediction(item)}
-                            style={styles.saveBtn}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                            <Bookmark size={18} color={isSaved ? Colors.primary : '#94a3b8'} fill={isSaved ? Colors.primary : 'transparent'} />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.branchSection}>
-                        <Text style={styles.branchName}>{item.branch}</Text>
-                        <View style={styles.badgeRow}>
-                            <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
-                            <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
-                            {item.category && (
-                                <View style={[
-                                    styles.badge,
-                                    { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
-                                ]}>
-                                    <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
-                                    <Text style={[
-                                        styles.badgeText,
-                                        { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
-                                    ]}>{item.category}</Text>
+                        <View style={styles.branchSection}>
+                            <Text style={styles.branchName}>{item.branch}</Text>
+                            <View style={styles.badgeRow}>
+                                <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
+                                <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
+                                {item.category && (
+                                    <View style={[
+                                        styles.badge,
+                                        { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
+                                    ]}>
+                                        <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
+                                        <Text style={[
+                                            styles.badgeText,
+                                            { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
+                                        ]}>{item.category}</Text>
+                                    </View>
+                                )}
+                                <View style={[styles.badge, { backgroundColor: '#f0fdf4', borderColor: '#16a34a20', borderWidth: 0.5 }]}>
+                                    <ShieldCheck size={10} color="#16a34a" />
+                                    <Text style={[styles.badgeText, { color: '#16a34a' }]}>Verified</Text>
                                 </View>
-                            )}
-                            <View style={[styles.badge, { backgroundColor: '#f0fdf4', borderColor: '#16a34a20', borderWidth: 0.5 }]}>
-                                <ShieldCheck size={10} color="#16a34a" />
-                                <Text style={[styles.badgeText, { color: '#16a34a' }]}>Verified</Text>
                             </View>
                         </View>
-                    </View>
 
-                    <View style={styles.statsRow}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.statLabel}>CUTOFF</Text>
-                            <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
-                            {item.rank ? <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text> : null}
+                        <View style={styles.statsRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.statLabel}>CUTOFF</Text>
+                                <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
+                                {item.rank ? <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text> : null}
+                            </View>
+                            <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                                <Text style={styles.statLabel}>CHANCE</Text>
+                                <Text style={[styles.statVal, { color: item.chanceColor || '#f59e0b', fontSize: 13 }]}>{item.chanceLabel || 'Medium'}</Text>
+                            </View>
                         </View>
-                        <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                            <Text style={styles.statLabel}>CHANCE</Text>
-                            <Text style={[styles.statVal, { color: item.chanceColor || '#f59e0b', fontSize: 13 }]}>{item.chanceLabel || 'Medium'}</Text>
+                        <View style={styles.cardFooter}>
+                            <TouchableOpacity 
+                                style={styles.infoLink} 
+                                onPress={() => navigation.navigate('CollegeDetail', { id: college._id })}
+                            >
+                                <Text style={styles.infoLinkText}>View College Info</Text>
+                                <ChevronRight size={12} color={Colors.primary} />
+                            </TouchableOpacity>
                         </View>
-                    </View>
-                </Card>
-            </Animated.View>
-        </TouchableOpacity>
+                    </Card>
+                </Animated.View>
+            </GestureHandlerTouchableOpacity>
+        </ScaleDecorator>
     );
 });
 
@@ -170,8 +182,8 @@ const OptionFormViewScreen = ({ route, navigation }) => {
                     const savedKeys = JSON.parse(saved);
                     const sorted = [...rawColleges].sort((a, b) => {
                         const getCollId = (c) => (c && typeof c === 'object' ? c._id : c);
-                        const keyA = a._id?.toString() || `${getCollId(a.collegeId)}_${a.branch}_${a.year}_${a.round}`;
-                        const keyB = b._id?.toString() || `${getCollId(b.collegeId)}_${b.branch}_${b.year}_${b.round}`;
+                        const keyA = a._id?.toString() || `${getCollId(a.collegeId)}_${a.branch}_${a.year}_${a.round}_${a.category || ''}_${a.seatType || ''}`;
+                        const keyB = b._id?.toString() || `${getCollId(b.collegeId)}_${b.branch}_${b.year}_${b.round}_${b.category || ''}_${b.seatType || ''}`;
                         const idxA = savedKeys.indexOf(keyA);
                         const idxB = savedKeys.indexOf(keyB);
                         if (idxA === -1 && idxB === -1) return 0;
@@ -238,7 +250,7 @@ const OptionFormViewScreen = ({ route, navigation }) => {
             const getCollId = (c) => (c && typeof c === 'object' ? c._id : c);
             return {
                 ...item,
-                key: item._id?.toString() || `${getCollId(item.collegeId)}_${item.branch}_${item.year}_${item.round}`
+                key: item._id?.toString() || `${getCollId(item.collegeId)}_${item.branch}_${item.year}_${item.round}_${item.category || ''}_${item.seatType || ''}`
             };
         });
 
@@ -255,7 +267,7 @@ const OptionFormViewScreen = ({ route, navigation }) => {
     const handleDragEnd = async (data) => {
         setResults(data);
         const getCollId = (c) => (c && typeof c === 'object' ? c._id : c);
-        const keys = data.map(item => item._id?.toString() || `${getCollId(item.collegeId)}_${item.branch}_${item.year}_${item.round}`);
+        const keys = data.map(item => item._id?.toString() || `${getCollId(item.collegeId)}_${item.branch}_${item.year}_${item.round}_${item.category || ''}_${item.seatType || ''}`);
         await AsyncStorage.setItem(`preset_order_${preset._id}`, JSON.stringify(keys));
     };
 
@@ -459,6 +471,7 @@ const OptionFormViewScreen = ({ route, navigation }) => {
             <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
                 <DraggableFlatList
                     data={processedResults}
+                    extraData={localSavedPredictions}
                     onDragEnd={({ data }) => handleDragEnd(data)}
                     keyExtractor={(item) => item.key}
                     renderItem={renderItem}
@@ -549,7 +562,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4
-    }
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 10,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    infoLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    infoLinkText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: Colors.primary,
+    },
 });
 
 export default OptionFormViewScreen;

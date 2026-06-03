@@ -8,7 +8,8 @@ import {
     ActivityIndicator,
     Alert,
     RefreshControl,
-    Share
+    Share,
+    Platform
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,9 +48,28 @@ const FormListScreen = ({ navigation }) => {
     };
 
     const handleDelete = (id) => {
+        const title = 'Delete Form';
+        const message = 'Are you sure you want to delete this form? All responses will be lost.';
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                (async () => {
+                    try {
+                        const res = await customFormsAPI.delete(id);
+                        if (res.data.success) {
+                            fetchForms();
+                        }
+                    } catch (error) {
+                        alert('Failed to delete form');
+                    }
+                })();
+            }
+            return;
+        }
+
         Alert.alert(
-            'Delete Form',
-            'Are you sure you want to delete this form? All responses will be lost.',
+            title,
+            message,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {

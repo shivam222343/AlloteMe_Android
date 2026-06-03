@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI } from '../services/api';
@@ -39,49 +39,77 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
 
     const handleToggleRole = async () => {
         const newRole = user.role === 'admin' ? 'student' : 'admin';
+        const title = "Change Role";
+        const message = `Are you sure you want to change ${user.displayName}'s role from ${user.role} to ${newRole}?`;
+
+        const action = async () => {
+            setUpdatingRole(true);
+            try {
+                const res = await authAPI.updateUserRole(userId, { role: newRole });
+                setUser({ ...user, role: res.data.role });
+                if (Platform.OS === 'web') alert(`Role updated to ${newRole}`);
+                else Alert.alert('Success', `Role updated to ${newRole}`);
+            } catch (error) {
+                if (Platform.OS === 'web') alert('Failed to update role');
+                else Alert.alert('Error', 'Failed to update role');
+                console.error(error);
+            } finally {
+                setUpdatingRole(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                action();
+            }
+            return;
+        }
+
         Alert.alert(
-            "Change Role",
-            `Are you sure you want to change ${user.displayName}'s role from ${user.role} to ${newRole}?`,
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 {
                     text: "Confirm",
-                    onPress: async () => {
-                        setUpdatingRole(true);
-                        try {
-                            const res = await authAPI.updateUserRole(userId, { role: newRole });
-                            setUser({ ...user, role: res.data.role });
-                            Alert.alert('Success', `Role updated to ${newRole}`);
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to update role');
-                            console.error(error);
-                        } finally {
-                            setUpdatingRole(false);
-                        }
-                    }
+                    onPress: action
                 }
             ]
         );
     };
 
     const handleDeleteUser = () => {
+        const title = 'Delete User';
+        const message = `Are you sure you want to permanently delete ${user.displayName}? This action cannot be undone.`;
+
+        const action = async () => {
+            try {
+                await authAPI.deleteUser(user._id);
+                if (Platform.OS === 'web') alert('User removed permanently');
+                else Alert.alert('Success', 'User removed permanently');
+                navigation.goBack();
+            } catch (error) {
+                if (Platform.OS === 'web') alert('Failed to delete user');
+                else Alert.alert('Error', 'Failed to delete user');
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                action();
+            }
+            return;
+        }
+
         Alert.alert(
-            'Delete User',
-            `Are you sure you want to permanently delete ${user.displayName}? This action cannot be undone.`,
+            title,
+            message,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Delete Permanently',
                     style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await authAPI.deleteUser(user._id);
-                            Alert.alert('Success', 'User removed permanently');
-                            navigation.goBack();
-                        } catch (error) {
-                            Alert.alert('Error', 'Failed to delete user');
-                        }
-                    }
+                    onPress: action
                 }
             ]
         );

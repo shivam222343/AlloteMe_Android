@@ -321,26 +321,40 @@ const EditInstitutionScreen = ({ route, navigation }) => {
     };
 
     const handleDelete = async () => {
+        const title = "Delete Institution";
+        const message = "Are you sure you want to delete this institution and ALL its cutoff data? This action IS IRREVERSIBLE.";
+
+        const action = async () => {
+            setLoading(true);
+            try {
+                await institutionAPI.delete(id);
+                if (Platform.OS === 'web') alert("Institution deleted.");
+                else Alert.alert("Success", "Institution deleted.");
+                navigation.navigate('Dashboard');
+            } catch (error) {
+                if (Platform.OS === 'web') alert("Failed to delete institution.");
+                else Alert.alert("Error", "Failed to delete institution.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                action();
+            }
+            return;
+        }
+
         Alert.alert(
-            "Delete Institution",
-            "Are you sure you want to delete this institution and ALL its cutoff data? This action IS IRREVERSIBLE.",
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 {
                     text: "Delete",
                     style: "destructive",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            await institutionAPI.delete(id);
-                            Alert.alert("Success", "Institution deleted.");
-                            navigation.navigate('Dashboard');
-                        } catch (error) {
-                            Alert.alert("Error", "Failed to delete institution.");
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
+                    onPress: action
                 }
             ]
         );

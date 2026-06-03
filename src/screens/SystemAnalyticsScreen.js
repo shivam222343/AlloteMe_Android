@@ -87,16 +87,29 @@ const SystemAnalyticsScreen = ({ navigation }) => {
     };
 
     const handleDeleteCoupon = async (id) => {
-        Alert.alert('Delete', 'Are you sure?', [
+        const title = 'Delete';
+        const message = 'Are you sure?';
+
+        const action = async () => {
+            try {
+                await systemAPI.deleteCoupon(id);
+                setCoupons(coupons.filter(c => c._id !== id));
+            } catch (e) {
+                if (Platform.OS === 'web') alert('Failed to delete coupon');
+                else Alert.alert('Error', 'Failed to delete coupon');
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                action();
+            }
+            return;
+        }
+
+        Alert.alert(title, message, [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: async () => {
-                try {
-                    await systemAPI.deleteCoupon(id);
-                    setCoupons(coupons.filter(c => c._id !== id));
-                } catch (e) {
-                    Alert.alert('Error', 'Failed to delete coupon');
-                }
-            }}
+            { text: 'Delete', style: 'destructive', onPress: action }
         ]);
     };
 

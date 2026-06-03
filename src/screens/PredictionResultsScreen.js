@@ -2,12 +2,13 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform, TextInput, LayoutAnimation, ScrollView, Modal } from 'react-native';
 import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
-import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, FileText, Trash2, Search, SortAsc, X, ShieldCheck, Star, Bookmark, PlusCircle } from 'lucide-react-native';
+import { MapPin, Layers, Calendar, Download, GripVertical, Info, ChevronLeft, ChevronRight, FileText, Trash2, Search, SortAsc, X, ShieldCheck, Star, Bookmark, PlusCircle } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { authAPI, optionFormAPI } from '../services/api';
 import OptimizedImage from '../components/ui/OptimizedImage';
-import DraggableFlatList from 'react-native-draggable-flatlist';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import { TouchableOpacity as GestureHandlerTouchableOpacity } from 'react-native-gesture-handler';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
@@ -44,133 +45,149 @@ const PredictionResultRow = React.memo(({
     });
 
     return (
-        <TouchableOpacity
-            onPress={() => navigation.navigate('CollegeDetail', { id: item.collegeId?._id || item.collegeId })}
-            onLongPress={(searchText || sortBy !== 'none') ? null : drag}
-            delayLongPress={Platform.OS === 'web' ? 80 : 150}
-            disabled={isActive}
-            activeOpacity={0.9}
-            style={[
-                styles.fullWidthItem,
-                Platform.OS === 'web' && { cursor: isActive ? 'grabbing' : 'grab' }
-            ]}
-        >
-            <Animated.View style={animatedStyle}>
-                <Card style={[styles.resultCard, isActive && styles.activeCard]}>
-                    <View style={styles.cardHeader}>
-                        <View style={styles.numberTag}>
-                            <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
-                        </View>
-                        <View style={styles.instHeader}>
-                            <View style={styles.instBasicRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.instName} numberOfLines={2}>
-                                        {item.collegeId?.name || 'Unknown Institution'}
-                                    </Text>
-                                    <View style={styles.locRow}>
-                                        <MapPin size={10} color={Colors.text.tertiary} />
-                                        <Text style={styles.locText}>{item.collegeId?.location?.city || 'Verified'}</Text>
-                                        <View style={styles.sep} />
-                                        <Text style={styles.dteText}>DTE: {item.collegeId?.dteCode || '—'}</Text>
+        <ScaleDecorator>
+            <GestureHandlerTouchableOpacity
+                onPress={() => navigation.navigate('CollegeDetail', { id: item.collegeId?._id || item.collegeId })}
+                onLongPress={(searchText || sortBy !== 'none') ? null : drag}
+                delayLongPress={Platform.OS === 'web' ? 80 : 150}
+                disabled={isActive}
+                activeOpacity={0.9}
+                style={[
+                    styles.fullWidthItem,
+                    Platform.OS === 'web' && { cursor: isActive ? 'grabbing' : 'grab' }
+                ]}
+            >
+                <Animated.View style={animatedStyle}>
+                    <Card style={[styles.resultCard, isActive && styles.activeCard]}>
+                        <View style={styles.cardHeader}>
+                            <View style={styles.numberTag}>
+                                <Text style={styles.numberText}>#{typeof index === 'number' ? index + 1 : '?'}</Text>
+                            </View>
+                            <View style={styles.instHeader}>
+                                <View style={styles.instBasicRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.instName} numberOfLines={2}>
+                                            {item.collegeId?.name || 'Unknown Institution'}
+                                        </Text>
+                                        <View style={styles.locRow}>
+                                            <MapPin size={10} color={Colors.text.tertiary} />
+                                            <Text style={styles.locText}>{item.collegeId?.location?.city || 'Verified'}</Text>
+                                            <View style={styles.sep} />
+                                            <Text style={styles.dteText}>DTE: {item.collegeId?.dteCode || '—'}</Text>
+                                        </View>
                                     </View>
                                 </View>
                             </View>
-                        </View>
 
-                        <View style={[
-                            styles.matchBadge,
-                            {
-                                borderColor: isSaved ? Colors.primary : item.chanceColor,
-                                backgroundColor: isSaved ? Colors.primary + '15' : (item.chanceColor || '#0A66C2') + '10'
-                            }
-                        ]}>
-                            <Text style={[
-                                styles.matchPercent,
-                                { color: isSaved ? Colors.primary : (item.chanceColor || '#0A66C2') }
+                            <View style={[
+                                styles.matchBadge,
+                                {
+                                    borderColor: isSaved ? Colors.primary : item.chanceColor,
+                                    backgroundColor: isSaved ? Colors.primary + '15' : (item.chanceColor || '#0A66C2') + '10'
+                                }
                             ]}>
-                                {isSaved ? 'SAVED' : item.chanceLabel}
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity
-                            onPress={() => handleSavePrediction(item)}
-                            style={styles.saveBtn}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                            <Bookmark size={18} color={isSaved ? Colors.primary : '#94a3b8'} fill={isSaved ? Colors.primary : 'transparent'} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => handleDelete(item.key)}
-                            style={styles.deleteBtn}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                            <X size={18} color="#94a3b8" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.branchSection}>
-                        <Text style={styles.branchName}>{item.branch}</Text>
-                        <View style={styles.badgeRow}>
-                            <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
-                            <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
-                            {item.category && (
-                                <View style={[
-                                    styles.badge,
-                                    { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
+                                <Text style={[
+                                    styles.matchPercent,
+                                    { color: isSaved ? Colors.primary : (item.chanceColor || '#0A66C2') }
                                 ]}>
-                                    <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
-                                    <Text style={[
-                                        styles.badgeText,
-                                        { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
-                                    ]}>{item.category}</Text>
-                                </View>
-                            )}
-                            {item.seatType && (
-                                <View style={[
-                                    styles.badge,
-                                    { backgroundColor: item.seatType.toUpperCase().startsWith('L') ? '#ecfdf5' : '#f0f9ff' }
-                                ]}>
-                                    <ShieldCheck size={10} color={item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1'} />
-                                    <Text style={[
-                                        styles.badgeText,
-                                        { color: item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1' }
-                                    ]}>{item.seatType}</Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
+                                    {isSaved ? 'SAVED' : item.chanceLabel}
+                                </Text>
+                            </View>
 
-                    <View style={styles.statsRow}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.statLabel}>CUTOFF</Text>
-                            <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
-                            {item.rank && <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text>}
+                            <TouchableOpacity
+                                onPress={() => handleSavePrediction(item)}
+                                style={styles.saveBtn}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Bookmark size={18} color={isSaved ? Colors.primary : '#94a3b8'} fill={isSaved ? Colors.primary : 'transparent'} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => handleDelete(item.key)}
+                                style={styles.deleteBtn}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <X size={18} color="#94a3b8" />
+                            </TouchableOpacity>
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.statLabel}>MY SCORE</Text>
-                            <Text style={styles.statVal}>{(parseFloat(item.userPercentile) || 0).toFixed(2)}%</Text>
+
+                        <View style={styles.branchSection}>
+                            <Text style={styles.branchName}>{item.branch}</Text>
+                            <View style={styles.badgeRow}>
+                                <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
+                                <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
+                                {item.category && (
+                                    <View style={[
+                                        styles.badge,
+                                        { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
+                                    ]}>
+                                        <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
+                                        <Text style={[
+                                            styles.badgeText,
+                                            { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
+                                        ]}>{item.category}</Text>
+                                    </View>
+                                )}
+                                {item.seatType && (
+                                    <View style={[
+                                        styles.badge,
+                                        { backgroundColor: item.seatType.toUpperCase().startsWith('L') ? '#ecfdf5' : '#f0f9ff' }
+                                    ]}>
+                                        <ShieldCheck size={10} color={item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1'} />
+                                        <Text style={[
+                                            styles.badgeText,
+                                            { color: item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1' }
+                                        ]}>{item.seatType}</Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.statLabel}>DIFF (+/-)</Text>
-                            <Text style={[styles.statVal, parseFloat(item.difference) >= 0 ? styles.safeText : styles.riskText]}>
-                                {parseFloat(item.difference) >= 0 ? '+' : ''}{item.difference}%
-                            </Text>
+
+                        <View style={styles.statsRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.statLabel}>CUTOFF</Text>
+                                <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
+                                {item.rank && <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text>}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.statLabel}>MY SCORE</Text>
+                                <Text style={styles.statVal}>{(parseFloat(item.userPercentile) || 0).toFixed(2)}%</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.statLabel}>DIFF (+/-)</Text>
+                                <Text style={[styles.statVal, parseFloat(item.difference) >= 0 ? styles.safeText : styles.riskText]}>
+                                    {parseFloat(item.difference) >= 0 ? '+' : ''}{item.difference}%
+                                </Text>
+                            </View>
+                            <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                                <Text style={styles.statLabel}>CHANCE</Text>
+                                <Text style={[styles.statVal, { color: item.chanceColor, fontSize: 13 }]}>{item.chanceLabel}</Text>
+                            </View>
                         </View>
-                        <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                            <Text style={styles.statLabel}>CHANCE</Text>
-                            <Text style={[styles.statVal, { color: item.chanceColor, fontSize: 13 }]}>{item.chanceLabel}</Text>
+                        <View style={styles.cardFooter}>
+                            <TouchableOpacity 
+                                style={styles.infoLink} 
+                                onPress={() => navigation.navigate('CollegeDetail', { id: item.collegeId?._id || item.collegeId })}
+                            >
+                                <Text style={styles.infoLinkText}>View College Info</Text>
+                                <ChevronRight size={12} color={Colors.primary} />
+                            </TouchableOpacity>
                         </View>
-                    </View>
-                </Card>
-            </Animated.View>
-        </TouchableOpacity>
+                    </Card>
+                </Animated.View>
+            </GestureHandlerTouchableOpacity>
+        </ScaleDecorator>
     );
 });
 
 const PredictionResultsScreen = ({ route, navigation }) => {
     const insets = useSafeAreaInsets();
-    const { results: resultsParam = [], percentile = 0, rank = '', category = '', examType = '' } = route?.params || {};
+    const params = route?.params || {};
+    const resultsParam = Array.isArray(params.results) ? params.results : [];
+    const percentile = params.percentile || 0;
+    const rank = params.rank || '';
+    const category = params.category || '';
+    const examType = params.examType || '';
 
     const [results, setResults] = useState(resultsParam);
 
@@ -181,20 +198,18 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 if (saved && resultsParam && resultsParam.length > 0) {
                     const savedKeys = JSON.parse(saved);
                     // Match the parsed keys to sort the current results
-                    setResults(() => {
-                        const sorted = [...resultsParam].sort((a, b) => {
-                            const getCollId = (c) => (c && typeof c === 'object' ? c._id : c);
-                            const keyA = a._id?.toString() || `${getCollId(a.collegeId)}_${a.branch}_${a.year}_${a.round}`;
-                            const keyB = b._id?.toString() || `${getCollId(b.collegeId)}_${b.branch}_${b.year}_${b.round}`;
-                            const idxA = savedKeys.indexOf(keyA);
-                            const idxB = savedKeys.indexOf(keyB);
-                            if (idxA === -1 && idxB === -1) return 0;
-                            if (idxA === -1) return 1;
-                            if (idxB === -1) return -1;
-                            return idxA - idxB;
-                        });
-                        return sorted;
+                    const sorted = [...resultsParam].sort((a, b) => {
+                        const getCollId = (c) => (c && typeof c === 'object' ? c._id : c);
+                        const keyA = a._id?.toString() || `${getCollId(a.collegeId)}_${a.branch}_${a.year}_${a.round}_${a.category || ''}_${a.seatType || ''}`;
+                        const keyB = b._id?.toString() || `${getCollId(b.collegeId)}_${b.branch}_${b.year}_${b.round}_${b.category || ''}_${b.seatType || ''}`;
+                        const idxA = savedKeys.indexOf(keyA);
+                        const idxB = savedKeys.indexOf(keyB);
+                        if (idxA === -1 && idxB === -1) return 0;
+                        if (idxA === -1) return 1;
+                        if (idxB === -1) return -1;
+                        return idxA - idxB;
                     });
+                    setResults(sorted);
                 } else if (resultsParam) {
                     setResults(resultsParam);
                 }
@@ -220,6 +235,14 @@ const PredictionResultsScreen = ({ route, navigation }) => {
     const [presetPercentile, setPresetPercentile] = useState(percentile?.toString() || '');
     const [presetCategory, setPresetCategory] = useState(category || 'OPEN');
     const [isSavingPreset, setIsSavingPreset] = useState(false);
+
+    const handleTryAgain = useCallback(() => {
+        if (navigation.canGoBack()) {
+            navigation.goBack();
+        } else {
+            navigation.navigate('Predictor');
+        }
+    }, [navigation]);
 
     // Sync local saved state with user object on mount or when user changes
     useEffect(() => {
@@ -314,7 +337,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 chanceLabel,
                 chanceColor,
                 matchScore: Math.max(0, 100 - (Math.abs(numericDiff) * 10)),
-                key: item._id?.toString() || `${item.collegeId?._id || item.collegeId}_${item.branch}_${item.year}_${item.round}`
+                key: item._id?.toString() || `${item.collegeId?._id || item.collegeId}_${item.branch}_${item.year}_${item.round}_${item.category || ''}_${item.seatType || ''}`
             };
         });
 
@@ -340,9 +363,20 @@ const PredictionResultsScreen = ({ route, navigation }) => {
     }, [results, searchText, sortBy, userPerc]);
 
     const handleDelete = (key) => {
+        const title = "Remove College";
+        const message = "Are you sure you want to remove this college from your list?";
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setResults(prev => prev.filter(item => item._id !== key && item.key !== key));
+            }
+            return;
+        }
+
         Alert.alert(
-            "Remove College",
-            "Are you sure you want to remove this college from your list?",
+            title,
+            message,
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -697,6 +731,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
             <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
                 <DraggableFlatList
                     data={processedResults}
+                    extraData={localSavedPredictions}
                     onDragEnd={({ data }) => {
                         if (sortBy !== 'none') {
                             const msg = "Reordering is only allowed in 'Priority' sort mode.";
@@ -728,11 +763,22 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                     contentContainerStyle={{ paddingBottom: 60 }}
                     containerStyle={{ flex: 1 }}
                     ListEmptyComponent={
-                        <View style={styles.centerEmpty}>
-                            <Search size={48} color="#cbd5e1" />
-                            <Text style={styles.emptyTitle}>No Matching Colleges</Text>
-                            <Text style={styles.emptyText}>Try reducing your percentile tolerance or changing the category filter.</Text>
-                        </View>
+                        percentile === 0 ? (
+                            <View style={styles.centerEmpty}>
+                                <Search size={48} color="#cbd5e1" />
+                                <Text style={styles.emptyTitle}>Results Expired</Text>
+                                <Text style={styles.emptyText}>Your session was cleared after page refresh. Please predict again.</Text>
+                                <TouchableOpacity style={styles.tryAgainBtn} onPress={handleTryAgain}>
+                                    <Text style={styles.tryAgainText}>Predict Again</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View style={styles.centerEmpty}>
+                                <Search size={48} color="#cbd5e1" />
+                                <Text style={styles.emptyTitle}>No Matching Colleges</Text>
+                                <Text style={styles.emptyText}>Try reducing your percentile tolerance or changing the category filter.</Text>
+                            </View>
+                        )
                     }
                 />
             </View>
@@ -870,6 +916,20 @@ const styles = StyleSheet.create({
     riskText: { color: "#ef4444" },
     centerEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 300, paddingHorizontal: 40 },
     emptyTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text.secondary, marginTop: 16 },
+    emptyText: { marginTop: 8, color: Colors.text.tertiary, textAlign: 'center', lineHeight: 20 },
+    tryAgainBtn: {
+        marginTop: 20,
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 10,
+        ...Shadows.sm
+    },
+    tryAgainText: {
+        color: Colors.white,
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
     usageSmall: {
         fontSize: 10,
         fontWeight: '700',
@@ -973,6 +1033,25 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
         color: Colors.white
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 10,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    infoLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    infoLinkText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: Colors.primary,
     },
 });
 

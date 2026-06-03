@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Platform } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { Star, CheckCircle, XCircle, Trash2, MessageSquare } from 'lucide-react-native';
@@ -39,9 +39,26 @@ const AdminReviewsScreen = () => {
     };
 
     const handleDelete = (id) => {
+        const title = 'Delete Review';
+        const message = 'Are you sure you want to delete this review permanently?';
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                (async () => {
+                    try {
+                        await reviewAPI.delete(id);
+                        setReviews(reviews.filter(r => r._id !== id));
+                    } catch (error) {
+                        alert('Failed to delete review');
+                    }
+                })();
+            }
+            return;
+        }
+
         Alert.alert(
-            'Delete Review',
-            'Are you sure you want to delete this review permanently?',
+            title,
+            message,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
