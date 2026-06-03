@@ -70,7 +70,7 @@ const AdminFormBuilderScreen = ({ route, navigation }) => {
     };
 
     const handleBannerPick = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [16, 9], quality: 0.5 });
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.5 });
         if (!result.canceled) {
             setLoading(true);
             try {

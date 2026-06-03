@@ -22,28 +22,33 @@ module.exports = function withRemovePermissions(config) {
       'android.permission.NOTIFICATIONS'
     ];
 
-    // Ensure the permissions array exists
-    if (!androidManifest['uses-permission']) {
-        androidManifest['uses-permission'] = [];
-    }
+    // Process both uses-permission and uses-permission-sdk-23 tags
+    // (some libraries inject via sdk-23 variant)
+    const permissionTags = ['uses-permission', 'uses-permission-sdk-23'];
 
-    // Explicitly add "remove" entries for these permissions to override any library defaults
-    permissionsToRemove.forEach(permission => {
-        // Remove existing if any
-        androidManifest['uses-permission'] = androidManifest['uses-permission'].filter(
-            p => p.$ && p.$['android:name'] !== permission
+    permissionTags.forEach(tag => {
+      // Ensure the permissions array exists
+      if (!androidManifest[tag]) {
+        androidManifest[tag] = [];
+      }
+
+      permissionsToRemove.forEach(permission => {
+        // Remove ALL existing entries for this permission (added by any library)
+        androidManifest[tag] = androidManifest[tag].filter(
+          p => !(p.$ && p.$['android:name'] === permission)
         );
         
-        // Add forced remove entry
-        androidManifest['uses-permission'].push({
-            $: {
-                'android:name': permission,
-                'tools:node': 'remove'
-            }
+        // Add forced remove entry using tools:node="remove"
+        // This ensures the manifest merger removes it even if AAR libraries declare it
+        androidManifest[tag].push({
+          $: {
+            'android:name': permission,
+            'tools:node': 'remove'
+          }
         });
+      });
     });
 
     return config;
   });
 };
-

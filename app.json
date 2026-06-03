@@ -79,7 +79,6 @@
       "favicon": "./imgs/logo.png"
     },
     "plugins": [
-      "./withRemovePermissions",
       "./withAndroidXFix",
       "@react-native-community/datetimepicker",
       [
@@ -104,6 +103,18 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AlloteMe needs camera access for video counseling sessions and profile photos."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./imgs/logo.png",
@@ -113,7 +124,8 @@
           "androidCollapsedTitle": "#{unread_notifications} new notifications"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "./withRemovePermissions"
     ],
     "notification": {
       "iosDisplayInForeground": true,
