@@ -4,7 +4,7 @@ import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, ChevronRight, User as UserIcon, Users, ShieldCheck, Mail, Trash2, Clock } from 'lucide-react-native';
+import { Search, ChevronRight, User as UserIcon, Users, ShieldCheck, Mail, Trash2, Clock, Phone } from 'lucide-react-native';
 import GradientBorder from '../components/ui/GradientBorder';
 
 const AdminUsersScreen = ({ navigation }) => {
@@ -67,7 +67,8 @@ const AdminUsersScreen = ({ navigation }) => {
         } else {
             const filtered = users.filter(u =>
                 u.displayName.toLowerCase().includes(text.toLowerCase()) ||
-                u.email.toLowerCase().includes(text.toLowerCase())
+                u.email.toLowerCase().includes(text.toLowerCase()) ||
+                (u.phoneNumber && u.phoneNumber.toLowerCase().includes(text.toLowerCase()))
             );
             setFilteredUsers(filtered);
         }
@@ -141,6 +142,12 @@ const AdminUsersScreen = ({ navigation }) => {
                     </View>
                     <Text style={styles.userEmail} numberOfLines={1}>{item.email}</Text>
                 </View>
+                {item.phoneNumber ? (
+                    <View style={styles.contactRow}>
+                        <Phone size={12} color={Colors.text.secondary} />
+                        <Text style={styles.userPhone} numberOfLines={1}>{item.phoneNumber}</Text>
+                    </View>
+                ) : null}
             </View>
             <View style={styles.actionColumn}>
                 <TouchableOpacity
@@ -264,6 +271,8 @@ const styles = StyleSheet.create({
     roleText: { fontSize: 9, fontWeight: 'bold', color: Colors.text.tertiary },
     adminText: { color: Colors.primary },
     userEmail: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
+    contactRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+    userPhone: { fontSize: 13, color: Colors.text.secondary },
     actionColumn: { flexDirection: 'row', alignItems: 'center' },
     deleteBtn: { padding: 8, marginRight: 4 },
     emptyBox: { padding: 60, alignItems: 'center' },

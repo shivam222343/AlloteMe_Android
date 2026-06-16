@@ -14,6 +14,12 @@ const AvatarSelectionPopup = ({ visible, onClose, initialAvatar }) => {
     const [currentAvatar, setCurrentAvatar] = useState(initialAvatar);
     const [loading, setLoading] = useState(false);
 
+    React.useEffect(() => {
+        if (visible) {
+            setCurrentAvatar(initialAvatar);
+        }
+    }, [visible, initialAvatar]);
+
     const handleShuffle = async () => {
         setLoading(true);
         try {

@@ -14,9 +14,20 @@ import { TouchableOpacity as RNTouchable } from 'react-native';
 
 const EXAM_OPTIONS = ['MHTCET PCM', 'MHTCET PCB', 'BBA', 'NEET', 'JEE'];
 
+const MAHARASHTRA_REGIONS = [
+    'Pune', 'Mumbai', 'Kolhapur', 'Nagpur', 'Nanded', 
+    'Solapur', 'Nashik', 'Jalgaon', 'Akola', 'Amravati',
+    'Thane', 'Aurangabad', 'Sangli', 'Satara', 'Latur', 
+    'Ahmednagar', 'Chandrapur', 'Yavatmal', 'Buldhana',
+    'Beed', 'Bhandara', 'Dhule', 'Gadchiroli', 'Gondia', 'Hingoli',
+    'Jalna', 'Nandurbar', 'Osmanabad', 'Palghar', 'Parbhani',
+    'Raigad', 'Ratnagiri', 'Sindhudurg', 'Wardha', 'Washim'
+];
+
 const CompleteProfileScreen = ({ navigation, route }) => {
-    const { user, refreshUser, setHasSkippedProfile } = useAuth();
+    const { user, refreshUser, setHasSkippedProfile, setValidateProfileForm } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [isSubmittingSuccess, setIsSubmittingSuccess] = useState(false);
 
     const initialExam = route.params?.admissionPath || user?.examType || 'MHTCET PCM';
     const userScores = user?.scores || {};
@@ -38,6 +49,102 @@ const CompleteProfileScreen = ({ navigation, route }) => {
         phoneNumber: '',
         expectedRegion: ''
     });
+
+    const handleToggleRegion = (region) => {
+        let current = formData.expectedRegion ? formData.expectedRegion.split(',').map(r => r.trim()).filter(Boolean) : [];
+        const regionLower = region.toLowerCase();
+        const exists = current.some(r => r.toLowerCase() === regionLower);
+        
+        if (exists) {
+            current = current.filter(r => r.toLowerCase() !== regionLower);
+        } else {
+            current = [...current, region];
+        }
+        
+        const newValue = current.join(', ');
+        setFormData(prev => ({ ...prev, expectedRegion: newValue }));
+        if (errors.expectedRegion) setErrors(prev => ({ ...prev, expectedRegion: '' }));
+    };
+
+    React.useEffect(() => {
+        // Disable drawer swiping when on this screen
+        const parent = navigation.getParent();
+        if (parent) {
+            parent.setOptions({ swipeEnabled: false });
+        }
+        return () => {
+            if (parent) {
+                parent.setOptions({ swipeEnabled: true });
+            }
+        };
+    }, [navigation]);
+
+    React.useEffect(() => {
+        setValidateProfileForm(() => () => {
+            const cleanPhone = (formData.phoneNumber || '').trim();
+            const phoneRegex = /^[6-9]\d{9}$/;
+            let phoneError = '';
+            if (!cleanPhone) {
+                phoneError = 'please enter this';
+            } else if (!phoneRegex.test(cleanPhone)) {
+                phoneError = 'Enter a valid 10-digit WhatsApp number';
+            }
+
+            const newErrors = {
+                percentile: !formData.percentile || !formData.percentile.trim() ? 'please enter this' : '',
+                rank: !formData.rank || !formData.rank.trim() ? 'please enter this' : '',
+                location: !formData.location || !formData.location.trim() ? 'please enter this' : '',
+                phoneNumber: phoneError,
+                expectedRegion: !formData.expectedRegion || !formData.expectedRegion.trim() ? 'please enter this' : ''
+            };
+
+            setErrors(newErrors);
+
+            const isValid = !Object.values(newErrors).some(err => err !== '');
+            return isValid;
+        });
+
+        return () => {
+            setValidateProfileForm(null);
+        };
+    }, [formData, setValidateProfileForm]);
+
+    React.useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+            if (isSubmittingSuccess) {
+                return;
+            }
+            
+            e.preventDefault();
+
+            // Run validation to show errors in red
+            const cleanPhone = (formData.phoneNumber || '').trim();
+            const phoneRegex = /^[6-9]\d{9}$/;
+            let phoneError = '';
+            if (!cleanPhone) {
+                phoneError = 'please enter this';
+            } else if (!phoneRegex.test(cleanPhone)) {
+                phoneError = 'Enter a valid 10-digit WhatsApp number';
+            }
+
+            const newErrors = {
+                percentile: !formData.percentile || !formData.percentile.trim() ? 'please enter this' : '',
+                rank: !formData.rank || !formData.rank.trim() ? 'please enter this' : '',
+                location: !formData.location || !formData.location.trim() ? 'please enter this' : '',
+                phoneNumber: phoneError,
+                expectedRegion: !formData.expectedRegion || !formData.expectedRegion.trim() ? 'please enter this' : ''
+            };
+            setErrors(newErrors);
+
+            Alert.alert(
+                'Profile Incomplete',
+                'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
+                [{ text: 'OK', style: 'cancel' }]
+            );
+        });
+
+        return unsubscribe;
+    }, [navigation, formData, isSubmittingSuccess]);
 
     const handleExamChange = (type) => {
         const score = userScores[type] || {};
@@ -83,12 +190,21 @@ const CompleteProfileScreen = ({ navigation, route }) => {
     }, [formData.percentile]);
 
     const handleSubmit = async () => {
+        const cleanPhone = (formData.phoneNumber || '').trim();
+        const phoneRegex = /^[6-9]\d{9}$/;
+        let phoneError = '';
+        if (!cleanPhone) {
+            phoneError = 'please enter this';
+        } else if (!phoneRegex.test(cleanPhone)) {
+            phoneError = 'Enter a valid 10-digit WhatsApp number';
+        }
+
         const newErrors = {
-            percentile: !formData.percentile.trim() ? 'please enter this' : '',
-            rank: !formData.rank.trim() ? 'please enter this' : '',
-            location: !formData.location.trim() ? 'please enter this' : '',
-            phoneNumber: !formData.phoneNumber.trim() ? 'please enter this' : '',
-            expectedRegion: !formData.expectedRegion.trim() ? 'please enter this' : ''
+            percentile: !formData.percentile || !formData.percentile.trim() ? 'please enter this' : '',
+            rank: !formData.rank || !formData.rank.trim() ? 'please enter this' : '',
+            location: !formData.location || !formData.location.trim() ? 'please enter this' : '',
+            phoneNumber: phoneError,
+            expectedRegion: !formData.expectedRegion || !formData.expectedRegion.trim() ? 'please enter this' : ''
         };
 
         setErrors(newErrors);
@@ -123,8 +239,13 @@ const CompleteProfileScreen = ({ navigation, route }) => {
             if (res.status === 200 || res.data) {
                 await refreshUser();
                 setHasSkippedProfile(false);
-                Alert.alert('Success', 'Profile updated! Welcome to AlloteMe.');
-                navigation.navigate('Dashboard');
+                setIsSubmittingSuccess(true);
+                Alert.alert('Success', 'Profile updated! Welcome to AlloteMe.', [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('Dashboard')
+                    }
+                ]);
             } else {
                 Alert.alert('Error', 'Failed to update profile');
             }
@@ -237,6 +358,28 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                             error={errors.expectedRegion}
                             placeholder="e.g. Pune, Mumbai, National"
                         />
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.regionScrollView}
+                            contentContainerStyle={styles.regionScrollContent}
+                        >
+                            {MAHARASHTRA_REGIONS.map((region) => {
+                                const selected = formData.expectedRegion.split(',').map(r => r.trim().toLowerCase()).includes(region.toLowerCase());
+                                return (
+                                    <RNTouchable
+                                        key={region}
+                                        style={[styles.regionTag, selected && styles.activeRegionTag]}
+                                        onPress={() => handleToggleRegion(region)}
+                                    >
+                                        <Text style={[styles.regionTagText, selected && styles.activeRegionTagText]}>
+                                            {region}
+                                        </Text>
+                                    </RNTouchable>
+                                );
+                            })}
+                        </ScrollView>
                     </Card>
 
                     <View style={styles.footerBtns}>
@@ -269,7 +412,13 @@ const styles = StyleSheet.create({
     examPill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.divider },
     activeExamPill: { backgroundColor: Colors.primary, borderColor: Colors.primary },
     examPillText: { fontSize: 12, fontWeight: '600', color: Colors.text.secondary },
-    activeExamPillText: { color: Colors.white }
+    activeExamPillText: { color: Colors.white },
+    regionScrollView: { marginTop: 8, marginBottom: 12 },
+    regionScrollContent: { paddingHorizontal: 4, paddingVertical: 4 },
+    regionTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
+    activeRegionTag: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+    regionTagText: { fontSize: 13, color: '#475569', fontWeight: '500' },
+    activeRegionTagText: { color: Colors.white, fontWeight: 'bold' }
 });
 
 export default CompleteProfileScreen;

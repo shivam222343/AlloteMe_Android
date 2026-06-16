@@ -14,6 +14,17 @@ Notifications.setNotificationHandler({
     }),
 });
 
+// Register default notification channel on Android immediately on load
+if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('default', {
+        name: 'CounselMe Notifications',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#0A66C2',
+        sound: 'default',
+    }).catch(err => console.log('Error setting notification channel:', err));
+}
+
 /**
  * Register for push notifications and get FCM token
  * @returns {Promise<string|null>} FCM token or null if registration failed

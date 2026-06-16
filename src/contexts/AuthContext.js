@@ -48,6 +48,7 @@ export const AuthProvider = ({ children }) => {
     const [showAvatarPopup, setShowAvatarPopupState] = useState(false);
     const [admissionPath, setAdmissionPathState] = useState('MHTCET PCM');
     const [subscriptionModal, setSubscriptionModal] = useState({ visible: false, feature: '' });
+    const [validateProfileForm, setValidateProfileForm] = useState(null);
 
     useEffect(() => {
         loadAdmissionPath();
@@ -571,7 +572,9 @@ export const AuthProvider = ({ children }) => {
             subscriptionModal,
             setSubscriptionModal,
             checkLimit,
-            incrementUsage
+            incrementUsage,
+            validateProfileForm,
+            setValidateProfileForm
         }}>
             {children}
         </AuthContext.Provider>

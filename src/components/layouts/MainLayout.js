@@ -25,7 +25,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         markAllLocalNotifsAsRead,
         clearAllLocalNotifs,
         showAvatarPopup,
-        setShowAvatarPopup
+        setShowAvatarPopup,
+        validateProfileForm
     } = useAuth();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
@@ -144,7 +145,20 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                         <View style={[styles.leftRow, isDesktop && { flex: 0, marginRight: 24 }]}>
                             {!hideBack && navigation.canGoBack() ? (
                                 <TouchableOpacity
-                                    onPress={() => navigation.goBack()}
+                                    onPress={() => {
+                                        if (validateProfileForm) {
+                                            const isValid = validateProfileForm();
+                                            if (!isValid) {
+                                                Alert.alert(
+                                                    'Profile Incomplete',
+                                                    'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
+                                                    [{ text: 'OK', style: 'cancel' }]
+                                                );
+                                                return;
+                                            }
+                                        }
+                                        navigation.goBack();
+                                    }}
                                     style={styles.iconBtn}
                                     activeOpacity={0.7}
                                 >
@@ -152,7 +166,20 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 </TouchableOpacity>
                             ) : (
                                 <TouchableOpacity
-                                    onPress={() => navigation?.openDrawer?.()}
+                                    onPress={() => {
+                                        if (validateProfileForm) {
+                                            const isValid = validateProfileForm();
+                                            if (!isValid) {
+                                                Alert.alert(
+                                                    'Profile Incomplete',
+                                                    'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
+                                                    [{ text: 'OK', style: 'cancel' }]
+                                                );
+                                                return;
+                                            }
+                                        }
+                                        navigation?.openDrawer?.();
+                                    }}
                                     style={styles.iconBtn}
                                     activeOpacity={0.7}
                                 >
@@ -175,6 +202,17 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                             key={tab.name}
                                             style={[styles.desktopNavLink, active && styles.desktopNavLinkActive]}
                                             onPress={() => {
+                                                if (validateProfileForm) {
+                                                    const isValid = validateProfileForm();
+                                                    if (!isValid) {
+                                                        Alert.alert(
+                                                            'Profile Incomplete',
+                                                            'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
+                                                            [{ text: 'OK', style: 'cancel' }]
+                                                        );
+                                                        return;
+                                                    }
+                                                }
                                                 if (Platform.OS === 'web') {
                                                     navigation.navigate('AppDrawer', {
                                                         screen: 'MainTabs',
@@ -200,14 +238,40 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                             <TouchableOpacity
                                 style={styles.iconBtn}
                                 activeOpacity={0.7}
-                                onPress={() => setShowNotifs(true)}
+                                onPress={() => {
+                                    if (validateProfileForm) {
+                                        const isValid = validateProfileForm();
+                                        if (!isValid) {
+                                            Alert.alert(
+                                                'Profile Incomplete',
+                                                'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
+                                                [{ text: 'OK', style: 'cancel' }]
+                                            );
+                                            return;
+                                        }
+                                    }
+                                    setShowNotifs(true);
+                                }}
                             >
                                 <Bell size={22} color={Colors.text.primary} />
                                 {unreadCount > 0 && <View style={styles.badge} />}
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={() => navigation.navigate('Profile')}
+                                onPress={() => {
+                                    if (validateProfileForm) {
+                                        const isValid = validateProfileForm();
+                                        if (!isValid) {
+                                            Alert.alert(
+                                                'Profile Incomplete',
+                                                'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
+                                                [{ text: 'OK', style: 'cancel' }]
+                                            );
+                                            return;
+                                        }
+                                    }
+                                    navigation.navigate('Profile');
+                                }}
                                 style={styles.avatarBtn}
                                 activeOpacity={0.7}
                             >

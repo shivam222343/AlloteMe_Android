@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions, Alert } from 'react-native';
 import { Colors, Shadows } from '../../constants/theme';
 import { Home, Search, LayoutGrid, User, Bot, CloudUpload } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const BottomBar = ({ state, navigation }) => {
-    const { user } = useAuth();
+    const { user, validateProfileForm } = useAuth();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const isAdmin = user?.role === 'admin';
@@ -47,7 +47,20 @@ const BottomBar = ({ state, navigation }) => {
                         <TouchableOpacity
                             key={index}
                             style={styles.tab}
-                            onPress={() => navigation.navigate(tab.name)}
+                            onPress={() => {
+                                if (validateProfileForm) {
+                                    const isValid = validateProfileForm();
+                                    if (!isValid) {
+                                        Alert.alert(
+                                            'Profile Incomplete',
+                                            'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
+                                            [{ text: 'OK', style: 'cancel' }]
+                                        );
+                                        return;
+                                    }
+                                }
+                                navigation.navigate(tab.name);
+                            }}
                             activeOpacity={0.7}
                         >
                             {isActive && <View style={styles.activeBar} />}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "AlloteMe",
     "slug": "alloteme0077",
-    "version": "2.0.3",
+    "version": "2.1.0",
     "scheme": "alloteme0077",
     "orientation": "portrait",
     "icon": "./imgs/logo.png",
@@ -25,7 +25,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.alloteme0077.app",
-      "versionCode": 8,
+      "versionCode": 9,
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "intentFilters": [
@@ -108,9 +108,7 @@
         {
           "icon": "./imgs/logo.png",
           "color": "#0A66C2",
-          "mode": "production",
-          "androidMode": "default",
-          "androidCollapsedTitle": "#{unread_notifications} new notifications"
+          "defaultChannel": "default"
         }
       ],
       "expo-font"

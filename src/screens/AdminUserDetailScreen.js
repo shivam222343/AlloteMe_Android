@@ -6,7 +6,8 @@ import { authAPI } from '../services/api';
 import {
     User as UserIcon, Mail, Phone, Calendar,
     ShieldCheck, GraduationCap, MapPin, Search,
-    Activity, CheckCircle2, AlertCircle, Star, Trash2, Clock
+    Activity, CheckCircle2, AlertCircle, Star, Trash2, Clock,
+    FileText
 } from 'lucide-react-native';
 import GradientBorder from '../components/ui/GradientBorder';
 
@@ -197,6 +198,17 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                             <Trash2 size={16} color={Colors.white} />
                             <Text style={styles.btnText}>Delete User</Text>
                         </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>User Information</Text>
+                    <View style={styles.card}>
+                        <InfoRow icon={Mail} label="Email Address" value={user.email} />
+                        <InfoRow icon={Phone} label="Contact Number" value={user.phoneNumber} />
+                        <InfoRow icon={Calendar} label="Member Since" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'} />
+                        <InfoRow icon={Clock} label="Last Active" value={user.lastActive ? new Date(user.lastActive).toLocaleString() : 'Never'} />
+                        <InfoRow icon={Star} label="Subscription Status" value={user.subscription?.type ? user.subscription.type.toUpperCase() : 'FREE'} />
                     </View>
                 </View>
 

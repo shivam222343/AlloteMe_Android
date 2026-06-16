@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     },
     modalContainer: {
         width: SCREEN_WIDTH * 0.9,
-        maxHeight: SCREEN_HEIGHT * 0.85,
+        height: SCREEN_HEIGHT * 0.85,
         borderRadius: 32,
         backgroundColor: Colors.white,
         overflow: 'hidden',
