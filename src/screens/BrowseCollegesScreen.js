@@ -9,6 +9,8 @@ import { Search, MapPin, Star, Pencil, Info, Trash2, ArrowUpDown, Filter, Chevro
 import { Modal } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import OptimizedImage from '../components/ui/OptimizedImage';
+import { SkeletonInstitutionCard } from '../components/SkeletonLoader';
+
 
 const BrowseCollegesScreen = ({ navigation }) => {
     const { user, socket, refreshUser, toggleSaveOptimistic, admissionPath } = useAuth();
@@ -301,10 +303,11 @@ const BrowseCollegesScreen = ({ navigation }) => {
                 </View>
 
                 {loading && institutions.length === 0 ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={Colors.primary} />
-                        <Text style={styles.loadingText}>Searching Colleges...</Text>
-                    </View>
+                    <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <SkeletonInstitutionCard key={i} />
+                        ))}
+                    </ScrollView>
                 ) : (
                     <SectionList
                         sections={sections}

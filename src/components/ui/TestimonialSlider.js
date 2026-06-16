@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, Image, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Platform, Image, Animated, useWindowDimensions } from 'react-native';
 import { Colors, Shadows } from '../../constants/theme';
 import { Quote, Star } from 'lucide-react-native';
 import { reviewAPI } from '../../services/api';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SLIDE_WIDTH = SCREEN_WIDTH - 32; // Standard padding is 16 on each side in MainLayout
 
 const TestimonialSlider = () => {
     const [reviews, setReviews] = useState([]);
@@ -13,6 +10,14 @@ const TestimonialSlider = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const flatListRef = useRef(null);
     const timerRef = useRef(null);
+
+    const { width: screenWidth } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && screenWidth > 768;
+
+    // Desktop: 75% of screen width, Mobile: full width minus padding
+    const SLIDE_WIDTH = isDesktop
+        ? Math.round(screenWidth * 0.75)
+        : screenWidth - 32;
 
     useEffect(() => {
         fetchReviews();
@@ -118,7 +123,7 @@ const TestimonialSlider = () => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerRow}>
+            <View style={[styles.headerRow, isDesktop && { width: SLIDE_WIDTH, alignSelf: 'center' }]}>
                 <Text style={styles.title}>What student Says</Text>
                 <View style={styles.pagination}>
                     {reviews.slice(0, reviews.length / 2 || 1).map((_, i) => (
@@ -133,24 +138,27 @@ const TestimonialSlider = () => {
                 </View>
             </View>
 
-            <FlatList
-                ref={flatListRef}
-                data={reviews}
-                renderItem={renderItem}
-                keyExtractor={(item, index) => `${item._id}-${index}`}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                onScrollBeginDrag={stopAutoPlay}
-                onScrollEndDrag={startAutoPlay}
-                getItemLayout={(data, index) => ({
-                    length: SLIDE_WIDTH,
-                    offset: SLIDE_WIDTH * index,
-                    index,
-                })}
-            />
+            <View style={isDesktop && { alignItems: 'center' }}>
+                <FlatList
+                    ref={flatListRef}
+                    data={reviews}
+                    renderItem={renderItem}
+                    keyExtractor={(item, index) => `${item._id}-${index}`}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={handleScroll}
+                    scrollEventThrottle={16}
+                    onScrollBeginDrag={stopAutoPlay}
+                    onScrollEndDrag={startAutoPlay}
+                    getItemLayout={(data, index) => ({
+                        length: SLIDE_WIDTH,
+                        offset: SLIDE_WIDTH * index,
+                        index,
+                    })}
+                    style={isDesktop && { width: SLIDE_WIDTH }}
+                />
+            </View>
         </View>
     );
 };
@@ -169,7 +177,7 @@ const styles = StyleSheet.create({
     dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#CBD5E1' },
     activeDot: { width: 16, backgroundColor: Colors.primary },
 
-    slide: { width: SCREEN_WIDTH, paddingHorizontal: 16 },
+    slide: { paddingHorizontal: 16 },
     card: {
         backgroundColor: Colors.white,
         borderRadius: 24,

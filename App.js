@@ -15,6 +15,29 @@ import { NetworkProvider } from './src/contexts/NetworkContext';
 
 configureGoogleSignin();
 
+// Inject thin blue scrollbar style for web
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1565C0;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #1976D2;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+
 const GOOGLE_WEB_CLIENT_ID = '1015159418208-vip5a2c92nb8rk91gqfqpsis0utpe9vl.apps.googleusercontent.com';
 
 export default function App() {

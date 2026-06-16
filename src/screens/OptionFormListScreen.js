@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert, Dimensions, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Trash2, ShieldCheck, GraduationCap } from 'lucide-react-native';
@@ -17,11 +17,15 @@ const PRESET_COLORS = [
 
 const OptionFormListScreen = ({ route, navigation }) => {
     const insets = useSafeAreaInsets();
+    const { width: windowWidth } = useWindowDimensions();
     const { user, admissionPath } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [presets, setPresets] = useState([]);
     const [categoryOrder, setCategoryOrder] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const isDesktop = Platform.OS === 'web' && windowWidth > 768;
+    const itemWidth = isDesktop ? 130 : (windowWidth - 44) / 3;
 
     const activePath = route?.params?.activePath || admissionPath || user?.examType;
 
@@ -180,7 +184,7 @@ const OptionFormListScreen = ({ route, navigation }) => {
                                     {catPresets.map((preset, idx) => {
                                         const colors = PRESET_COLORS[idx % PRESET_COLORS.length];
                                         return (
-                                            <View key={preset._id} style={styles.gridItemContainer}>
+                                            <View key={preset._id} style={[styles.gridItemContainer, { width: itemWidth }]}>
                                                 <TouchableOpacity
                                                     style={styles.gridItem}
                                                     activeOpacity={0.8}

@@ -89,7 +89,7 @@ const LoginScreen = ({ navigation }) => {
     return (
         <MainLayout showHeader={false} style={styles.container}>
             <ScrollView
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator={Platform.OS === 'web'}
                 contentContainerStyle={styles.contentContainer}
                 style={styles.content}
             >
@@ -161,10 +161,14 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    content: {
+        ...(Platform.OS === 'web' ? { height: '100vh', overflow: 'auto' } : {}),
+    },
     contentContainer: {
         flexGrow: 1,
         justifyContent: 'center',
         paddingVertical: 40,
+        ...(Platform.OS === 'web' ? { minHeight: '100%' } : {}),
     },
     header: {
         marginBottom: 40,

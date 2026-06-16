@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5100/api/' : 'http://localhost:5100/api/';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api/';
-// Switch to LOCAL_URL for development, RENDER_URL for production
 const API_BASE_URL = RENDER_URL;
 
 export const api = axios.create({
@@ -164,6 +163,7 @@ export const videoAPI = {
 
 export const optionFormAPI = {
     getAll: () => api.get('option-forms'),
+    getById: (id) => api.get(`option-forms/${id}`),
     add: (data) => api.post('option-forms', data),
     delete: (id) => api.delete(`option-forms/${id}`)
 };

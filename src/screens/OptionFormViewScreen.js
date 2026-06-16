@@ -4,6 +4,7 @@ import Card from '../components/ui/Card';
 import { Colors, Shadows } from '../constants/theme';
 import { MapPin, Layers, Calendar, Download, GripVertical, ChevronLeft, ChevronRight, FileText, Search, X, ShieldCheck, Bookmark } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { optionFormAPI } from '../services/api';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { TouchableOpacity as GestureHandlerTouchableOpacity } from 'react-native-gesture-handler';
@@ -161,7 +162,9 @@ const OptionPresetRow = React.memo(({
 const OptionFormViewScreen = ({ route, navigation }) => {
     const insets = useSafeAreaInsets();
     const { preset } = route.params || {};
+    const [fullPreset, setFullPreset] = useState(preset);
     const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [isReordering, setIsReordering] = useState(false);
     const [exportingPDF, setExportingPDF] = useState(false);
     const [exportingCSV, setExportingCSV] = useState(false);
@@ -170,13 +173,21 @@ const OptionFormViewScreen = ({ route, navigation }) => {
     const { user, toggleSavePredictionOptimistic, checkLimit, incrementUsage } = useAuth();
     const [localSavedPredictions, setLocalSavedPredictions] = useState(new Set());
 
-    // Initialize list & load custom reorder index if exists
+    // Fetch full preset details on mount/preset change
     useEffect(() => {
-        if (!preset) return;
+        if (!preset?._id) {
+            setLoading(false);
+            return;
+        }
 
-        const loadOrder = async () => {
-            const rawColleges = preset.colleges || [];
+        const fetchFullPreset = async () => {
             try {
+                setLoading(true);
+                const res = await optionFormAPI.getById(preset._id);
+                const data = res.data.data;
+                setFullPreset(data);
+                const rawColleges = data.colleges || [];
+
                 const saved = await AsyncStorage.getItem(`preset_order_${preset._id}`);
                 if (saved) {
                     const savedKeys = JSON.parse(saved);
@@ -196,12 +207,15 @@ const OptionFormViewScreen = ({ route, navigation }) => {
                     setResults(rawColleges);
                 }
             } catch (err) {
-                setResults(rawColleges);
+                console.error('Failed to fetch full preset:', err);
+                Alert.alert('Error', 'Failed to retrieve preset details.');
+            } finally {
+                setLoading(false);
             }
         };
 
-        loadOrder();
-    }, [preset]);
+        fetchFullPreset();
+    }, [preset?._id]);
 
     // Sync saved status with user model
     useEffect(() => {
@@ -268,7 +282,7 @@ const OptionFormViewScreen = ({ route, navigation }) => {
         setResults(data);
         const getCollId = (c) => (c && typeof c === 'object' ? c._id : c);
         const keys = data.map(item => item._id?.toString() || `${getCollId(item.collegeId)}_${item.branch}_${item.year}_${item.round}_${item.category || ''}_${item.seatType || ''}`);
-        await AsyncStorage.setItem(`preset_order_${preset._id}`, JSON.stringify(keys));
+        await AsyncStorage.setItem(`preset_order_${fullPreset?._id}`, JSON.stringify(keys));
     };
 
     const exportToPDF = async () => {
@@ -301,7 +315,7 @@ const OptionFormViewScreen = ({ route, navigation }) => {
                         <div class="header">
                             <div class="brand">
                                 <h1>AlloteMe Option List Preset</h1>
-                                <p>Target Score: ${preset.percentile}%ile | Quota: ${preset.category}</p>
+                                <p>Target Score: ${fullPreset?.percentile}%ile | Quota: ${fullPreset?.category}</p>
                             </div>
                         </div>
                         <table>
@@ -359,7 +373,7 @@ const OptionFormViewScreen = ({ route, navigation }) => {
                         item.year
                     ]),
                 });
-                doc.save(`Option_Form_Preset_${preset.percentile}.pdf`);
+                doc.save(`Option_Form_Preset_${fullPreset?.percentile}.pdf`);
             } else {
                 const { uri } = await Print.printToFileAsync({ html });
                 await Sharing.shareAsync(uri);
@@ -395,10 +409,10 @@ const OptionFormViewScreen = ({ route, navigation }) => {
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `Option_Form_Preset_${preset.percentile}.csv`;
+                link.download = `Option_Form_Preset_${fullPreset?.percentile}.csv`;
                 link.click();
             } else {
-                const fileUri = `${FileSystem.cacheDirectory}Option_Form_Preset_${preset.percentile}.csv`;
+                const fileUri = `${FileSystem.cacheDirectory}Option_Form_Preset_${fullPreset?.percentile}.csv`;
                 await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
                 await Sharing.shareAsync(fileUri);
             }
@@ -438,9 +452,9 @@ const OptionFormViewScreen = ({ route, navigation }) => {
             <View style={styles.topHeader}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><ChevronLeft size={24} color={Colors.text.primary} /></TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.title} numberOfLines={1}>{preset?.percentile}%ile Option List</Text>
+                    <Text style={styles.title} numberOfLines={1}>{fullPreset?.percentile}%ile Option List</Text>
                     <Text style={styles.subtitle} numberOfLines={1}>
-                        {preset?.category} List • {processedResults.length} Colleges • Exports: {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.exports || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports)}
+                        {fullPreset?.category} List • {processedResults.length} Colleges • Exports: {user?.role === 'admin' ? '∞' : (user?.subscription?.usage?.exports || 0)}/{user?.role === 'admin' ? '∞' : (SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports === Infinity ? '∞' : SUBSCRIPTION_PLANS[user?.subscription?.type?.toUpperCase() || 'FREE'].limits.exports)}
                     </Text>
                 </View>
                 <View style={styles.headerActions}>
@@ -469,31 +483,38 @@ const OptionFormViewScreen = ({ route, navigation }) => {
             )}
 
             <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
-                <DraggableFlatList
-                    data={processedResults}
-                    extraData={localSavedPredictions}
-                    onDragEnd={({ data }) => handleDragEnd(data)}
-                    keyExtractor={(item) => item.key}
-                    renderItem={renderItem}
-                    activationDistance={5}
-                    dragItemOverflow={false}
-                    autoscrollThreshold={80}
-                    autoscrollSpeed={150}
-                    animationConfig={{
-                        damping: 35,
-                        stiffness: 400,
-                        mass: 0.3,
-                    }}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 60 }}
-                    containerStyle={{ flex: 1 }}
-                    ListEmptyComponent={
-                        <View style={styles.centerEmpty}>
-                            <Search size={48} color="#cbd5e1" />
-                            <Text style={styles.emptyTitle}>No matching options</Text>
-                        </View>
-                    }
-                />
+                {loading ? (
+                    <View style={styles.centerLoading}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.loadingText}>Loading Cutoff Presets...</Text>
+                    </View>
+                ) : (
+                    <DraggableFlatList
+                        data={processedResults}
+                        extraData={localSavedPredictions}
+                        onDragEnd={({ data }) => handleDragEnd(data)}
+                        keyExtractor={(item) => item.key}
+                        renderItem={renderItem}
+                        activationDistance={5}
+                        dragItemOverflow={false}
+                        autoscrollThreshold={80}
+                        autoscrollSpeed={150}
+                        animationConfig={{
+                            damping: 35,
+                            stiffness: 400,
+                            mass: 0.3,
+                        }}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 60 }}
+                        containerStyle={{ flex: 1 }}
+                        ListEmptyComponent={
+                            <View style={styles.centerEmpty}>
+                                <Search size={48} color="#cbd5e1" />
+                                <Text style={styles.emptyTitle}>No matching options</Text>
+                            </View>
+                        }
+                    />
+                )}
             </View>
         </View>
     );
@@ -581,6 +602,18 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '600',
         color: Colors.primary,
+    },
+    centerLoading: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: Colors.text.tertiary,
+        fontWeight: '600',
     },
 });
 

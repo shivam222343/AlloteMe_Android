@@ -200,11 +200,92 @@ const SignupScreen = ({ navigation }) => {
 
     if (showGoogleComplete) {
         return (
-            <MainLayout showHeader={false} scrollable={true}>
+            <MainLayout showHeader={false} style={styles.container}>
+                <ScrollView
+                    showsVerticalScrollIndicator={Platform.OS === 'web'}
+                    contentContainerStyle={styles.contentContainer}
+                    style={styles.content}
+                >
+                    <View style={styles.header}>
+                        <Image source={require('../../imgs/splash.png')} style={styles.logo} />
+                        <Text style={styles.title}>One last step! 🚀</Text>
+                        <Text style={styles.subtitle}>Complete your profile to continue</Text>
+                    </View>
+
+                    {errors.general ? <Text style={styles.generalError}>{errors.general}</Text> : null}
+
+                    <View style={styles.form}>
+                        <Input
+                            label="Full Name"
+                            value={formData.displayName}
+                            onChangeText={(val) => {
+                                setFormData({ ...formData, displayName: val });
+                                if (errors.displayName) setErrors({ ...errors, displayName: null });
+                            }}
+                            placeholder="Confirm your name"
+                            leftIcon={<User size={20} color={Colors.text.secondary} />}
+                            error={errors.displayName}
+                        />
+
+                        <Input
+                            label="Email Address"
+                            value={formData.email}
+                            editable={false}
+                            leftIcon={<Mail size={20} color={Colors.text.secondary} />}
+                            style={{ opacity: 0.7 }}
+                        />
+
+                        <Input
+                            label="Contact Number"
+                            value={formData.phoneNumber}
+                            onChangeText={(val) => {
+                                setFormData({ ...formData, phoneNumber: val });
+                                if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: null });
+                            }}
+                            placeholder="e.g. 9876543210"
+                            keyboardType="number-pad"
+                            maxLength={10}
+                            leftIcon={<Phone size={20} color={Colors.text.secondary} />}
+                            error={errors.phoneNumber}
+                        />
+
+                        <Input
+                            label="Set Password (Optional)"
+                            value={formData.password}
+                            onChangeText={(val) => {
+                                setFormData({ ...formData, password: val });
+                                if (errors.password) setErrors({ ...errors, password: null });
+                            }}
+                            placeholder="Create a login password"
+                            secureTextEntry
+                            leftIcon={<Lock size={20} color={Colors.text.secondary} />}
+                            error={errors.password}
+                        />
+
+                        <Button 
+                            title="Complete Setup" 
+                            onPress={handleCompleteGoogleProfile} 
+                            loading={loading} 
+                            style={styles.mainBtn}
+                            icon={<ArrowRight size={20} color="white" />}
+                        />
+                    </View>
+                </ScrollView>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout showHeader={false} style={styles.container}>
+            <ScrollView
+                showsVerticalScrollIndicator={Platform.OS === 'web'}
+                contentContainerStyle={styles.contentContainer}
+                style={styles.content}
+            >
                 <View style={styles.header}>
                     <Image source={require('../../imgs/splash.png')} style={styles.logo} />
-                    <Text style={styles.title}>One last step! 🚀</Text>
-                    <Text style={styles.subtitle}>Complete your profile to continue</Text>
+                    <Text style={styles.title}>Join AlloteMe</Text>
+                    <Text style={styles.subtitle}>Start your counseling journey</Text>
                 </View>
 
                 {errors.general ? <Text style={styles.generalError}>{errors.general}</Text> : null}
@@ -217,17 +298,86 @@ const SignupScreen = ({ navigation }) => {
                             setFormData({ ...formData, displayName: val });
                             if (errors.displayName) setErrors({ ...errors, displayName: null });
                         }}
-                        placeholder="Confirm your name"
-                        leftIcon={<User size={20} color={Colors.text.secondary} />}
+                        placeholder="e.g. John Doe"
                         error={errors.displayName}
                     />
 
+                    <View style={styles.inputGroup}>
+                        <View style={{ flex: 1 }}>
+                            <Input
+                                label="Email Address"
+                                value={formData.email}
+                                onChangeText={(val) => {
+                                    setFormData({ ...formData, email: val });
+                                    setIsOtpVerified(false);
+                                    if (errors.email) setErrors({ ...errors, email: null });
+                                }}
+                                placeholder="johnt@example.com"
+                                keyboardType="email-address"
+                                editable={!isOtpVerified}
+                                error={errors.email}
+                            />
+                        </View>
+                        {!isOtpVerified && (
+                            <TouchableOpacity 
+                                style={[styles.inlineBtn, { marginTop: 28 }]} 
+                                onPress={handleSendOtp}
+                                disabled={otpLoading}
+                            >
+                                {otpLoading ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                ) : (
+                                    <Text style={styles.inlineBtnText}>{showOtpField ? 'Resend' : 'Send OTP'}</Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                        {isOtpVerified && (
+                            <View style={[styles.verifiedBadge, { marginTop: 28 }]}>
+                                <Check size={16} color="white" />
+                            </View>
+                        )}
+                    </View>
+
+                    {showOtpField && !isOtpVerified && (
+                        <View style={styles.inputGroup}>
+                            <View style={{ flex: 1 }}>
+                                <Input
+                                    label="OTP Code"
+                                    value={otp}
+                                    onChangeText={(t) => {
+                                        setOtp(t);
+                                        if (errors.otp) setErrors({ ...errors, otp: null });
+                                    }}
+                                    placeholder="6-digit code"
+                                    keyboardType="number-pad"
+                                    maxLength={6}
+                                    error={errors.otp}
+                                />
+                            </View>
+                            <TouchableOpacity 
+                                style={[styles.inlineBtn, { marginTop: 28, backgroundColor: Colors.success || '#10b981' }]} 
+                                onPress={handleVerifyOtp}
+                                disabled={otpLoading}
+                            >
+                                {otpLoading ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                ) : (
+                                    <Text style={styles.inlineBtnText}>Verify</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
                     <Input
-                        label="Email Address"
-                        value={formData.email}
-                        editable={false}
-                        leftIcon={<Mail size={20} color={Colors.text.secondary} />}
-                        style={{ opacity: 0.7 }}
+                        label="Password"
+                        value={formData.password}
+                        onChangeText={(val) => {
+                            setFormData({ ...formData, password: val });
+                            if (errors.password) setErrors({ ...errors, password: null });
+                        }}
+                        placeholder="Create a strong password"
+                        secureTextEntry
+                        error={errors.password}
                     />
 
                     <Input
@@ -240,184 +390,56 @@ const SignupScreen = ({ navigation }) => {
                         placeholder="e.g. 9876543210"
                         keyboardType="number-pad"
                         maxLength={10}
-                        leftIcon={<Phone size={20} color={Colors.text.secondary} />}
                         error={errors.phoneNumber}
                     />
 
-                    <Input
-                        label="Set Password (Optional)"
-                        value={formData.password}
-                        onChangeText={(val) => {
-                            setFormData({ ...formData, password: val });
-                            if (errors.password) setErrors({ ...errors, password: null });
-                        }}
-                        placeholder="Create a login password"
-                        secureTextEntry
-                        leftIcon={<Lock size={20} color={Colors.text.secondary} />}
-                        error={errors.password}
-                    />
-
                     <Button 
-                        title="Complete Setup" 
-                        onPress={handleCompleteGoogleProfile} 
+                        title="Register" 
+                        onPress={handleSignup} 
                         loading={loading} 
-                        style={styles.mainBtn}
-                        icon={<ArrowRight size={20} color="white" />}
+                        style={[styles.mainBtn, !isOtpVerified && styles.disabledBtn]} 
+                        disabled={!isOtpVerified}
                     />
-                </View>
-            </MainLayout>
-        );
-    }
 
-    return (
-        <MainLayout showHeader={false} scrollable={true}>
-            <View style={styles.header}>
-                <Image source={require('../../imgs/splash.png')} style={styles.logo} />
-                <Text style={styles.title}>Join AlloteMe</Text>
-                <Text style={styles.subtitle}>Start your counseling journey</Text>
-            </View>
-
-            {errors.general ? <Text style={styles.generalError}>{errors.general}</Text> : null}
-
-            <View style={styles.form}>
-                <Input
-                    label="Full Name"
-                    value={formData.displayName}
-                    onChangeText={(val) => {
-                        setFormData({ ...formData, displayName: val });
-                        if (errors.displayName) setErrors({ ...errors, displayName: null });
-                    }}
-                    placeholder="e.g. John Doe"
-                    error={errors.displayName}
-                />
-
-                <View style={styles.inputGroup}>
-                    <View style={{ flex: 1 }}>
-                        <Input
-                            label="Email Address"
-                            value={formData.email}
-                            onChangeText={(val) => {
-                                setFormData({ ...formData, email: val });
-                                setIsOtpVerified(false);
-                                if (errors.email) setErrors({ ...errors, email: null });
-                            }}
-                            placeholder="johnt@example.com"
-                            keyboardType="email-address"
-                            editable={!isOtpVerified}
-                            error={errors.email}
-                        />
+                    <View style={styles.divider}>
+                        <View style={styles.line} />
+                        <Text style={styles.dividerText}>OR</Text>
+                        <View style={styles.line} />
                     </View>
-                    {!isOtpVerified && (
-                        <TouchableOpacity 
-                            style={[styles.inlineBtn, { marginTop: 28 }]} 
-                            onPress={handleSendOtp}
-                            disabled={otpLoading}
-                        >
-                            {otpLoading ? (
-                                <ActivityIndicator size="small" color="white" />
-                            ) : (
-                                <Text style={styles.inlineBtnText}>{showOtpField ? 'Resend' : 'Send OTP'}</Text>
-                            )}
-                        </TouchableOpacity>
-                    )}
-                    {isOtpVerified && (
-                        <View style={[styles.verifiedBadge, { marginTop: 28 }]}>
-                            <Check size={16} color="white" />
-                        </View>
-                    )}
+
+                    <TouchableOpacity 
+                        style={styles.googleBtn} 
+                        onPress={handleGoogleSignup}
+                        disabled={loading}
+                    >
+                        <Image source={require('../../imgs/google.png')} style={styles.googleIcon} />
+                        <Text style={styles.googleBtnText}>Continue with Google</Text>
+                    </TouchableOpacity>
                 </View>
 
-                {showOtpField && !isOtpVerified && (
-                    <View style={styles.inputGroup}>
-                        <View style={{ flex: 1 }}>
-                            <Input
-                                label="OTP Code"
-                                value={otp}
-                                onChangeText={(t) => {
-                                    setOtp(t);
-                                    if (errors.otp) setErrors({ ...errors, otp: null });
-                                }}
-                                placeholder="6-digit code"
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                error={errors.otp}
-                            />
-                        </View>
-                        <TouchableOpacity 
-                            style={[styles.inlineBtn, { marginTop: 28, backgroundColor: Colors.success || '#10b981' }]} 
-                            onPress={handleVerifyOtp}
-                            disabled={otpLoading}
-                        >
-                            {otpLoading ? (
-                                <ActivityIndicator size="small" color="white" />
-                            ) : (
-                                <Text style={styles.inlineBtnText}>Verify</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                <Input
-                    label="Password"
-                    value={formData.password}
-                    onChangeText={(val) => {
-                        setFormData({ ...formData, password: val });
-                        if (errors.password) setErrors({ ...errors, password: null });
-                    }}
-                    placeholder="Create a strong password"
-                    secureTextEntry
-                    error={errors.password}
-                />
-
-                <Input
-                    label="Contact Number"
-                    value={formData.phoneNumber}
-                    onChangeText={(val) => {
-                        setFormData({ ...formData, phoneNumber: val });
-                        if (errors.phoneNumber) setErrors({ ...errors, phoneNumber: null });
-                    }}
-                    placeholder="e.g. 9876543210"
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    error={errors.phoneNumber}
-                />
-
-                <Button 
-                    title="Register" 
-                    onPress={handleSignup} 
-                    loading={loading} 
-                    style={[styles.mainBtn, !isOtpVerified && styles.disabledBtn]} 
-                    disabled={!isOtpVerified}
-                />
-
-                <View style={styles.divider}>
-                    <View style={styles.line} />
-                    <Text style={styles.dividerText}>OR</Text>
-                    <View style={styles.line} />
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>Already have an account? </Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                        <Text style={styles.linkText}>Sign In</Text>
+                    </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity 
-                    style={styles.googleBtn} 
-                    onPress={handleGoogleSignup}
-                    disabled={loading}
-                >
-                    <Image source={require('../../imgs/google.png')} style={styles.googleIcon} />
-                    <Text style={styles.googleBtnText}>Continue with Google</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.footer}>
-                <Text style={styles.footerText}>Already have an account? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                    <Text style={styles.linkText}>Sign In</Text>
-                </TouchableOpacity>
-            </View>
+            </ScrollView>
         </MainLayout>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { paddingVertical: Spacing.lg },
+    container: {
+        flex: 1,
+    },
+    content: {
+        ...(Platform.OS === 'web' ? { height: '100vh', overflow: 'auto' } : {}),
+    },
+    contentContainer: {
+        flexGrow: 1,
+        paddingVertical: 40,
+        ...(Platform.OS === 'web' ? { minHeight: '100%' } : {}),
+    },
     header: {
         marginBottom: 32,
         alignItems: 'center',

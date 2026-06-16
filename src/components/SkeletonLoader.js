@@ -246,6 +246,36 @@ export const SkeletonBannerItem = ({ fullWidth = false }) => (
     </View>
 );
 
+// Institution/College Card Skeleton
+export const SkeletonInstitutionCard = () => (
+    <View style={styles.institutionListItem}>
+        <View style={styles.listItemHeader}>
+            <SkeletonBox width={50} height={50} borderRadius={10} />
+            <View style={styles.listItemInfo}>
+                <View style={styles.listItemTitleRow}>
+                    <SkeletonBox width="65%" height={16} borderRadius={4} />
+                    <SkeletonBox width={22} height={22} borderRadius={11} />
+                </View>
+                <SkeletonBox width="45%" height={12} borderRadius={3} style={{ marginTop: 6 }} />
+            </View>
+        </View>
+
+        <View style={styles.listItemBadgeRow}>
+            <SkeletonBox width={75} height={18} borderRadius={6} />
+            <SkeletonBox width={65} height={18} borderRadius={6} />
+            <SkeletonBox width={50} height={18} borderRadius={6} />
+        </View>
+
+        <View style={styles.listItemFooter}>
+            <View style={styles.listItemLoc}>
+                <SkeletonBox width={14} height={14} borderRadius={7} />
+                <SkeletonBox width={100} height={12} borderRadius={3} />
+            </View>
+            <SkeletonBox width={110} height={15} borderRadius={4} />
+        </View>
+    </View>
+);
+
 const styles = StyleSheet.create({
     skeleton: {
         backgroundColor: '#E2E8F0',
@@ -333,5 +363,39 @@ const styles = StyleSheet.create({
         padding: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9',
+    },
+    institutionListItem: {
+        padding: 16,
+        backgroundColor: '#FFFFFF',
+        borderBottomWidth: 1,
+        borderBottomColor: '#00C853',
+    },
+    listItemHeader: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
+    },
+    listItemInfo: {
+        flex: 1,
+    },
+    listItemTitleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    listItemBadgeRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 12,
+    },
+    listItemFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    listItemLoc: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
     },
 });

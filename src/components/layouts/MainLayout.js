@@ -138,7 +138,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         ]}>
             <StatusBar barStyle="dark-content" backgroundColor={Colors.white} translucent={false} />
 
-            {(showHeader || isDesktop) && (
+            {showHeader && (
                 <View style={[styles.header, { paddingTop: topPadding }]}>
                     <View style={styles.headerInner}>
                         <View style={[styles.leftRow, isDesktop && { flex: 0, marginRight: 24 }]}>
@@ -245,9 +245,9 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
             >
                 {scrollable ? (
                     <ScrollView
-                        style={{ flex: 1 }}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ paddingBottom: 100 }}
+                        style={{ flex: 1, ...(Platform.OS === 'web' ? { height: '100vh', overflow: 'auto' } : {}) }}
+                        showsVerticalScrollIndicator={Platform.OS === 'web'}
+                        contentContainerStyle={{ paddingBottom: 100, ...(Platform.OS === 'web' ? { minHeight: '100%' } : {}) }}
                     >
                         {children}
                     </ScrollView>

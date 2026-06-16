@@ -8,7 +8,7 @@ import { cutoffAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { Colors, Shadows } from '../constants/theme';
-import { Sparkles, Settings2, ChevronDown, ChevronUp, CheckCircle2, MapPin, GitBranch, Calendar, ShieldCheck, LucideShieldCheck, Info } from 'lucide-react-native';
+import { Sparkles, Settings2, ChevronDown, ChevronUp, CheckCircle2, MapPin, GitBranch, Calendar, ShieldCheck, LucideShieldCheck, Info, ChevronLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import Slider from '@react-native-community/slider';
@@ -271,7 +271,14 @@ const PredictorScreen = ({ navigation }) => {
         <MainLayout scrollable={true} showHeader={false} noPadding={true}>
             <View style={styles.container}>
                 <View style={styles.topHeader}>
-                    <View>
+                    <View style={styles.headerLeftRow}>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Dashboard')}
+                            style={styles.backBtn}
+                            activeOpacity={0.7}
+                        >
+                            <ChevronLeft size={28} color={Colors.text.primary} />
+                        </TouchableOpacity>
                         <Text style={styles.title}>College Predictor</Text>
                     </View>
                     <View style={styles.usageChip}>
@@ -557,6 +564,8 @@ const PredictorScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFC' },
     topHeader: { paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 16 : 12, paddingBottom: 16, backgroundColor: Colors.white, ...Shadows.sm, gap: 6 },
+    headerLeftRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    backBtn: { padding: 4, marginLeft: -8 },
     title: { fontSize: 28, fontWeight: 'bold', color: Colors.text.primary },
     subtitle: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
 

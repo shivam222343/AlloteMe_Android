@@ -36,10 +36,26 @@ exports.addPreset = async (req, res) => {
 
 exports.getPresets = async (req, res) => {
     try {
-        const presets = await OptionFormPreset.find().populate('colleges.collegeId').sort({ percentile: -1, createdAt: -1 });
+        const presets = await OptionFormPreset.find()
+            .slice('colleges', 1)
+            .populate('colleges.collegeId', 'category')
+            .sort({ percentile: -1, createdAt: -1 });
         res.json({ success: true, data: presets });
     } catch (error) {
         console.error('Get presets error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.getPresetById = async (req, res) => {
+    try {
+        const preset = await OptionFormPreset.findById(req.params.id).populate('colleges.collegeId');
+        if (!preset) {
+            return res.status(404).json({ success: false, message: 'Preset not found' });
+        }
+        res.json({ success: true, data: preset });
+    } catch (error) {
+        console.error('Get preset by ID error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
