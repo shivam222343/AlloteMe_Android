@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Modal, TouchableOpacity } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
@@ -7,17 +7,14 @@ import Card from '../components/ui/Card';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, cutoffAPI } from '../services/api';
-import { MapPin, Target, Award, Hash, Bot } from 'lucide-react-native';
-
-import TouchableOpacity from 'react-native-gesture-handler/src/components/touchables/TouchableOpacity'; // Fallback if needed, but standard is fine
-import { TouchableOpacity as RNTouchable } from 'react-native';
+import { MapPin, Target, Award, Hash, Bot, AlertCircle } from 'lucide-react-native';
 
 const EXAM_OPTIONS = ['MHTCET PCM', 'MHTCET PCB', 'BBA', 'NEET', 'JEE'];
 
 const MAHARASHTRA_REGIONS = [
-    'Pune', 'Mumbai', 'Kolhapur', 'Nagpur', 'Nanded', 
+    'Pune', 'Mumbai', 'Kolhapur', 'Nagpur', 'Nanded',
     'Solapur', 'Nashik', 'Jalgaon', 'Akola', 'Amravati',
-    'Thane', 'Aurangabad', 'Sangli', 'Satara', 'Latur', 
+    'Thane', 'Aurangabad', 'Sangli', 'Satara', 'Latur',
     'Ahmednagar', 'Chandrapur', 'Yavatmal', 'Buldhana',
     'Beed', 'Bhandara', 'Dhule', 'Gadchiroli', 'Gondia', 'Hingoli',
     'Jalna', 'Nandurbar', 'Osmanabad', 'Palghar', 'Parbhani',
@@ -28,6 +25,30 @@ const CompleteProfileScreen = ({ navigation, route }) => {
     const { user, refreshUser, setHasSkippedProfile, setValidateProfileForm } = useAuth();
     const [loading, setLoading] = useState(false);
     const [isSubmittingSuccess, setIsSubmittingSuccess] = useState(false);
+    const [showWarningModal, setShowWarningModal] = useState(false);
+
+    const handleBackgroundPress = () => {
+        const cleanPhone = (formData.phoneNumber || '').trim();
+        const phoneRegex = /^[6-9]\d{9}$/;
+        const hasEmpty = !formData.percentile.trim() ||
+            !formData.rank.trim() ||
+            !formData.location.trim() ||
+            !cleanPhone ||
+            !phoneRegex.test(cleanPhone) ||
+            !formData.expectedRegion.trim();
+
+        if (hasEmpty) {
+            const phoneError = !cleanPhone ? 'please enter this' : (!phoneRegex.test(cleanPhone) ? 'Enter a valid 10-digit WhatsApp number' : '');
+            setErrors({
+                percentile: !formData.percentile.trim() ? 'please enter this' : '',
+                rank: !formData.rank.trim() ? 'please enter this' : '',
+                location: !formData.location.trim() ? 'please enter this' : '',
+                phoneNumber: phoneError,
+                expectedRegion: !formData.expectedRegion.trim() ? 'please enter this' : ''
+            });
+            setShowWarningModal(true);
+        }
+    };
 
     const initialExam = route.params?.admissionPath || user?.examType || 'MHTCET PCM';
     const userScores = user?.scores || {};
@@ -54,13 +75,13 @@ const CompleteProfileScreen = ({ navigation, route }) => {
         let current = formData.expectedRegion ? formData.expectedRegion.split(',').map(r => r.trim()).filter(Boolean) : [];
         const regionLower = region.toLowerCase();
         const exists = current.some(r => r.toLowerCase() === regionLower);
-        
+
         if (exists) {
             current = current.filter(r => r.toLowerCase() !== regionLower);
         } else {
             current = [...current, region];
         }
-        
+
         const newValue = current.join(', ');
         setFormData(prev => ({ ...prev, expectedRegion: newValue }));
         if (errors.expectedRegion) setErrors(prev => ({ ...prev, expectedRegion: '' }));
@@ -80,7 +101,7 @@ const CompleteProfileScreen = ({ navigation, route }) => {
     }, [navigation]);
 
     React.useEffect(() => {
-        setValidateProfileForm(() => () => {
+        setValidateProfileForm(() => (showPopup = false) => {
             const cleanPhone = (formData.phoneNumber || '').trim();
             const phoneRegex = /^[6-9]\d{9}$/;
             let phoneError = '';
@@ -101,6 +122,9 @@ const CompleteProfileScreen = ({ navigation, route }) => {
             setErrors(newErrors);
 
             const isValid = !Object.values(newErrors).some(err => err !== '');
+            if (!isValid && showPopup) {
+                setShowWarningModal(true);
+            }
             return isValid;
         });
 
@@ -114,7 +138,7 @@ const CompleteProfileScreen = ({ navigation, route }) => {
             if (isSubmittingSuccess) {
                 return;
             }
-            
+
             e.preventDefault();
 
             // Run validation to show errors in red
@@ -240,12 +264,8 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                 await refreshUser();
                 setHasSkippedProfile(false);
                 setIsSubmittingSuccess(true);
-                Alert.alert('Success', 'Profile updated! Welcome to AlloteMe.', [
-                    {
-                        text: 'OK',
-                        onPress: () => navigation.navigate('Dashboard')
-                    }
-                ]);
+                navigation.navigate('Dashboard');
+                Alert.alert('Success', 'Profile updated! Welcome to AlloteMe.');
             } else {
                 Alert.alert('Error', 'Failed to update profile');
             }
@@ -275,7 +295,7 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                     {/* Exam Type Selector */}
                     <View style={styles.examSelector}>
                         {EXAM_OPTIONS.map(opt => (
-                            <RNTouchable
+                            <TouchableOpacity
                                 key={opt}
                                 style={[styles.examPill, formData.examType === opt && styles.activeExamPill]}
                                 onPress={() => handleExamChange(opt)}
@@ -283,7 +303,7 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                                 <Text style={[styles.examPillText, formData.examType === opt && styles.activeExamPillText]}>
                                     {opt}
                                 </Text>
-                            </RNTouchable>
+                            </TouchableOpacity>
                         ))}
                     </View>
 
@@ -368,7 +388,7 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                             {MAHARASHTRA_REGIONS.map((region) => {
                                 const selected = formData.expectedRegion.split(',').map(r => r.trim().toLowerCase()).includes(region.toLowerCase());
                                 return (
-                                    <RNTouchable
+                                    <TouchableOpacity
                                         key={region}
                                         style={[styles.regionTag, selected && styles.activeRegionTag]}
                                         onPress={() => handleToggleRegion(region)}
@@ -376,7 +396,7 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                                         <Text style={[styles.regionTagText, selected && styles.activeRegionTagText]}>
                                             {region}
                                         </Text>
-                                    </RNTouchable>
+                                    </TouchableOpacity>
                                 );
                             })}
                         </ScrollView>
@@ -395,6 +415,32 @@ const CompleteProfileScreen = ({ navigation, route }) => {
                     </Text>
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* Custom Background Click Warning Modal */}
+            <Modal
+                visible={showWarningModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowWarningModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.popupContent}>
+                        <View style={styles.warningIconCircle}>
+                            <AlertCircle size={28} color={Colors.error} />
+                        </View>
+                        <Text style={styles.popupTitle}>Profile Verification Required</Text>
+                        <Text style={styles.popupSub}>
+                            Please fill in all details (Percentile, Rank, City, Phone, and Region) with valid information. This helps us provide accurate college recommendations! 🎓
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.primaryAction}
+                            onPress={() => setShowWarningModal(false)}
+                        >
+                            <Text style={styles.primaryActionText}>Okay, I will fill it</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </MainLayout>
     );
 };
@@ -418,7 +464,60 @@ const styles = StyleSheet.create({
     regionTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
     activeRegionTag: { backgroundColor: Colors.primary, borderColor: Colors.primary },
     regionTagText: { fontSize: 13, color: '#475569', fontWeight: '500' },
-    activeRegionTagText: { color: Colors.white, fontWeight: 'bold' }
+    activeRegionTagText: { color: Colors.white, fontWeight: 'bold' },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    popupContent: {
+        backgroundColor: Colors.white,
+        borderRadius: 24,
+        padding: 24,
+        width: '85%',
+        alignItems: 'center',
+        ...Shadows.lg,
+    },
+    warningIconCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: Colors.error + '15',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    popupTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    popupSub: {
+        fontSize: 13,
+        color: Colors.text.secondary,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 20,
+    },
+    primaryAction: {
+        backgroundColor: Colors.primary,
+        alignSelf: 'stretch',
+        paddingVertical: 14,
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...Shadows.md,
+    },
+    primaryActionText: {
+        color: Colors.white,
+        fontSize: 15,
+        fontWeight: 'bold',
+        paddingLeft: 25,
+        paddingRight: 25,
+    }
 });
 
 export default CompleteProfileScreen;

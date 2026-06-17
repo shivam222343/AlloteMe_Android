@@ -90,12 +90,19 @@ const StudentDashboard = ({ navigation }) => {
     }, [user, hasShownSubscription]);
 
     useEffect(() => {
-        // Only redirect if user is fully loaded and specifically has isProfileComplete as FALSE
-        // This prevents redirects during partial state updates
-        if (user && user.role === 'student' && user.preferences && user.preferences.isProfileComplete === false && !hasSkippedProfile) {
-            navigation.navigate('CompleteProfile');
+        if (user && user.role === 'student') {
+            const cleanPhone = (user.phoneNumber || '').trim();
+            const phoneRegex = /^[6-9]\d{9}$/;
+            const hasEmptyField = !user.percentile || !user.percentile.toString().trim() ||
+                                  !user.rank || !user.rank.toString().trim() ||
+                                  !user.location || !user.location.trim() ||
+                                  !cleanPhone || !phoneRegex.test(cleanPhone) ||
+                                  !user.expectedRegion || !user.expectedRegion.trim();
+            if (hasEmptyField) {
+                navigation.navigate('CompleteProfile');
+            }
         }
-    }, [user?.preferences?.isProfileComplete, hasSkippedProfile]);
+    }, [user]);
 
     const fetchPresets = async () => {
         try {
@@ -399,19 +406,6 @@ const StudentDashboard = ({ navigation }) => {
                         <View style={styles.featuredSection}>
                             <View style={styles.sectionHeader}>
                                 <Text style={styles.sectionTitle}>{admissionPath} Trends</Text>
-                                {!isDesktop && (
-                                    <View style={styles.dotContainer}>
-                                        {featuredColleges.map((_, i) => (
-                                            <View
-                                                key={i}
-                                                style={[
-                                                    styles.indicatorDot,
-                                                    currentIndex === i && styles.activeDot
-                                                ]}
-                                            />
-                                        ))}
-                                    </View>
-                                )}
                             </View>
                             <FlatList
                                 ref={flatListRef}
@@ -434,6 +428,19 @@ const StudentDashboard = ({ navigation }) => {
                                     index,
                                 })}
                             />
+                            {!isDesktop && (
+                                <View style={[styles.dotContainer, { alignSelf: 'center', marginTop: 12 }]}>
+                                    {featuredColleges.map((_, i) => (
+                                        <View
+                                            key={i}
+                                            style={[
+                                                styles.indicatorDot,
+                                                currentIndex === i && styles.activeDot
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     ) : (
                         <View style={styles.emptyFeatured}>

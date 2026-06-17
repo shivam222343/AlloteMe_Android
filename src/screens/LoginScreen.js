@@ -148,7 +148,7 @@ const LoginScreen = ({ navigation }) => {
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>Don't have an account? </Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+                    <TouchableOpacity onPress={() => navigation.navigate('Signup', { skipIntro: true })}>
                         <Text style={styles.linkText}>Create Account</Text>
                     </TouchableOpacity>
                 </View>

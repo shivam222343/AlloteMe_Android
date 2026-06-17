@@ -1,16 +1,52 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, ActivityIndicator, ScrollView, Animated, Dimensions } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
-import { Colors, Typography, Spacing, BorderRadius } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { User, Check, Mail, Phone, Lock, ArrowRight } from 'lucide-react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useWebGoogleLogin } from '../utils/webAuthHelper';
 
-const SignupScreen = ({ navigation }) => {
+const INTRO_SLIDES = [
+    {
+        title: "Browse & Search Colleges",
+        description: "Explore government autonomous and private colleges in Maharashtra with cutoffs, fees, and contact info.",
+        image: require('../../assets/intro_browse.png'),
+        bgColor: '#F0F7FF' // Light pastel blue
+    },
+    {
+        title: "Precise College Predictor",
+        description: "Enter your percentile, rank, category, and quotas to get recommendations tailored to your profile.",
+        image: require('../../assets/intro_predictor.png'),
+        bgColor: '#F5F3FF' // Soft violet tint
+    },
+    {
+        title: "24/7 AI Counseling Assistant",
+        description: "Get instant answers to your questions, explore branches, fee structures, and document requirements.",
+        image: require('../../assets/intro_counselor.png'),
+        bgColor: '#F0FDF4' // Soft mint tint
+    },
+    {
+        title: "Document Verification Checklist",
+        description: "Track necessary documents for OPEN, OBC, SC, ST, EWS, SEBC, NT/SBC categories for verification.",
+        image: require('../../assets/intro_documents.png'),
+        bgColor: '#FFF7ED' // Soft orange tint
+    },
+    {
+        title: "Map & Nearby Colleges",
+        description: "Locate engineering colleges near your location with route maps and road distances.",
+        image: require('../../assets/intro_nearby.png'),
+        bgColor: '#FFF1F2' // Soft rose tint
+    }
+];
+
+const SignupScreen = ({ route, navigation }) => {
+    const routeParams = route?.params || {};
+    const skipIntroParam = routeParams.skipIntro;
+
     const [formData, setFormData] = useState({
         displayName: '',
         email: '',
@@ -25,8 +61,59 @@ const SignupScreen = ({ navigation }) => {
     const [isOtpVerified, setIsOtpVerified] = useState(false);
     const [otpLoading, setOtpLoading] = useState(false);
     const [showGoogleComplete, setShowGoogleComplete] = useState(false);
-    
+
+    // Intro Slider States
+    const [activeSlide, setActiveSlide] = useState(() => (skipIntroParam ? 5 : 0));
+    const [prevSlide, setPrevSlide] = useState(() => (skipIntroParam ? 5 : 0));
+    const fadeAnim = useRef(new Animated.Value(1)).current;
+
+    // Window dimensions state for responsive web layout
+    const [windowWidth, setWindowWidth] = useState(() => Dimensions.get('window').width);
+    const isDesktop = Platform.OS === 'web' && windowWidth >= 768;
+
     const { register, sendSignupOtp, verifyOnlyOtp, verifySignupOtp, googleLogin, updateUserProfile } = useAuth();
+
+    // Listen to skipIntro param changes
+    useEffect(() => {
+        if (skipIntroParam) {
+            setActiveSlide(5);
+            setPrevSlide(5);
+            if (navigation && typeof navigation.setParams === 'function') {
+                navigation.setParams({ skipIntro: undefined });
+            }
+        }
+    }, [skipIntroParam]);
+
+    // Handle viewport changes dynamically
+    useEffect(() => {
+        const subscription = Dimensions.addEventListener('change', ({ window }) => {
+            setWindowWidth(window.width);
+        });
+        return () => subscription?.remove();
+    }, []);
+
+    // Slide transition animation handler
+    const handleSlideChange = useCallback((nextIndex) => {
+        setPrevSlide(activeSlide);
+        setActiveSlide(nextIndex);
+        fadeAnim.setValue(0);
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+        }).start();
+    }, [activeSlide, fadeAnim]);
+
+    // Autoplay slider on desktop layout
+    useEffect(() => {
+        if (!isDesktop || activeSlide >= 5) return;
+
+        const interval = setInterval(() => {
+            handleSlideChange((activeSlide + 1) % INTRO_SLIDES.length);
+        }, 4500);
+
+        return () => clearInterval(interval);
+    }, [isDesktop, activeSlide, handleSlideChange]);
 
     const loginWeb = useWebGoogleLogin({
         onSuccess: async (tokenResponse) => {
@@ -35,11 +122,11 @@ const SignupScreen = ({ navigation }) => {
                 const idToken = tokenResponse.credential;
                 const accessToken = tokenResponse.access_token;
                 const result = await googleLogin({ idToken, accessToken });
-                
+
                 if (result.success) {
                     if (result.isNewUser) {
-                        setFormData(prev => ({ 
-                            ...prev, 
+                        setFormData(prev => ({
+                            ...prev,
                             displayName: result.user.displayName || '',
                             email: result.user.email || ''
                         }));
@@ -69,12 +156,12 @@ const SignupScreen = ({ navigation }) => {
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
             const idToken = userInfo.data?.idToken || userInfo.idToken;
-            
+
             const result = await googleLogin({ idToken });
             if (result.success) {
                 if (result.isNewUser) {
-                    setFormData(prev => ({ 
-                        ...prev, 
+                    setFormData(prev => ({
+                        ...prev,
                         displayName: result.user.displayName || '',
                         email: result.user.email || ''
                     }));
@@ -111,7 +198,6 @@ const SignupScreen = ({ navigation }) => {
             });
 
             if (result.success) {
-                // Success, navigate away (AuthContext will handle user state)
                 navigation.navigate('MainTabs');
             } else {
                 setErrors({ general: result.message });
@@ -172,13 +258,13 @@ const SignupScreen = ({ navigation }) => {
 
     const handleSignup = async () => {
         if (!isOtpVerified) return;
-        
+
         const newErrors = {};
         if (!formData.displayName) newErrors.displayName = 'Full Name is required';
         if (!formData.password) newErrors.password = 'Password is required';
         else if (formData.password.length < 8) newErrors.password = 'Password must be at least 8 characters long';
         if (!formData.phoneNumber) newErrors.phoneNumber = 'Contact number is required';
-        
+
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
             return;
@@ -198,7 +284,7 @@ const SignupScreen = ({ navigation }) => {
         }
     };
 
-    if (showGoogleComplete) {
+    const renderGoogleCompleteForm = () => {
         return (
             <MainLayout showHeader={false} style={styles.container}>
                 <ScrollView
@@ -262,35 +348,33 @@ const SignupScreen = ({ navigation }) => {
                             error={errors.password}
                         />
 
-                        <Button 
-                            title="Complete Setup" 
-                            onPress={handleCompleteGoogleProfile} 
-                            loading={loading} 
-                            style={styles.mainBtn}
+                        <Button
+                            title="Complete Setup"
+                            onPress={handleCompleteGoogleProfile}
+                            loading={loading}
+                            style={styles.completeBtn}
                             icon={<ArrowRight size={20} color="white" />}
                         />
                     </View>
                 </ScrollView>
             </MainLayout>
         );
-    }
+    };
 
-    return (
-        <MainLayout showHeader={false} style={styles.container}>
+    const renderRegistrationForm = () => {
+        return (
             <ScrollView
                 showsVerticalScrollIndicator={Platform.OS === 'web'}
-                contentContainerStyle={styles.contentContainer}
-                style={styles.content}
+                contentContainerStyle={styles.formContentContainer}
+                style={styles.formScroll}
             >
-                <View style={styles.header}>
+                <View style={styles.formHeader}>
                     <Image source={require('../../imgs/splash.png')} style={styles.logo} />
-                    <Text style={styles.title}>Join AlloteMe</Text>
-                    <Text style={styles.subtitle}>Start your counseling journey</Text>
                 </View>
 
                 {errors.general ? <Text style={styles.generalError}>{errors.general}</Text> : null}
 
-                <View style={styles.form}>
+                <View style={styles.formFields}>
                     <Input
                         label="Full Name"
                         value={formData.displayName}
@@ -319,8 +403,8 @@ const SignupScreen = ({ navigation }) => {
                             />
                         </View>
                         {!isOtpVerified && (
-                            <TouchableOpacity 
-                                style={[styles.inlineBtn, { marginTop: 28 }]} 
+                            <TouchableOpacity
+                                style={[styles.inlineBtn, { marginTop: 28 }]}
                                 onPress={handleSendOtp}
                                 disabled={otpLoading}
                             >
@@ -354,8 +438,8 @@ const SignupScreen = ({ navigation }) => {
                                     error={errors.otp}
                                 />
                             </View>
-                            <TouchableOpacity 
-                                style={[styles.inlineBtn, { marginTop: 28, backgroundColor: Colors.success || '#10b981' }]} 
+                            <TouchableOpacity
+                                style={[styles.inlineBtn, { marginTop: 28, backgroundColor: Colors.success || '#10b981' }]}
                                 onPress={handleVerifyOtp}
                                 disabled={otpLoading}
                             >
@@ -393,11 +477,14 @@ const SignupScreen = ({ navigation }) => {
                         error={errors.phoneNumber}
                     />
 
-                    <Button 
-                        title="Register" 
-                        onPress={handleSignup} 
-                        loading={loading} 
-                        style={[styles.mainBtn, !isOtpVerified && styles.disabledBtn]} 
+                    <Button
+                        title="Register"
+                        onPress={handleSignup}
+                        loading={loading}
+                        style={[
+                            styles.registerBtn,
+                            !isOtpVerified && styles.disabledBtn
+                        ]}
                         disabled={!isOtpVerified}
                     />
 
@@ -407,8 +494,8 @@ const SignupScreen = ({ navigation }) => {
                         <View style={styles.line} />
                     </View>
 
-                    <TouchableOpacity 
-                        style={styles.googleBtn} 
+                    <TouchableOpacity
+                        style={styles.googleBtn}
                         onPress={handleGoogleSignup}
                         disabled={loading}
                     >
@@ -417,13 +504,140 @@ const SignupScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.footer}>
+                <View style={styles.formFooter}>
                     <Text style={styles.footerText}>Already have an account? </Text>
                     <TouchableOpacity onPress={() => navigation.navigate('Login')}>
                         <Text style={styles.linkText}>Sign In</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+        );
+    };
+
+    const renderGuideSlider = () => {
+        // Clamp slider index to ensure no index out of bounds during transition to form
+        const sliderIndex = activeSlide < 5 ? activeSlide : 4;
+        const prevSliderIndex = prevSlide < 5 ? prevSlide : 4;
+
+        const activeSlideData = INTRO_SLIDES[sliderIndex];
+        const prevSlideData = INTRO_SLIDES[prevSliderIndex];
+
+        const opacityCurrent = fadeAnim;
+        const opacityPrev = fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0]
+        });
+
+        const scaleCurrent = fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.92, 1.0]
+        });
+        const scalePrev = fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1.0, 1.08]
+        });
+
+        return (
+            <View style={styles.sliderContent}>
+                {/* Image Showcase Container */}
+                <View style={styles.imageWrapper}>
+                    {prevSliderIndex !== sliderIndex && (
+                        <Animated.Image
+                            source={prevSlideData.image}
+                            style={[
+                                styles.slideImage,
+                                styles.absoluteImage,
+                                {
+                                    opacity: opacityPrev,
+                                    transform: [{ scale: scalePrev }]
+                                }
+                            ]}
+                        />
+                    )}
+                    <Animated.Image
+                        source={activeSlideData.image}
+                        style={[
+                            styles.slideImage,
+                            {
+                                opacity: opacityCurrent,
+                                transform: [{ scale: scaleCurrent }]
+                            }
+                        ]}
+                    />
+                </View>
+
+                {/* Info guide text */}
+                <View style={styles.infoContainer}>
+                    <Text style={styles.slideTitle}>{activeSlideData.title}</Text>
+                    <Text style={styles.slideDescription}>{activeSlideData.description}</Text>
+                </View>
+
+                {/* Pagination Dots */}
+                <View style={styles.dotsContainer}>
+                    {INTRO_SLIDES.map((_, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            onPress={() => handleSlideChange(index)}
+                            style={[
+                                styles.dot,
+                                sliderIndex === index ? styles.activeDot : styles.inactiveDot
+                            ]}
+                        />
+                    ))}
+                </View>
+
+                {/* Action Buttons (Only visible on mobile onboarding flow) */}
+                {!isDesktop && (
+                    <View style={styles.buttonRow}>
+                        <TouchableOpacity
+                            onPress={() => handleSlideChange(5)}
+                            style={styles.skipBtn}
+                        >
+                            <Text style={styles.skipBtnText}>Skip</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (sliderIndex < INTRO_SLIDES.length - 1) {
+                                    handleSlideChange(sliderIndex + 1);
+                                } else {
+                                    handleSlideChange(5);
+                                }
+                            }}
+                            style={styles.nextBtn}
+                        >
+                            <Text style={styles.nextBtnText}>
+                                {sliderIndex === INTRO_SLIDES.length - 1 ? "Get Started" : "Next"}
+                            </Text>
+                            <ArrowRight size={16} color="white" />
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    if (showGoogleComplete) {
+        return renderGoogleCompleteForm();
+    }
+
+    if (isDesktop) {
+        return (
+            <View style={styles.desktopContainer}>
+                <View style={[styles.desktopLeft, { backgroundColor: INTRO_SLIDES[activeSlide < 5 ? activeSlide : 4].bgColor }]}>
+                    {renderGuideSlider()}
+                </View>
+                <View style={styles.desktopRight}>
+                    {renderRegistrationForm()}
+                </View>
+            </View>
+        );
+    }
+
+    // Mobile/Tablet Layout
+    return (
+        <MainLayout showHeader={false} style={[styles.container, activeSlide < 5 && { backgroundColor: INTRO_SLIDES[activeSlide].bgColor }]}>
+            {activeSlide < 5 ? renderGuideSlider() : renderRegistrationForm()}
         </MainLayout>
     );
 };
@@ -445,15 +659,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logo: {
-        width: 380,
-        height: 100,
-        marginTop: 60,
+        width: 320,
+        height: 85,
+        marginTop: 30,
         marginBottom: 16,
         resizeMode: 'contain',
         borderRadius: 50,
     },
     title: {
-        fontSize: 28,
+        fontSize: 26,
         fontWeight: 'bold',
         color: Colors.text.primary,
         marginBottom: 4,
@@ -492,7 +706,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         alignSelf: 'center',
     },
-    mainBtn: { marginTop: 12 },
     disabledBtn: {
         opacity: 0.5,
         backgroundColor: Colors.text.tertiary,
@@ -513,17 +726,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
     },
-    googleBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'white',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        borderRadius: BorderRadius.md || 12,
-        height: 50,
-        gap: 12,
-    },
     googleIcon: {
         width: 24,
         height: 24,
@@ -533,11 +735,201 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: Colors.text.primary,
     },
-    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
-    footerText: { color: Colors.text.secondary },
-    linkText: { color: Colors.primary, fontWeight: 'bold' },
     generalError: { color: Colors.error, fontSize: 13, textAlign: 'center', marginBottom: 16 },
-});
 
+    // Fully-rounded Action Buttons
+    completeBtn: {
+        marginTop: 16,
+        borderRadius: 9999,
+        paddingVertical: 14,
+        ...Shadows.md,
+    },
+    registerBtn: {
+        marginTop: 16,
+        borderRadius: 9999,
+        paddingVertical: 14,
+        ...Shadows.md,
+    },
+    googleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 9999,
+        height: 50,
+        gap: 12,
+        ...Shadows.sm,
+    },
+
+    // Desktop/Responsive Web Styles
+    desktopContainer: {
+        flexDirection: 'row',
+        flex: 1,
+        ...(Platform.OS === 'web' ? { height: '100vh', overflow: 'hidden' } : { height: '100%' }),
+    },
+    desktopLeft: {
+        width: '50%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: Spacing.xl,
+        transition: 'background-color 0.5s ease', // Smooth transition on web
+    },
+    desktopRight: {
+        width: '50%',
+        backgroundColor: Colors.white,
+    },
+
+    // Guide/Slider UI Components
+    sliderContent: {
+        width: '100%',
+        maxWidth: 420,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: Spacing.md,
+    },
+    imageWrapper: {
+        width: 250,
+        height: 480,
+        borderRadius: BorderRadius.lg,
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+        alignSelf: 'center',
+        marginVertical: Spacing.sm,
+        position: 'relative',
+        ...Shadows.lg,
+    },
+    slideImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'contain',
+    },
+    absoluteImage: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    },
+    infoContainer: {
+        alignItems: 'center',
+        paddingHorizontal: Spacing.lg,
+        marginTop: Spacing.md,
+        height: 125,
+        justifyContent: 'center',
+    },
+    slideTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    slideDescription: {
+        fontSize: 14,
+        color: Colors.text.secondary,
+        textAlign: 'center',
+        lineHeight: 20,
+        minHeight: 40, // Avoid layout jumping for multi-line text
+    },
+    dotsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginVertical: Spacing.lg,
+        gap: 8,
+    },
+    dot: {
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#E5E7EB',
+    },
+    activeDot: {
+        width: 24,
+        backgroundColor: Colors.primary,
+    },
+    inactiveDot: {
+        width: 8,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: Spacing.lg,
+        marginTop: Spacing.xs,
+        width: '100%',
+        maxWidth: 320,
+        alignSelf: 'center',
+    },
+    nextBtn: {
+        backgroundColor: Colors.primary,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 9999,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        ...Shadows.md,
+    },
+    nextBtnText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 15,
+    },
+    skipBtn: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+    },
+    skipBtnText: {
+        color: Colors.text.secondary,
+        fontWeight: '600',
+        fontSize: 15,
+    },
+
+    // Signup Form Styles
+    formScroll: {
+        flex: 1,
+        backgroundColor: Colors.white,
+    },
+    formContentContainer: {
+        paddingHorizontal: Spacing.xl,
+        paddingVertical: 40,
+        justifyContent: 'center',
+        minHeight: '100%',
+    },
+    formHeader: {
+        marginBottom: 24,
+        alignItems: 'center',
+    },
+    formTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+        marginBottom: 4,
+        textAlign: 'center'
+    },
+    formSubtitle: {
+        fontSize: 14,
+        color: Colors.text.tertiary,
+        textAlign: 'center'
+    },
+    formFields: {
+        gap: 12,
+    },
+    formFooter: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 32,
+    },
+    footerText: {
+        color: Colors.text.secondary,
+    },
+    linkText: {
+        color: Colors.primary,
+        fontWeight: 'bold',
+    },
+});
 
 export default SignupScreen;

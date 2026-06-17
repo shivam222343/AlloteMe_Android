@@ -780,7 +780,7 @@ const NearbyCollegesScreen = ({ navigation }) => {
                                         <TouchableOpacity style={styles.distBadge} onPress={(e) => { e.stopPropagation(); handleRoute(item); }}>
                                             <Navigation size={12} color={Colors.primary} />
                                             <Text style={styles.distVal}>{item.realDist ? `${item.realDist}km Road` : `${item.distanceKm.toFixed(1)}km Approx.`}</Text>
-                                            {item.duration && <Text style={styles.durationText}> • {formatDuration(item.duration)}</Text>}
+                                            {!!item.duration && <Text style={styles.durationText}> • {formatDuration(item.duration)}</Text>}
                                         </TouchableOpacity>
                                     </View>
                                     <View style={styles.divider} />

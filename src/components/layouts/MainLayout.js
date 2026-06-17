@@ -24,6 +24,7 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         markLocalNotifAsRead,
         markAllLocalNotifsAsRead,
         clearAllLocalNotifs,
+        deleteLocalNotif,
         showAvatarPopup,
         setShowAvatarPopup,
         validateProfileForm
@@ -98,6 +99,25 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
         }
     }, [title]);
 
+    useEffect(() => {
+        if (user && user.role === 'student' && route.name !== 'CompleteProfile') {
+            const cleanPhone = (user.phoneNumber || '').trim();
+            const phoneRegex = /^[6-9]\d{9}$/;
+            const hasEmptyField = !user.percentile || !user.percentile.toString().trim() ||
+                                  !user.rank || !user.rank.toString().trim() ||
+                                  !user.location || !user.location.trim() ||
+                                  !cleanPhone || !phoneRegex.test(cleanPhone) ||
+                                  !user.expectedRegion || !user.expectedRegion.trim();
+                                  
+            if (hasEmptyField) {
+                const timer = setTimeout(() => {
+                    navigation.navigate('CompleteProfile');
+                }, 100);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [user, route.name, navigation]);
+
     // Fallback for devices/web where insets might be 0
     const topPadding = Platform.OS === 'web' ? 0 : Math.max(insets.top, Platform.OS === 'ios' ? 0 : 20);
     // On Android, insets.bottom often includes the system nav bar which we don't want to double-pad
@@ -147,15 +167,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 <TouchableOpacity
                                     onPress={() => {
                                         if (validateProfileForm) {
-                                            const isValid = validateProfileForm();
-                                            if (!isValid) {
-                                                Alert.alert(
-                                                    'Profile Incomplete',
-                                                    'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
-                                                    [{ text: 'OK', style: 'cancel' }]
-                                                );
-                                                return;
-                                            }
+                                            const isValid = validateProfileForm(true);
+                                            if (!isValid) return;
                                         }
                                         navigation.goBack();
                                     }}
@@ -168,15 +181,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                 <TouchableOpacity
                                     onPress={() => {
                                         if (validateProfileForm) {
-                                            const isValid = validateProfileForm();
-                                            if (!isValid) {
-                                                Alert.alert(
-                                                    'Profile Incomplete',
-                                                    'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
-                                                    [{ text: 'OK', style: 'cancel' }]
-                                                );
-                                                return;
-                                            }
+                                            const isValid = validateProfileForm(true);
+                                            if (!isValid) return;
                                         }
                                         navigation?.openDrawer?.();
                                     }}
@@ -203,15 +209,8 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                             style={[styles.desktopNavLink, active && styles.desktopNavLinkActive]}
                                             onPress={() => {
                                                 if (validateProfileForm) {
-                                                    const isValid = validateProfileForm();
-                                                    if (!isValid) {
-                                                        Alert.alert(
-                                                            'Profile Incomplete',
-                                                            'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
-                                                            [{ text: 'OK', style: 'cancel' }]
-                                                        );
-                                                        return;
-                                                    }
+                                                    const isValid = validateProfileForm(true);
+                                                    if (!isValid) return;
                                                 }
                                                 if (Platform.OS === 'web') {
                                                     navigation.navigate('AppDrawer', {
@@ -389,7 +388,19 @@ const MainLayout = ({ children, title, showHeader = true, hideBack = false, noPa
                                                 <Text style={styles.notifMsg} numberOfLines={2}>{item.message}</Text>
                                                 <Text style={styles.notifTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
                                             </View>
-                                            {!item.read && <View style={styles.unreadDot} />}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                {!item.read && <View style={styles.unreadDot} />}
+                                                <TouchableOpacity
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteLocalNotif(item._id);
+                                                    }}
+                                                    style={{ padding: 8, marginLeft: 8 }}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Trash2 size={16} color="#94a3b8" />
+                                                </TouchableOpacity>
+                                            </View>
                                         </TouchableOpacity>
                                     );
                                 }}

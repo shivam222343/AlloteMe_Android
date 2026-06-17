@@ -125,17 +125,6 @@ const TestimonialSlider = () => {
         <View style={styles.container}>
             <View style={[styles.headerRow, isDesktop && { width: SLIDE_WIDTH, alignSelf: 'center' }]}>
                 <Text style={styles.title}>What student Says</Text>
-                <View style={styles.pagination}>
-                    {reviews.slice(0, reviews.length / 2 || 1).map((_, i) => (
-                        <View
-                            key={i}
-                            style={[
-                                styles.dot,
-                                (currentIndex % (reviews.length / 2 || 1)) === i && styles.activeDot
-                            ]}
-                        />
-                    ))}
-                </View>
             </View>
 
             <View style={isDesktop && { alignItems: 'center' }}>
@@ -158,6 +147,19 @@ const TestimonialSlider = () => {
                     })}
                     style={isDesktop && { width: SLIDE_WIDTH }}
                 />
+            </View>
+
+            {/* Pagination dots below cards */}
+            <View style={[styles.pagination, { alignSelf: 'center', marginTop: 16 }]}>
+                {reviews.slice(0, reviews.length / 2 || 1).map((_, i) => (
+                    <View
+                        key={i}
+                        style={[
+                            styles.dot,
+                            (currentIndex % (reviews.length / 2 || 1)) === i && styles.activeDot
+                        ]}
+                    />
+                ))}
             </View>
         </View>
     );

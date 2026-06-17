@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
 import { Colors, Shadows } from '../../constants/theme';
 import { Home, Search, LayoutGrid, User, Bot, CloudUpload } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -49,15 +49,8 @@ const BottomBar = ({ state, navigation }) => {
                             style={styles.tab}
                             onPress={() => {
                                 if (validateProfileForm) {
-                                    const isValid = validateProfileForm();
-                                    if (!isValid) {
-                                        Alert.alert(
-                                            'Profile Incomplete',
-                                            'Please fill in all fields with valid information and tap "Finish & Save" to complete your profile before leaving.',
-                                            [{ text: 'OK', style: 'cancel' }]
-                                        );
-                                        return;
-                                    }
+                                    const isValid = validateProfileForm(true);
+                                    if (!isValid) return;
                                 }
                                 navigation.navigate(tab.name);
                             }}

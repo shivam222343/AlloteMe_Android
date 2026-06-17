@@ -19,7 +19,7 @@ const Input = ({
 
     return (
         <View style={[styles.container, containerStyle]}>
-            {label && <Text style={styles.label}>{label}</Text>}
+            {!!label && <Text style={styles.label}>{label}</Text>}
             <View style={styles.inputWrapper}>
                 <TextInput
                     style={[styles.input, error && styles.inputError, secureTextEntry && { paddingRight: 50 }]}
@@ -45,7 +45,7 @@ const Input = ({
                     </TouchableOpacity>
                 )}
             </View>
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {!!error && <Text style={styles.errorText}>{error}</Text>}
         </View>
     );
 };

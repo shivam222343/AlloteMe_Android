@@ -197,14 +197,14 @@ const FormResponsesScreen = ({ route, navigation }) => {
             if (val.rating || val.collegeName || val.comment) {
                 return (
                     <View style={styles.objectBlock}>
-                        {val.collegeName && <Text style={styles.objectSubtitle}>Institution: <Text style={{ fontWeight: '700' }}>{val.collegeName}</Text></Text>}
+                        {!!val.collegeName && <Text style={styles.objectSubtitle}>Institution: <Text style={{ fontWeight: '700' }}>{val.collegeName}</Text></Text>}
                         {val.rating && (
                             <View style={styles.starsRow}>
                                 {[1, 2, 3, 4, 5].map(s => <Ionicons key={s} name="star" size={16} color={s <= val.rating ? '#F59E0B' : '#E2E8F0'} />)}
                                 <Text style={styles.ratingText}>{val.rating}/5 Rating</Text>
                             </View>
                         )}
-                        {val.reviewerName && <Text style={styles.reviewerMini}>Shared as: <Text style={{ fontWeight: '600' }}>{val.reviewerName}</Text></Text>}
+                        {!!val.reviewerName && <Text style={styles.reviewerMini}>Shared as: <Text style={{ fontWeight: '600' }}>{val.reviewerName}</Text></Text>}
                         {val.comment && (
                             <View style={styles.commentBox}>
                                 <Text style={styles.commentText}>"{val.comment}"</Text>

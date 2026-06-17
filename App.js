@@ -11,6 +11,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Platform } from 'react-native';
 
 import linking from './src/navigation/linking';
+import { navigationRef } from './src/navigation/AppNavigator';
 import { NetworkProvider } from './src/contexts/NetworkContext';
 
 configureGoogleSignin();
@@ -19,19 +20,23 @@ configureGoogleSignin();
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const style = document.createElement('style');
   style.textContent = `
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+    }
     ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+      width: 4px;
+      height: 4px;
     }
     ::-webkit-scrollbar-track {
       background: transparent;
     }
     ::-webkit-scrollbar-thumb {
-      background: #1565C0;
+      background: rgba(59, 130, 246, 0.3);
       border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: #1976D2;
+      background: rgba(59, 130, 246, 0.6);
     }
   `;
   document.head.appendChild(style);
@@ -46,7 +51,7 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <NetworkProvider>
           <AuthProvider>
-            <NavigationContainer linking={linking}>
+            <NavigationContainer ref={navigationRef} linking={linking}>
               <AppNavigator />
               <SubscriptionLockModal />
             </NavigationContainer>

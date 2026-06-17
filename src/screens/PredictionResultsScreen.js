@@ -147,7 +147,7 @@ const PredictionResultRow = React.memo(({
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.statLabel}>CUTOFF</Text>
                                 <Text style={styles.statVal}>{Number(item.percentile).toFixed(2)}%</Text>
-                                {item.rank && <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text>}
+                                {!!item.rank && <Text style={{ fontSize: 9, color: Colors.text.tertiary }}>Rank: {item.rank}</Text>}
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.statLabel}>MY SCORE</Text>

@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { Platform } from 'react-native';
 import { registerForPushNotificationsAsync, removeFCMTokenFromBackend, scheduleLocalNotification, setupNotificationListeners, cleanupNotificationListeners } from '../services/NotificationService';
+import { navigationRef } from '../navigation/AppNavigator';
 
 const LOCAL_URL = Platform.OS === 'android' ? 'http://[IP_ADDRESS]' : 'http://127.0.0.1:5100';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com';
@@ -86,8 +87,14 @@ export const AuthProvider = ({ children }) => {
         if (!user?._id) return;
         try {
             const res = await notificationsAPI.getAll();
+            const deletedStored = await AsyncStorage.getItem('deleted_notification_ids').catch(() => null);
+            const clearTimeStored = await AsyncStorage.getItem('notifications_clear_all_time').catch(() => null);
+
+            const deletedIds = deletedStored ? JSON.parse(deletedStored) : [];
+            const clearTime = clearTimeStored ? new Date(clearTimeStored) : null;
+
             if (res.data) {
-                const serverNotifs = res.data.map(n => ({
+                let serverNotifs = res.data.map(n => ({
                     _id: n._id,
                     title: n.title,
                     message: n.message,
@@ -96,10 +103,19 @@ export const AuthProvider = ({ children }) => {
                     createdAt: n.createdAt
                 }));
 
+                if (clearTime) {
+                    serverNotifs = serverNotifs.filter(n => new Date(n.createdAt) > clearTime);
+                }
+                serverNotifs = serverNotifs.filter(n => !deletedIds.includes(n._id));
+
                 setNotifications(prev => {
                     const combined = [...serverNotifs, ...prev];
                     // Filter unique by _id
-                    const unique = combined.filter((v, i, a) => a.findIndex(t => t._id === v._id) === i);
+                    let unique = combined.filter((v, i, a) => a.findIndex(t => t._id === v._id) === i);
+                    if (clearTime) {
+                        unique = unique.filter(n => new Date(n.createdAt) > clearTime);
+                    }
+                    unique = unique.filter(n => !deletedIds.includes(n._id));
                     const sorted = unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 50);
                     saveLocalNotifications(sorted);
                     setUnreadCount(sorted.filter(n => !n.read).length);
@@ -168,6 +184,10 @@ export const AuthProvider = ({ children }) => {
                 });
             }
 
+            const deletedStored = await AsyncStorage.getItem('deleted_notification_ids').catch(() => null);
+            const deletedIds = deletedStored ? JSON.parse(deletedStored) : [];
+            if (deletedIds.includes(data._id)) return;
+
             const newNotif = {
                 _id: data._id || Date.now().toString(),
                 title: data.title,
@@ -206,8 +226,18 @@ export const AuthProvider = ({ children }) => {
     const loadLocalNotifications = async () => {
         try {
             const stored = await AsyncStorage.getItem('local_notifications');
+            const deletedStored = await AsyncStorage.getItem('deleted_notification_ids');
+            const clearTimeStored = await AsyncStorage.getItem('notifications_clear_all_time');
+
+            const deletedIds = deletedStored ? JSON.parse(deletedStored) : [];
+            const clearTime = clearTimeStored ? new Date(clearTimeStored) : null;
+
             if (stored) {
-                const parsed = JSON.parse(stored);
+                let parsed = JSON.parse(stored);
+                if (clearTime) {
+                    parsed = parsed.filter(n => new Date(n.createdAt) > clearTime);
+                }
+                parsed = parsed.filter(n => !deletedIds.includes(n._id));
                 setNotifications(parsed);
                 setUnreadCount(parsed.filter(n => !n.read).length);
             }
@@ -239,16 +269,39 @@ export const AuthProvider = ({ children }) => {
     };
 
     const deleteLocalNotif = async (id) => {
+        try {
+            const deletedStored = await AsyncStorage.getItem('deleted_notification_ids');
+            const deletedIds = deletedStored ? JSON.parse(deletedStored) : [];
+            if (!deletedIds.includes(id)) {
+                deletedIds.push(id);
+                await AsyncStorage.setItem('deleted_notification_ids', JSON.stringify(deletedIds));
+            }
+        } catch (e) {
+            console.error('Failed to save deleted ID', e);
+        }
+
         const updated = notifications.filter(n => n._id !== id);
         setNotifications(updated);
         setUnreadCount(updated.filter(n => !n.read).length);
         saveLocalNotifications(updated);
+
+        try {
+            await notificationsAPI.delete(id);
+        } catch (err) {
+            console.log('[AuthContext] Backend delete notification error (might not be implemented):', err.message);
+        }
     };
 
     const clearAllLocalNotifs = async () => {
         setNotifications([]);
         setUnreadCount(0);
-        await AsyncStorage.removeItem('local_notifications');
+        try {
+            await AsyncStorage.setItem('notifications_clear_all_time', new Date().toISOString());
+            await AsyncStorage.removeItem('local_notifications');
+            await notificationsAPI.deleteAll();
+        } catch (e) {
+            console.error('Failed to clear notifications', e);
+        }
     };
 
     const refreshUser = async () => {
@@ -444,6 +497,14 @@ export const AuthProvider = ({ children }) => {
         } catch (e) { }
         await AsyncStorage.removeItem('userToken');
         setUser(null);
+        setTimeout(() => {
+            if (navigationRef.isReady()) {
+                navigationRef.reset({
+                    index: 0,
+                    routes: [{ name: 'Signup' }],
+                });
+            }
+        }, 100);
     };
 
     const toggleSaveOptimistic = async (collegeId) => {
