@@ -22,21 +22,22 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   style.textContent = `
     * {
       scrollbar-width: thin;
-      scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+      scrollbar-color: rgba(10, 102, 194, 0.5) rgba(0, 0, 0, 0.05);
     }
     ::-webkit-scrollbar {
-      width: 4px;
-      height: 4px;
+      width: 8px;
+      height: 8px;
     }
     ::-webkit-scrollbar-track {
-      background: transparent;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 4px;
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(59, 130, 246, 0.3);
+      background: rgba(10, 102, 194, 0.5);
       border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(59, 130, 246, 0.6);
+      background: rgba(10, 102, 194, 0.8);
     }
   `;
   document.head.appendChild(style);
