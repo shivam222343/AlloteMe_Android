@@ -19,6 +19,14 @@
             "ios": {
                 "distribution": "store"
             }
+        },
+        "production-apk": {
+            "android": {
+                "buildType": "apk"
+            },
+            "ios": {
+                "distribution": "store"
+            }
         }
     }
 }

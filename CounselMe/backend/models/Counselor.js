@@ -39,6 +39,15 @@ const counselorSchema = new mongoose.Schema({
     reviewsCount: {
         type: Number,
         default: 120
+    },
+    // Legacy field — unique index exists in MongoDB from a previous schema version.
+    // sparse: true allows multiple documents to have accessKey: null/undefined
+    // without triggering a duplicate key error.
+    accessKey: {
+        type: String,
+        unique: true,
+        sparse: true,
+        default: undefined
     }
 }, {
     timestamps: true

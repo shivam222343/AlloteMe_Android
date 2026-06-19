@@ -67,31 +67,50 @@ const AdminCounselorsScreen = ({ navigation }) => {
             if (image && !image.startsWith('http')) {
                 console.log('Uploading local image:', image);
                 const formData = new FormData();
+                const fileName = `counselor_${Date.now()}.jpg`;
 
-                // Fix for Android URI format if needed
-                const uri = Platform.OS === 'android' ? image : image.replace('file://', '');
+                if (Platform.OS === 'web') {
+                    // On web, {uri, name, type} is ignored by FormData.
+                    // We must fetch the blob URI and append a real Blob.
+                    const response = await fetch(image);
+                    const blob = await response.blob();
+                    formData.append('image', blob, fileName);
+                } else {
+                    // React Native (iOS / Android) — the {uri,name,type} object works fine
+                    formData.append('image', {
+                        uri: image,
+                        name: fileName,
+                        type: 'image/jpeg',
+                    });
+                }
 
-                formData.append('image', {
-                    uri: image, // Expo Picked URI is usually fine as is
-                    name: `counselor_${Date.now()}.jpg`,
-                    type: 'image/jpeg',
-                });
                 const uploadRes = await institutionAPI.uploadImage(formData);
                 imageUrl = uploadRes.data.url;
             } else if (!image) {
                 imageUrl = 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=200';
             }
 
+            const cityNameValue = (cityName || "").trim() || "India";
+            const contactNumberValue = (contact || "").trim();
+
+            if (!contactNumberValue) {
+                Alert.alert("Error", "Contact number is required");
+                setSubmitting(false);
+                return;
+            }
+
             const data = {
                 name: (name || "").trim(),
                 field: (field || "").trim(),
                 experience: (experience || "").trim(),
-                cityName: (cityName || "India").trim(),
-                contactNumber: (contact || "").trim(), // Ensure this matches model
+                cityName: cityNameValue,
+                contactNumber: contactNumberValue,
                 email: (email || "").trim(),
                 description: (description || "").trim(),
                 profileImage: imageUrl
             };
+
+            console.log('[CounselorSave] Payload:', JSON.stringify(data, null, 2));
 
             if (editingId) {
                 const res = await counselorAPI.update(editingId, data);
@@ -106,8 +125,10 @@ const AdminCounselorsScreen = ({ navigation }) => {
             resetForm();
             fetchCounselors();
         } catch (error) {
-            console.error(error);
-            Alert.alert("Error", "Failed to save counselor");
+            console.error('[CounselorSave] Error:', error);
+            const serverMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+            console.error('[CounselorSave] Server message:', serverMsg);
+            Alert.alert("Error", `Failed to save counselor: ${serverMsg}`);
         } finally {
             setSubmitting(false);
         }

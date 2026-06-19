@@ -11,7 +11,8 @@ import {
     Modal,
     Switch,
     Image,
-    FlatList
+    FlatList,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MainLayout from '../components/layouts/MainLayout';
@@ -74,8 +75,18 @@ const AdminFormBuilderScreen = ({ route, navigation }) => {
         if (!result.canceled) {
             setLoading(true);
             try {
+                const uri = result.assets[0].uri;
                 const formData = new FormData();
-                formData.append('image', { uri: result.assets[0].uri, name: 'banner.jpg', type: 'image/jpeg' });
+
+                if (Platform.OS === 'web') {
+                    // On web, {uri, name, type} is ignored — must use a real Blob
+                    const response = await fetch(uri);
+                    const blob = await response.blob();
+                    formData.append('image', blob, 'banner.jpg');
+                } else {
+                    formData.append('image', { uri, name: 'banner.jpg', type: 'image/jpeg' });
+                }
+
                 const upRes = await uploadAPI.upload(formData);
                 if (upRes.data.success) {
                     setBannerImage(upRes.data.url);
