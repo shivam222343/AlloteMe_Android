@@ -2,4 +2,4 @@ flask
 werkzeug
 flask-cors
 pdfplumber
-# PyMuPDF # Uncomment if you decide to use PyMuPDF (fitz) instead of pdfplumber
+PyMuPDF
