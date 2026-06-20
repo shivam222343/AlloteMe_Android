@@ -225,46 +225,58 @@ const PricingScreen = ({ navigation }) => {
         amount = amount * 100;
         
         const successHandler = async (paymentId) => {
-            if (appliedCoupon) {
-                try { await systemAPI.applyCoupon({ code: appliedCoupon.code }); } catch (e) {}
-            }
-            const updatedSubscription = {
-                type: plan.id,
-                paymentId: paymentId,
-                usage: { aiPrompts: 0, predictions: 0, exports: 0 } // Reset usage on new plan
-            };
-
-            // Local storage backup
-            const cacheKey = `user_usage_${user._id}`;
             try {
-                await AsyncStorage.setItem(cacheKey, JSON.stringify(updatedSubscription.usage));
-            } catch (e) { }
+                if (appliedCoupon) {
+                    try { await systemAPI.applyCoupon({ code: appliedCoupon.code }); } catch (e) {}
+                }
+                const updatedSubscription = {
+                    type: plan.id,
+                    paymentId: paymentId,
+                    usage: { aiPrompts: 0, predictions: 0, exports: 0 } // Reset usage on new plan
+                };
 
-            const res = await updateProfile({ subscription: updatedSubscription });
-            if (res.success) {
-                const message = plan.id === 'free' 
-                    ? "Congratulations! Your Free Plan has been activated! 🎓✨"
-                    : `Congratulations! You've successfully upgraded to the ${plan.name} Plan! 🎊🏆✨`;
-                
-                setSuccessMessage(message);
-                setShowSuccess(true);
-                Animated.spring(successAnim, {
-                    toValue: 1,
-                    useNativeDriver: true,
-                    tension: 40,
-                    friction: 7
-                }).start();
+                // Local storage backup
+                const cacheKey = `user_usage_${user._id}`;
+                try {
+                    await AsyncStorage.setItem(cacheKey, JSON.stringify(updatedSubscription.usage));
+                } catch (e) { }
 
-                setTimeout(() => {
-                    Animated.timing(successAnim, {
-                        toValue: 0,
-                        duration: 400,
-                        useNativeDriver: true
-                    }).start(() => {
-                        setShowSuccess(false);
-                        navigation.navigate('Dashboard');
-                    });
-                }, 4000);
+                const res = await updateProfile({ subscription: updatedSubscription });
+                if (res && res.success) {
+                    const message = plan.id === 'free'
+                        ? "Congratulations! Your Free Plan has been activated! 🎓✨"
+                        : `Congratulations! You've successfully upgraded to the ${plan.name} Plan! 🎊🏆✨`;
+
+                    setSuccessMessage(message);
+                    setShowSuccess(true);
+                    Animated.spring(successAnim, {
+                        toValue: 1,
+                        useNativeDriver: true,
+                        tension: 40,
+                        friction: 7
+                    }).start();
+
+                    setTimeout(() => {
+                        Animated.timing(successAnim, {
+                            toValue: 0,
+                            duration: 400,
+                            useNativeDriver: true
+                        }).start(() => {
+                            setShowSuccess(false);
+                            navigation.navigate('Dashboard');
+                        });
+                    }, 4000);
+                } else {
+                    // Plan saved in payment but profile update failed — show manual instructions
+                    const msg = `Payment ID: ${paymentId}\n\nYour payment was successful but plan activation encountered an issue. Please contact support with this Payment ID and we will activate your plan manually.`;
+                    if (Platform.OS === 'web') alert(msg);
+                    else Alert.alert('Payment Received — Activation Pending', msg);
+                }
+            } catch (err) {
+                console.error('[PricingScreen] successHandler error:', err);
+                const msg = `Payment ID: ${paymentId}\n\nYour payment was received but we couldn't activate your plan automatically. Please contact support with this Payment ID.`;
+                if (Platform.OS === 'web') alert(msg);
+                else Alert.alert('Activation Failed', msg);
             }
         };
 
@@ -644,7 +656,7 @@ const PricingScreen = ({ navigation }) => {
                                         <Text style={styles.summaryPlanName}>{selectedPlanForCheckout.name} Plan</Text>
                                         <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                                             <Text style={[styles.summaryPlanPrice, { textDecorationLine: 'line-through', marginRight: 8 }]}>
-                                                ₹{parseInt(selectedPlanForCheckout.price.replace('₹', '')) + (selectedPlanForCheckout.id === 'advance' ? 700 : 500)}
+                                                ₹{parseInt(selectedPlanForCheckout.price.replace('₹', '')) + (selectedPlanForCheckout.id === 'counselor' ? 1000 : selectedPlanForCheckout.id === 'advance' ? 700 : 500)}
                                             </Text>
                                             <Text style={[styles.summaryPlanPrice, { fontWeight: 'bold', color: Colors.primary }]}>
                                                 ₹{getBaseCheckoutAmount(selectedPlanForCheckout)}
