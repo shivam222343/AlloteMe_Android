@@ -21,6 +21,7 @@
     "expo-server-sdk": "^3.7.0",
     "express": "^5.2.1",
     "firebase-admin": "^13.7.0",
+    "form-data": "^4.0.6",
     "google-auth-library": "^10.6.2",
     "groq-sdk": "^1.1.1",
     "jsonwebtoken": "^9.0.3",

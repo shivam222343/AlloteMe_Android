@@ -2,6 +2,7 @@ const Cutoff = require('../models/Cutoff');
 const Institution = require('../models/Institution');
 const Groq = require('groq-sdk');
 const axios = require('axios');
+const FormDataNode = require('form-data');
 
 // Normalizes category strings for consistent indexing and duplicate detection
 const normalizeCategory = (cat) => {
@@ -884,19 +885,24 @@ const parsePdfCutoffs = async (req, res) => {
             return res.status(400).json({ message: 'No PDF file uploaded' });
         }
 
-        const formData = new FormData();
-        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-        formData.append('file', blob, req.file.originalname);
+        // Use Node.js form-data package (not browser FormData/Blob) for server-side multipart uploads
+        const formData = new FormDataNode();
+        formData.append('file', req.file.buffer, {
+            filename: req.file.originalname,
+            contentType: req.file.mimetype,
+            knownLength: req.file.buffer.length
+        });
 
         const mlApiUrl = process.env.ML_API_URL || 'http://localhost:5005';
         console.log(`[ML Uploader] Forwarding PDF to ML service: ${mlApiUrl}/api/extract-pdf`);
-        
+
         const response = await axios.post(`${mlApiUrl}/api/extract-pdf`, formData, {
             headers: {
-                'Content-Type': 'multipart/form-data'
+                ...formData.getHeaders()  // Sets correct Content-Type with multipart boundary
             },
             maxContentLength: Infinity,
-            maxBodyLength: Infinity
+            maxBodyLength: Infinity,
+            timeout: 120000  // 120s — ML parsing can be slow on cold starts
         });
 
         if (response.data && response.data.success) {
