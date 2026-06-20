@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, TextInput, ActivityIndicator, Platform } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
@@ -24,6 +25,18 @@ const UploadCutoffScreen = ({ navigation }) => {
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [bulkParsedData, setBulkParsedData] = useState(null);
     const [cutoffSummary, setCutoffSummary] = useState({});
+
+    // Auto Upload States
+    const [autoUploadMode, setAutoUploadMode] = useState(false);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [uploadingState, setUploadingState] = useState('idle'); // 'idle', 'parsing', 'review', 'uploading', 'completed'
+    const [collegesToProcess, setCollegesToProcess] = useState([]);
+    const [selectedCollegesMap, setSelectedCollegesMap] = useState({});
+    const [activeUploadIndex, setActiveUploadIndex] = useState(0);
+    const [statusLogs, setStatusLogs] = useState([]);
+    const [lastClickedIndex, setLastClickedIndex] = useState(null);
+
+    const consoleScrollRef = React.useRef(null);
 
     const [metaData, setMetaData] = useState({
         examType: (admissionPath || 'MHTCET').toUpperCase(),
@@ -103,8 +116,52 @@ const UploadCutoffScreen = ({ navigation }) => {
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch data');
-        } finally {
             setLoading(false);
+        }
+    };
+
+    const handleClearAllData = () => {
+        const performClear = async () => {
+            setLoading(true);
+            try {
+                const res = await cutoffAPI.clearAllData();
+                if (res.data && res.data.success) {
+                    const msg = `Successfully wiped database!\n\nDeleted Cutoffs: ${res.data.deletedCutoffsCount}\nColleges Reset: ${res.data.updatedCollegesCount}`;
+                    if (Platform.OS === 'web') {
+                        window.alert(msg);
+                        fetchInstitutions();
+                    } else {
+                        Alert.alert('Dataset Cleared', msg, [{ text: 'OK', onPress: () => fetchInstitutions() }]);
+                    }
+                } else {
+                    const errMsg = res.data?.message || 'Failed to clear data';
+                    if (Platform.OS === 'web') window.alert('Error: ' + errMsg);
+                    else Alert.alert('Error', errMsg);
+                }
+            } catch (err) {
+                console.error('Clear All Error:', err);
+                const errMsg = err.response?.data?.message || err.message || 'Network error';
+                if (Platform.OS === 'web') window.alert('Error: ' + errMsg);
+                else Alert.alert('Error', errMsg);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm(
+                '⚠️ WARNING: Critical Action\n\nThis will permanently delete ALL cutoff entries and clear ALL branches from ALL colleges in the database.\n\nThis action CANNOT be undone. Are you absolutely sure?'
+            );
+            if (confirmed) performClear();
+        } else {
+            Alert.alert(
+                '⚠️ WARNING: Critical Action',
+                'This will permanently delete ALL cutoff entries and clear ALL branches from ALL colleges in the database.\n\nThis action CANNOT be undone. Are you absolutely sure?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Yes, Delete Everything', style: 'destructive', onPress: performClear }
+                ]
+            );
         }
     };
 
@@ -235,6 +292,368 @@ const UploadCutoffScreen = ({ navigation }) => {
         }
     };
 
+    const handlePickDocument = async () => {
+        try {
+            const pickerOptions = {
+                type: 'application/pdf',
+                copyToCacheDirectory: true,
+                multiple: false
+            };
+
+            const result = await DocumentPicker.getDocumentAsync(pickerOptions);
+            const isCanceled = result.canceled === true || result.type === 'cancel';
+            const assets = result.assets || (result.uri ? [result] : []);
+
+            if (isCanceled || assets.length === 0) {
+                console.log('[AutoUpload] Document picker canceled');
+                return;
+            }
+
+            const asset = assets[0];
+            setSelectedFile(asset);
+        } catch (err) {
+            console.error('[AutoUpload] Document picker error:', err);
+            Alert.alert('Error', 'Failed to pick PDF file');
+        }
+    };
+
+    const handleAutoUploadStart = async () => {
+        if (!selectedFile) {
+            return Alert.alert('Error', 'Please select a PDF file first.');
+        }
+
+        setUploadingState('parsing');
+        setStatusLogs(['[System] Preparing PDF file...']);
+        
+        try {
+            const formData = new FormData();
+            if (Platform.OS === 'web') {
+                const response = await fetch(selectedFile.uri);
+                const blob = await response.blob();
+                formData.append('file', blob, selectedFile.name || 'cutoffs.pdf');
+            } else {
+                formData.append('file', {
+                    uri: selectedFile.uri,
+                    type: selectedFile.mimeType || 'application/pdf',
+                    name: selectedFile.name || 'cutoffs.pdf'
+                });
+            }
+
+            setStatusLogs(prev => [...prev, '[System] Uploading PDF and starting ML parsing engine... (This can take 15-30s)']);
+            
+            const parseRes = await cutoffAPI.parsePdf(formData);
+            
+            if (!parseRes.data.success || !Array.isArray(parseRes.data.data) || parseRes.data.data.length === 0) {
+                setUploadingState('idle');
+                setStatusLogs(prev => [...prev, '❌ [Error] Failed to extract any college data from PDF.']);
+                Alert.alert('Error', 'ML parser returned no data.');
+                return;
+            }
+
+            const colleges = parseRes.data.data;
+            setCollegesToProcess(colleges);
+
+            // Default all extracted colleges to selected
+            const initialMap = {};
+            colleges.forEach(c => {
+                initialMap[c["DTE code"]] = true;
+            });
+            setSelectedCollegesMap(initialMap);
+            setLastClickedIndex(null);
+
+            setUploadingState('review');
+            setStatusLogs(prev => [
+                ...prev, 
+                `✨ [ML Success] Extracted data for ${colleges.length} colleges successfully!`,
+                `📋 Please select the colleges you wish to import/update.`
+            ]);
+
+        } catch (err) {
+            console.error('[AutoUpload] Error during upload workflow:', err);
+            setUploadingState('idle');
+            const errMsg = err.response?.data?.message || err.message || 'An error occurred during extraction';
+            setStatusLogs(prev => [...prev, `❌ [Fatal Error] ${errMsg}`]);
+            Alert.alert('Upload Failed', errMsg);
+        }
+    };
+
+    const handleStartImportSelected = async () => {
+        const selectedColleges = collegesToProcess.filter(c => selectedCollegesMap[c["DTE code"]]);
+        if (selectedColleges.length === 0) {
+            return Alert.alert('Error', 'Please select at least one college to import.');
+        }
+
+        setUploadingState('uploading');
+        setActiveUploadIndex(0);
+        setStatusLogs(prev => [
+            ...prev,
+            `🚀 [System] Starting database import for ${selectedColleges.length} selected colleges...`
+        ]);
+
+        let successCount = 0;
+        let warningCount = 0;
+
+        for (let i = 0; i < selectedColleges.length; i++) {
+            const college = selectedColleges[i];
+            setActiveUploadIndex(i);
+            
+            setStatusLogs(prev => [...prev, `⏳ [${i+1}/${selectedColleges.length}] Importing: ${college.college} (DTE: ${college["DTE code"]})`]);
+
+            try {
+                const payload = {
+                    collegeName: college.college,
+                    dteCode: college["DTE code"],
+                    examType: metaData.examType,
+                    year: parseInt(metaData.year),
+                    round: parseInt(metaData.round),
+                    branches: college.branches
+                };
+
+                const importRes = await cutoffAPI.importCollege(payload);
+                
+                if (importRes.data.success) {
+                    successCount++;
+                    setStatusLogs(prev => [
+                        ...prev, 
+                        `✅ [Success] ${importRes.data.institutionName}: Inserted ${importRes.data.cutoffsInserted} cutoffs (${importRes.data.branchesAdded} new branches)`
+                    ]);
+                } else {
+                    warningCount++;
+                    setStatusLogs(prev => [...prev, `⚠️ [Skip] ${college.college}: ${importRes.data.message || 'Unknown issue'}`]);
+                }
+            } catch (err) {
+                warningCount++;
+                const errMsg = err.response?.data?.message || err.message || 'Network error';
+                setStatusLogs(prev => [...prev, `❌ [Failed] ${college.college}: ${errMsg}`]);
+            }
+        }
+
+        setUploadingState('completed');
+        setStatusLogs(prev => [
+            ...prev, 
+            `🏁 [Completed] Process finished. Successfully imported ${successCount} colleges, skipped/failed ${warningCount} colleges.`
+        ]);
+    };
+
+    const renderAutoUploadContent = () => {
+        const selectedColleges = collegesToProcess.filter(c => selectedCollegesMap[c["DTE code"]]);
+        const total = selectedColleges.length;
+        const progress = total > 0 ? (activeUploadIndex + 1) / total : 0;
+
+        return (
+            <View style={{ flex: 1 }}>
+                <View style={styles.autoUploadHeader}>
+                    <TouchableOpacity onPress={() => setAutoUploadMode(false)} style={styles.backLink}>
+                        <Text style={styles.backLinkText}>← Back to Manual Mode</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.stepTitle}>Auto Cutoff Upload (ML Engine)</Text>
+                </View>
+
+                {uploadingState === 'idle' && (
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        <Card style={[styles.card, { padding: 20 }]}>
+                            <Text style={styles.label}>1. Select Target Metadata</Text>
+                            <Input
+                                label="Exam"
+                                value={metaData.examType}
+                                editable={false}
+                            />
+                            <View style={styles.row}>
+                                <Input
+                                    label="Year"
+                                    value={metaData.year}
+                                    onChangeText={(v) => setMetaData({ ...metaData, year: v })}
+                                    placeholder="2025"
+                                    keyboardType="numeric"
+                                    containerStyle={{ flex: 1, marginRight: 12 }}
+                                />
+                                <Input
+                                    label="Round"
+                                    value={metaData.round}
+                                    onChangeText={(v) => setMetaData({ ...metaData, round: v })}
+                                    placeholder="1"
+                                    keyboardType="numeric"
+                                    containerStyle={{ flex: 1 }}
+                                />
+                            </View>
+                        </Card>
+
+                        <TouchableOpacity style={styles.uploadArea} onPress={handlePickDocument}>
+                            <Bot size={32} color={Colors.primary} style={{ marginBottom: 12 }} />
+                            <Text style={styles.uploadTitle}>
+                                {selectedFile ? selectedFile.name : 'Click to select PDF Cutoff File'}
+                            </Text>
+                            <Text style={styles.uploadSub}>
+                                {selectedFile ? `Size: ${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'MHT-CET official cutoff PDF document'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <Button 
+                            title="🚀 Start Auto Upload" 
+                            onPress={handleAutoUploadStart}
+                            disabled={!selectedFile}
+                            style={{ marginTop: 20 }}
+                        />
+                    </ScrollView>
+                )}
+
+                {uploadingState === 'review' && (
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.label}>2. Review & Select Colleges to Upload</Text>
+                        
+                        <View style={styles.reviewActions}>
+                            <TouchableOpacity 
+                                style={styles.reviewActionBtn}
+                                onPress={() => {
+                                    const newMap = {};
+                                    collegesToProcess.forEach(c => {
+                                        newMap[c["DTE code"]] = true;
+                                    });
+                                    setSelectedCollegesMap(newMap);
+                                }}
+                            >
+                                <Text style={styles.reviewActionBtnText}>Select All</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={styles.reviewActionBtn}
+                                onPress={() => {
+                                    setSelectedCollegesMap({});
+                                }}
+                            >
+                                <Text style={styles.reviewActionBtnText}>Deselect All</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.reviewList} showsVerticalScrollIndicator={false}>
+                            {(() => {
+                                const sortedColleges = [...collegesToProcess]
+                                    .sort((a, b) => (a.college || '').localeCompare(b.college || ''));
+                                
+                                return sortedColleges.map((c, idx) => {
+                                    const isChecked = !!selectedCollegesMap[c["DTE code"]];
+                                    return (
+                                        <TouchableOpacity 
+                                            key={idx}
+                                            style={[styles.reviewItem, isChecked && styles.reviewItemChecked]}
+                                            onPress={(event) => {
+                                                const isShift = event.shiftKey || event.nativeEvent?.shiftKey;
+                                                if (isShift && lastClickedIndex !== null) {
+                                                    const start = Math.min(lastClickedIndex, idx);
+                                                    const end = Math.max(lastClickedIndex, idx);
+                                                    const targetVal = !isChecked;
+                                                    
+                                                    setSelectedCollegesMap(prev => {
+                                                        const newMap = { ...prev };
+                                                        for (let i = start; i <= end; i++) {
+                                                            newMap[sortedColleges[i]["DTE code"]] = targetVal;
+                                                        }
+                                                        return newMap;
+                                                    });
+                                                } else {
+                                                    setSelectedCollegesMap(prev => ({
+                                                        ...prev,
+                                                        [c["DTE code"]]: !prev[c["DTE code"]]
+                                                    }));
+                                                }
+                                                setLastClickedIndex(idx);
+                                            }}
+                                        >
+                                            <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+                                                {isChecked && <CheckCircle2 size={12} color={Colors.white} />}
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.reviewItemTitle} numberOfLines={1}>{c.college}</Text>
+                                                <Text style={styles.reviewItemSub}>DTE Code: {c["DTE code"]} | {c.branches?.length || 0} branches found</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                });
+                            })()}
+                        </ScrollView>
+
+                        <View style={{ gap: 12, marginTop: 20 }}>
+                            <Button 
+                                title={`🚀 Import Selected (${total} Colleges)`}
+                                onPress={handleStartImportSelected}
+                                disabled={total === 0}
+                            />
+                            <Button 
+                                title="Cancel" 
+                                type="secondary"
+                                onPress={() => {
+                                    setUploadingState('idle');
+                                    setSelectedFile(null);
+                                }}
+                            />
+                        </View>
+                    </View>
+                )}
+
+                {(uploadingState === 'parsing' || uploadingState === 'uploading' || uploadingState === 'completed') && (
+                    <View style={{ flex: 1 }}>
+                        <Card style={styles.progressCard}>
+                            <View style={styles.progressHeader}>
+                                {uploadingState === 'parsing' ? (
+                                    <ActivityIndicator size="small" color={Colors.primary} />
+                                ) : uploadingState === 'uploading' ? (
+                                    <ActivityIndicator size="small" color="#F59E0B" />
+                                ) : (
+                                    <CheckCircle2 size={20} color="#10B981" />
+                                )}
+                                <Text style={styles.progressStatusText}>
+                                    {uploadingState === 'parsing' ? 'Extracting text via ML...' :
+                                     uploadingState === 'uploading' ? `Uploading college ${activeUploadIndex+1} of ${total}...` :
+                                     'Auto Import Complete!'}
+                                </Text>
+                            </View>
+
+                            {total > 0 && (
+                                <View style={styles.progressBarBg}>
+                                    <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+                                </View>
+                            )}
+                        </Card>
+
+                        <Text style={[styles.label, { marginTop: 16 }]}>Console Log Output:</Text>
+                        <ScrollView 
+                            style={styles.consoleLogBox}
+                            contentContainerStyle={{ padding: 12 }}
+                            ref={consoleScrollRef}
+                            onContentSizeChange={() => consoleScrollRef.current?.scrollToEnd({ animated: true })}
+                        >
+                            {statusLogs.map((log, idx) => (
+                                <Text 
+                                    key={idx} 
+                                    style={[
+                                        styles.consoleLogText,
+                                        log.startsWith('✅') && { color: '#10B981' },
+                                        log.startsWith('⚠️') && { color: '#F59E0B' },
+                                        log.startsWith('❌') && { color: '#EF4444' },
+                                        log.startsWith('✨') && { color: '#3B82F6', fontWeight: 'bold' }
+                                    ]}
+                                >
+                                    {log}
+                                </Text>
+                            ))}
+                        </ScrollView>
+
+                        {uploadingState === 'completed' && (
+                            <Button 
+                                title="Done & Return" 
+                                onPress={() => {
+                                    setAutoUploadMode(false);
+                                    setStep(1);
+                                    fetchInstitutions();
+                                }} 
+                                style={{ marginTop: 20 }}
+                            />
+                        )}
+                    </View>
+                )}
+            </View>
+        );
+    };
+
     const renderStatusDots = (collegeId) => {
         const yearsData = cutoffSummary[collegeId];
         if (!yearsData || yearsData.length === 0) return null;
@@ -313,10 +732,35 @@ const UploadCutoffScreen = ({ navigation }) => {
     };
 
     const renderStepContent = () => {
+        if (autoUploadMode) {
+            return renderAutoUploadContent();
+        }
         switch (step) {
             case 1: // Select Institution
                 return (
                     <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                            <TouchableOpacity 
+                                style={[styles.autoUploadHeaderBtn, { flex: 1, marginBottom: 0 }]}
+                                onPress={() => {
+                                    setAutoUploadMode(true);
+                                    setUploadingState('idle');
+                                    setSelectedFile(null);
+                                    setStatusLogs([]);
+                                    setCollegesToProcess([]);
+                                }}
+                            >
+                                <Bot size={18} color={Colors.white} />
+                                <Text style={styles.autoUploadHeaderBtnText}>✨ PDF Auto-Import</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.autoUploadHeaderBtn, { backgroundColor: '#EF4444', flex: 1, marginBottom: 0 }]}
+                                onPress={handleClearAllData}
+                            >
+                                <Building2 size={18} color={Colors.white} />
+                                <Text style={styles.autoUploadHeaderBtnText}>⚠️ Clear Dataset</Text>
+                            </TouchableOpacity>
+                        </View>
                         <View style={styles.searchBar}>
                             <Search size={20} color={Colors.text.tertiary} />
                             <TextInput
@@ -626,7 +1070,160 @@ const styles = StyleSheet.create({
     dteBadge: { backgroundColor: Colors.primary + '10', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: Colors.primary + '30' },
     dteBadgeText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-    loadingText: { marginTop: 12, fontSize: 14, color: Colors.text.tertiary, fontWeight: '500' }
+    loadingText: { marginTop: 12, fontSize: 14, color: Colors.text.tertiary, fontWeight: '500' },
+    autoUploadHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.primary,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginBottom: 16,
+        gap: 10,
+        ...Shadows.sm
+    },
+    autoUploadHeaderBtnText: {
+        color: Colors.white,
+        fontWeight: 'bold',
+        fontSize: 15
+    },
+    autoUploadHeader: {
+        marginBottom: 20
+    },
+    backLink: {
+        marginBottom: 8
+    },
+    backLinkText: {
+        color: Colors.primary,
+        fontSize: 14,
+        fontWeight: '600'
+    },
+    uploadArea: {
+        borderWidth: 2,
+        borderColor: Colors.border,
+        borderStyle: 'dashed',
+        borderRadius: 16,
+        padding: 30,
+        alignItems: 'center',
+        backgroundColor: Colors.white,
+        marginTop: 16
+    },
+    uploadTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+        textAlign: 'center'
+    },
+    uploadSub: {
+        fontSize: 12,
+        color: Colors.text.tertiary,
+        marginTop: 4,
+        textAlign: 'center'
+    },
+    progressCard: {
+        padding: 16,
+        gap: 12
+    },
+    progressHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10
+    },
+    progressStatusText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: Colors.text.primary
+    },
+    progressBarBg: {
+        height: 8,
+        backgroundColor: Colors.divider,
+        borderRadius: 4,
+        overflow: 'hidden'
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: Colors.primary,
+        borderRadius: 4
+    },
+    consoleLogBox: {
+        flex: 1,
+        backgroundColor: '#1E1E1E',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        minHeight: 250,
+        maxHeight: 400
+    },
+    consoleLogText: {
+        fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+        color: '#D4D4D4',
+        fontSize: 12,
+        marginBottom: 6,
+        lineHeight: 16
+    },
+    reviewActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12
+    },
+    reviewActionBtn: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: Colors.divider + '40',
+        borderWidth: 1,
+        borderColor: Colors.border
+    },
+    reviewActionBtnText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: Colors.text.secondary
+    },
+    reviewList: {
+        flex: 1,
+        backgroundColor: Colors.white,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        paddingHorizontal: 12,
+        paddingVertical: 6
+    },
+    reviewItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.divider,
+        gap: 12
+    },
+    reviewItemChecked: {
+        backgroundColor: Colors.primary + '03'
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 6,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: Colors.white
+    },
+    checkboxChecked: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary
+    },
+    reviewItemTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: Colors.text.primary
+    },
+    reviewItemSub: {
+        fontSize: 11,
+        color: Colors.text.tertiary,
+        marginTop: 2
+    }
 });
 
 export default UploadCutoffScreen;

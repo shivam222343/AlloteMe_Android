@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
 require('dotenv').config({ path: 'c:/Users/Shiva/OneDrive/Desktop/AlloteMe/AlloteMe/AlloteMe-Mobile/CounselMe/backend/.env' });
+
+try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (err) {}
 
 const inspect = async () => {
     try {

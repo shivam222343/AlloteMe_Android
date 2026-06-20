@@ -1,6 +1,100 @@
 const Cutoff = require('../models/Cutoff');
 const Institution = require('../models/Institution');
 const Groq = require('groq-sdk');
+const axios = require('axios');
+
+// Normalizes category strings for consistent indexing and duplicate detection
+const normalizeCategory = (cat) => {
+    if (!cat) return '';
+    let normalized = cat.trim()
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+    
+    // Normalize female suffixes
+    normalized = normalized.replace(/\(FEMALE\)/g, 'FEMALE');
+    normalized = normalized.replace(/\bFEMALE\b/g, 'FEMALE');
+    normalized = normalized.replace(/\s*\(FEMALE\)\s*/g, ' FEMALE');
+    normalized = normalized.replace(/\s*FEMALE\s*/g, ' FEMALE');
+    
+    // Normalize DEFENCE prefix
+    // Replace word 'DEF' with 'DEFENCE'
+    normalized = normalized.replace(/\bDEF\b/g, 'DEFENCE');
+    
+    return normalized.trim().replace(/\s+/g, ' ');
+};
+
+// Normalizes seatType
+const normalizeSeatType = (st) => st ? st.trim().toUpperCase() : null;
+
+// Gets the number of decimal places of a float/string number for precision comparison
+const getDecimalPlaces = (val) => {
+    if (val === undefined || val === null) return 0;
+    const str = val.toString();
+    const parts = str.split('.');
+    return parts.length > 1 ? parts[1].length : 0;
+};
+
+// Compares new vs existing doc to decide which one is better to keep
+const shouldReplaceDoc = (newDoc, existingDoc) => {
+    if (newDoc.rank && !existingDoc.rank) return true;
+    if (!newDoc.rank && existingDoc.rank) return false;
+
+    const newPrecision = getDecimalPlaces(newDoc.percentile);
+    const existingPrecision = getDecimalPlaces(existingDoc.percentile);
+    if (newPrecision > existingPrecision) return true;
+    if (newPrecision < existingPrecision) return false;
+
+    return newDoc.percentile > existingDoc.percentile;
+};
+
+// Deduplicates and writes/updates documents in MongoDB using bulkWrite (Replace mode)
+const saveCutoffDocuments = async (documents) => {
+    if (!documents || documents.length === 0) return 0;
+
+    // 1. Normalize categories and seatTypes in all documents
+    for (const doc of documents) {
+        doc.category = normalizeCategory(doc.category);
+        doc.seatType = normalizeSeatType(doc.seatType);
+    }
+
+    // 2. Deduplicate within the payload itself
+    const uniqueDocsMap = new Map();
+    for (const doc of documents) {
+        const key = `${doc.collegeId}_${doc.examType}_${doc.year}_${doc.round}_${doc.branch?.toLowerCase()}_${doc.category}_${doc.seatType || ''}`;
+        
+        const existing = uniqueDocsMap.get(key);
+        if (!existing || shouldReplaceDoc(doc, existing)) {
+            uniqueDocsMap.set(key, doc);
+        }
+    }
+
+    const dedupedDocs = Array.from(uniqueDocsMap.values());
+
+    // 3. Write to database using bulkWrite upserts to overwrite any duplicate keys in the DB
+    const operations = dedupedDocs.map(doc => ({
+        updateOne: {
+            filter: {
+                collegeId: doc.collegeId,
+                examType: doc.examType,
+                year: doc.year,
+                round: doc.round,
+                branch: doc.branch,
+                category: doc.category,
+                seatType: doc.seatType
+            },
+            update: {
+                $set: doc
+            },
+            upsert: true
+        }
+    }));
+
+    if (operations.length > 0) {
+        const result = await Cutoff.bulkWrite(operations);
+        return (result.upsertedCount || 0) + (result.modifiedCount || 0) + (result.insertedCount || 0);
+    }
+    return 0;
+};
 
 // Category Mapping for Maharashtra DTE Data
 const CATEGORY_ALIASES = {
@@ -492,8 +586,71 @@ const estimateRank = async (req, res) => {
 
 const addCutoffData = async (req, res) => {
     try {
-        const cutoff = await Cutoff.create(req.body);
-        res.status(201).json(cutoff);
+        const { collegeId, institutionId, branch, branchName, examType, year, round, category, seatType, cutoffData } = req.body;
+        
+        const finalCollegeId = collegeId || institutionId;
+        const finalBranch = branch || branchName;
+
+        if (cutoffData && Array.isArray(cutoffData)) {
+            // Bulk-like array insertion for a single branch
+            // Delete all existing cutoffs for this college, examType, year, and round (Replace mode)
+            await Cutoff.deleteMany({
+                collegeId: finalCollegeId,
+                examType,
+                year: parseInt(year),
+                round: parseInt(round)
+            });
+
+            const documents = [];
+            for (const entry of cutoffData) {
+                if (!entry.category || entry.percentile == null) continue;
+                documents.push({
+                    collegeId: finalCollegeId,
+                    branch: finalBranch,
+                    examType,
+                    year: parseInt(year),
+                    round: parseInt(round),
+                    category: entry.category,
+                    percentile: parseFloat(entry.percentile),
+                    rank: entry.rank ? parseInt(entry.rank) : null,
+                    seatType: entry.seatType || null
+                });
+            }
+
+            const inserted = await saveCutoffDocuments(documents);
+
+            return res.status(201).json({
+                message: `Inserted/Updated ${inserted} cutoff entries.`,
+                inserted
+            });
+        } else {
+            // Single cutoff insertion
+            // Delete all existing cutoffs for this college, examType, year, and round (Replace mode)
+            await Cutoff.deleteMany({
+                collegeId: finalCollegeId,
+                examType,
+                year: parseInt(year),
+                round: parseInt(round)
+            });
+
+            const documents = [{
+                collegeId: finalCollegeId,
+                branch: finalBranch,
+                examType,
+                year: parseInt(year),
+                round: parseInt(round),
+                category: category,
+                percentile: parseFloat(req.body.percentile),
+                rank: req.body.rank ? parseInt(req.body.rank) : null,
+                seatType: seatType || null
+            }];
+
+            const inserted = await saveCutoffDocuments(documents);
+            return res.status(201).json({
+                message: `Inserted/Updated cutoff entry.`,
+                inserted
+            });
+        }
     } catch (error) {
         res.status(400).json({ message: error.message });
     }
@@ -501,13 +658,39 @@ const addCutoffData = async (req, res) => {
 
 const bulkAddCutoffData = async (req, res) => {
     try {
-        const { institutionId, items } = req.body;
+        const { institutionId, collegeId, items } = req.body;
+        const finalCollegeId = collegeId || institutionId;
 
-        if (!institutionId || !items || !Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({ message: 'institutionId and items array are required' });
+        if (!finalCollegeId || !items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ message: 'collegeId/institutionId and items array are required' });
         }
 
-        // Flatten branches -> individual Cutoff documents
+        // 1. Identify all unique rounds (examType, year, round) being updated and delete them first
+        const roundsToClear = [];
+        for (const item of items) {
+            const { examType, year, round } = item;
+            if (!examType || !year || !round) continue;
+
+            const y = parseInt(year);
+            const r = parseInt(round);
+            const exists = roundsToClear.some(
+                c => c.examType === examType && c.year === y && c.round === r
+            );
+            if (!exists) {
+                roundsToClear.push({ examType, year: y, round: r });
+            }
+        }
+
+        for (const r of roundsToClear) {
+            await Cutoff.deleteMany({
+                collegeId: finalCollegeId,
+                examType: r.examType,
+                year: r.year,
+                round: r.round
+            });
+        }
+
+        // 2. Flatten branches -> individual Cutoff documents and insert them
         const documents = [];
         for (const item of items) {
             const { branchName, examType, year, round, cutoffData } = item;
@@ -516,7 +699,7 @@ const bulkAddCutoffData = async (req, res) => {
             for (const entry of cutoffData) {
                 if (!entry.category || entry.percentile == null) continue;
                 documents.push({
-                    collegeId: institutionId,
+                    collegeId: finalCollegeId,
                     branch: branchName,
                     examType,
                     year: parseInt(year),
@@ -533,25 +716,12 @@ const bulkAddCutoffData = async (req, res) => {
             return res.status(400).json({ message: 'No valid cutoff documents to insert. Check your data format.' });
         }
 
-        // ordered: false = continue inserting valid docs even if some are duplicates
-        let inserted = 0;
-        let skipped = 0;
-        try {
-            const result = await Cutoff.insertMany(documents, { ordered: false });
-            inserted = result.length;
-        } catch (bulkErr) {
-            if (bulkErr.code === 11000 || bulkErr.name === 'MongoBulkWriteError') {
-                inserted = bulkErr.result?.insertedCount || 0;
-                skipped = documents.length - inserted;
-            } else {
-                throw bulkErr;
-            }
-        }
+        const inserted = await saveCutoffDocuments(documents);
 
         res.status(201).json({
-            message: `Inserted ${inserted} cutoff entries${skipped > 0 ? `, skipped ${skipped} duplicates` : ''}.`,
+            message: `Inserted/Updated ${inserted} cutoff entries.`,
             inserted,
-            skipped
+            skipped: 0
         });
     } catch (error) {
         console.error('Bulk Insert Error:', error.message);
@@ -708,6 +878,193 @@ const getCutoffSummary = async (req, res) => {
     }
 };
 
+const parsePdfCutoffs = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No PDF file uploaded' });
+        }
+
+        const formData = new FormData();
+        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+        formData.append('file', blob, req.file.originalname);
+
+        const mlApiUrl = process.env.ML_API_URL || 'http://localhost:5005';
+        console.log(`[ML Uploader] Forwarding PDF to ML service: ${mlApiUrl}/api/extract-pdf`);
+        
+        const response = await axios.post(`${mlApiUrl}/api/extract-pdf`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            },
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity
+        });
+
+        if (response.data && response.data.success) {
+            return res.json({
+                success: true,
+                data: response.data.data
+            });
+        } else {
+            return res.status(500).json({
+                success: false,
+                message: response.data?.error || 'ML service parsing failed'
+            });
+        }
+    } catch (error) {
+        console.error('[ML Uploader] Error forwarding to ML service:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error communicating with ML service: ' + error.message
+        });
+    }
+};
+
+const importParsedCollege = async (req, res) => {
+    try {
+        const { collegeName, dteCode, examType, year, round, branches } = req.body;
+
+        if (!dteCode || !examType || !year || !round || !branches || !Array.isArray(branches)) {
+            return res.status(400).json({ message: "Missing required fields in payload" });
+        }
+
+        // 1. Find the Institution by DTE code (checking both exact and integer-parsed/padded variants)
+        const cleanDte = dteCode.toString().trim();
+        const dteQueryOptions = [cleanDte];
+        const numDte = parseInt(cleanDte, 10);
+        if (!isNaN(numDte)) {
+            const strippedDte = numDte.toString();
+            if (!dteQueryOptions.includes(strippedDte)) {
+                dteQueryOptions.push(strippedDte);
+            }
+            const paddedDte = strippedDte.padStart(cleanDte.length > 4 ? cleanDte.length : 5, '0');
+            if (!dteQueryOptions.includes(paddedDte)) {
+                dteQueryOptions.push(paddedDte);
+            }
+            const paddedDte4 = strippedDte.padStart(4, '0');
+            if (!dteQueryOptions.includes(paddedDte4)) {
+                dteQueryOptions.push(paddedDte4);
+            }
+        }
+
+        let institution = await Institution.findOne({ dteCode: { $in: dteQueryOptions } });
+
+        // Fallback: search by name (case-insensitive regex match)
+        if (!institution && collegeName) {
+            const cleanName = collegeName.trim();
+            institution = await Institution.findOne({ name: { $regex: new RegExp(cleanName, 'i') } });
+        }
+
+        if (!institution) {
+            return res.status(404).json({
+                success: false,
+                message: `Institution with DTE code "${dteCode}" or name "${collegeName}" not found.`
+            });
+        }
+
+        let branchesAdded = 0;
+        let cutoffsInserted = 0;
+
+        if (!institution.branches) {
+            institution.branches = [];
+        }
+
+        // Delete all existing cutoffs for this college, examType, year, and round (Replace mode)
+        await Cutoff.deleteMany({
+            collegeId: institution._id,
+            examType,
+            year: parseInt(year),
+            round: parseInt(round)
+        });
+
+        // 2. Loop through each branch and process
+        for (const branch of branches) {
+            const { branchName, cutoffData } = branch;
+            if (!branchName || !Array.isArray(cutoffData) || cutoffData.length === 0) continue;
+
+            const trimmedBranchName = branchName.trim();
+
+            // Check if branch exists
+            let branchExists = institution.branches.some(
+                b => b.name && b.name.toLowerCase() === trimmedBranchName.toLowerCase()
+            );
+
+            if (!branchExists) {
+                // Generate a short code from the branch name
+                const generatedCode = trimmedBranchName
+                    .split(/[\s\(\)\-]+/)
+                    .filter(w => w.length > 0 && !['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science'].includes(w.toLowerCase()))
+                    .map(w => w[0])
+                    .join('')
+                    .toUpperCase()
+                    .substring(0, 5) || 'BR';
+
+                institution.branches.push({
+                    name: trimmedBranchName,
+                    code: generatedCode
+                });
+                branchesAdded++;
+            }
+
+            // Insert new cutoffs
+            const documents = [];
+            for (const entry of cutoffData) {
+                if (!entry.category || entry.percentile == null) continue;
+
+                documents.push({
+                    collegeId: institution._id,
+                    branch: trimmedBranchName,
+                    examType,
+                    year: parseInt(year),
+                    round: parseInt(round),
+                    category: entry.category,
+                    percentile: parseFloat(entry.percentile),
+                    rank: entry.rank ? parseInt(entry.rank) : null,
+                    seatType: entry.seatType || null
+                });
+            }
+
+            if (documents.length > 0) {
+                const inserted = await saveCutoffDocuments(documents);
+                cutoffsInserted += inserted;
+            }
+        }
+
+        // Save updated institution branches if any were added
+        if (branchesAdded > 0) {
+            await institution.save();
+        }
+
+        res.status(200).json({
+            success: true,
+            institutionId: institution._id,
+            institutionName: institution.name,
+            branchesAdded,
+            cutoffsInserted
+        });
+
+    } catch (error) {
+        console.error('[ML Uploader] Import parsed college error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const clearAllCutoffsAndBranches = async (req, res) => {
+    try {
+        const cutoffsResult = await Cutoff.deleteMany({});
+        const institutionsResult = await Institution.updateMany({}, { $set: { branches: [] } });
+
+        res.json({
+            success: true,
+            message: "Successfully deleted all cutoff entries and branches from all colleges.",
+            deletedCutoffsCount: cutoffsResult.deletedCount || 0,
+            updatedCollegesCount: institutionsResult.modifiedCount || 0
+        });
+    } catch (error) {
+        console.error("[Admin Clear] Failed to clear all dataset:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     addCutoffData,
     bulkAddCutoffData,
@@ -717,5 +1074,8 @@ module.exports = {
     predictColleges,
     deleteCutoffs,
     estimateRank,
-    getCutoffSummary
+    getCutoffSummary,
+    parsePdfCutoffs,
+    importParsedCollege,
+    clearAllCutoffsAndBranches
 };

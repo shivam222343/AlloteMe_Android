@@ -97,6 +97,11 @@ export const cutoffAPI = {
     importExcel: (formData) => api.post('cutoffs/import', formData),
     parse: (text) => api.post('cutoffs/parse', { text }),
     parseBulk: (text) => api.post('cutoffs/parse-bulk', { text }),
+    parsePdf: (formData) => api.post('cutoffs/parse-pdf', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    importCollege: (data) => api.post('cutoffs/import-college', data),
+    clearAllData: () => api.delete('cutoffs/clear-all-data'),
 };
 
 export const uploadAPI = {
