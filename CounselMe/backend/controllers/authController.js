@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Institution = require('../models/Institution');
+const Counselor = require('../models/Counselor');
 const OTP = require('../models/OTP');
 const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
@@ -482,20 +483,59 @@ const registerCollegeAdmin = async (req, res) => {
 // @route   PUT /api/auth/users/:id/role
 // @access  Private/Admin
 const updateUserRole = async (req, res) => {
-    const user = await User.findById(req.params.id);
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (user) {
         if (req.body.role !== undefined) {
             if (user._id.toString() === req.user._id.toString()) {
                 return res.status(400).json({ message: 'You cannot change your own role' });
             }
             user.role = req.body.role;
+
+            // When promoting to counselor, create/update a Counselor profile document
+            if (req.body.role === 'counselor') {
+                const { experience, field, cityName, contactNumber, description, profileImage } = req.body.counselorProfile || {};
+                const counselorData = {
+                    name: user.displayName,
+                    email: user.email,
+                    experience: experience || '1+ Years',
+                    field: field || 'Engineering',
+                    cityName: cityName || 'Maharashtra',
+                    contactNumber: contactNumber || user.phoneNumber || '',
+                    description: description || `Expert educational counselor dedicated to helping students find their best path.`,
+                    profileImage: profileImage || user.preferences?.avatarUrl || undefined
+                };
+                // Upsert counselor record linked by email
+                await Counselor.findOneAndUpdate(
+                    { email: user.email },
+                    counselorData,
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+                console.log(`[Admin] Counselor profile created/updated for ${user.email}`);
+
+                // Automatically grant the Counselor Special subscription plan
+                user.subscription = {
+                    type: 'counselor',
+                    paymentId: 'ADMIN_GRANT',
+                    usage: user.subscription?.usage || { aiPrompts: 0, predictions: 0, exports: 0 }
+                };
+                console.log(`[Admin] Counselor subscription granted to ${user.email}`);
+            }
+
+            // When demoting from counselor back to student, reset subscription to free
+            if (req.body.role === 'student' && user.subscription?.type === 'counselor') {
+                user.subscription = {
+                    type: 'free',
+                    usage: { aiPrompts: 0, predictions: 0, exports: 0 }
+                };
+                console.log(`[Admin] Subscription reset to free for ${user.email}`);
+            }
         }
-        
+
         if (req.body.documents !== undefined) {
             user.documents = req.body.documents;
-            
-            // Auto mark verified/accepted documents as checked (true) in the student's checklist
+
             if (user.documentChecklist) {
                 for (const [docName, doc] of Object.entries(req.body.documents)) {
                     if (doc && (doc.status === 'accepted' || doc.status === 'verified')) {
@@ -514,11 +554,9 @@ const updateUserRole = async (req, res) => {
 
         const updatedUser = await user.save();
 
-        // Invalidate Redis cache for student profile
         const { client: redis } = require('../config/redis');
         await redis.del(`user_profile_${updatedUser._id}`);
 
-        // Push real-time update via socket to the student's room
         if (req.io) {
             console.log(`[Socket] Broadcasting real-time profile update to user: ${updatedUser._id}`);
             req.io.to(updatedUser._id.toString()).emit('user:updated', updatedUser);
@@ -532,8 +570,9 @@ const updateUserRole = async (req, res) => {
             documents: updatedUser.documents,
             documentChecklist: updatedUser.documentChecklist
         });
-    } else {
-        res.status(404).json({ message: 'User not found' });
+    } catch (error) {
+        console.error('[updateUserRole] Error:', error);
+        res.status(500).json({ message: error.message });
     }
 };
 

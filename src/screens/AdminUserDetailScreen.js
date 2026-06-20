@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Platform, TextInput } from 'react-native';
 import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI } from '../services/api';
@@ -7,7 +7,7 @@ import {
     User as UserIcon, Mail, Phone, Calendar,
     ShieldCheck, GraduationCap, MapPin, Search,
     Activity, CheckCircle2, AlertCircle, Star, Trash2, Clock,
-    FileText
+    FileText, ChevronRight, Briefcase, X, ChevronDown, ChevronUp
 } from 'lucide-react-native';
 import GradientBorder from '../components/ui/GradientBorder';
 
@@ -16,6 +16,14 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [updatingRole, setUpdatingRole] = useState(false);
+    const [showCounselorForm, setShowCounselorForm] = useState(false);
+    const [counselorForm, setCounselorForm] = useState({
+        experience: '',
+        field: 'Engineering',
+        cityName: '',
+        contactNumber: '',
+        description: ''
+    });
 
     useEffect(() => {
         fetchUser();
@@ -40,9 +48,8 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
 
     const handleToggleRole = async () => {
         const newRole = user.role === 'admin' ? 'student' : 'admin';
-        const title = "Change Role";
+        const title = 'Change Role';
         const message = `Are you sure you want to change ${user.displayName}'s role from ${user.role} to ${newRole}?`;
-
         const action = async () => {
             setUpdatingRole(true);
             try {
@@ -54,29 +61,60 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                 if (Platform.OS === 'web') alert('Failed to update role');
                 else Alert.alert('Error', 'Failed to update role');
                 console.error(error);
-            } finally {
-                setUpdatingRole(false);
-            }
+            } finally { setUpdatingRole(false); }
         };
-
         if (Platform.OS === 'web') {
-            if (window.confirm(`${title}\n\n${message}`)) {
-                action();
-            }
+            if (window.confirm(`${title}\n\n${message}`)) action();
             return;
         }
+        Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', onPress: action }]);
+    };
 
-        Alert.alert(
-            title,
-            message,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Confirm",
-                    onPress: action
+    const handleMakeCounselor = async () => {
+        setUpdatingRole(true);
+        try {
+            await authAPI.updateUserRole(userId, {
+                role: 'counselor',
+                counselorProfile: {
+                    experience: counselorForm.experience || '1+ Years',
+                    field: counselorForm.field || 'Engineering',
+                    cityName: counselorForm.cityName,
+                    contactNumber: counselorForm.contactNumber || user.phoneNumber || '',
+                    description: counselorForm.description
                 }
-            ]
-        );
+            });
+            setUser({ ...user, role: 'counselor' });
+            setShowCounselorForm(false);
+            if (Platform.OS === 'web') alert('User promoted to Counselor successfully!');
+            else Alert.alert('Success', 'User promoted to Counselor successfully!');
+        } catch (error) {
+            console.error(error);
+            if (Platform.OS === 'web') alert('Failed to promote to Counselor');
+            else Alert.alert('Error', 'Failed to promote to Counselor');
+        } finally { setUpdatingRole(false); }
+    };
+
+    const handleRevokeCounselor = () => {
+        const action = async () => {
+            setUpdatingRole(true);
+            try {
+                await authAPI.updateUserRole(userId, { role: 'student' });
+                setUser({ ...user, role: 'student' });
+                if (Platform.OS === 'web') alert('Counselor role revoked.');
+                else Alert.alert('Done', 'Counselor role revoked. User is now a Student.');
+            } catch (error) {
+                if (Platform.OS === 'web') alert('Failed to revoke role');
+                else Alert.alert('Error', 'Failed to revoke role');
+            } finally { setUpdatingRole(false); }
+        };
+        if (Platform.OS === 'web') {
+            if (window.confirm(`Revoke counselor role from ${user.displayName}?`)) action();
+        } else {
+            Alert.alert('Revoke Counselor', `Remove counselor role from ${user.displayName}?`, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Revoke', style: 'destructive', onPress: action }
+            ]);
+        }
     };
 
     const handleDeleteUser = () => {
@@ -173,7 +211,9 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                         </View>
                     </View>
 
-                    <View style={styles.actionRow}>
+                    {/* Role Action Buttons */}
+                <View style={styles.actionRow}>
+                    {user.role !== 'counselor' && (
                         <TouchableOpacity
                             style={[styles.roleBtn, user.role === 'admin' ? styles.demoteBtn : styles.promoteBtn]}
                             onPress={handleToggleRole}
@@ -183,22 +223,105 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                                 <ActivityIndicator size="small" color={Colors.white} />
                             ) : (
                                 <>
-                                    {user.role === 'admin' ? <UserIcon size={16} color={Colors.white} /> : <ShieldCheck size={16} color={Colors.white} />}
+                                    {user.role === 'admin'
+                                        ? <UserIcon size={16} color={Colors.white} />
+                                        : <ShieldCheck size={16} color={Colors.white} />}
                                     <Text style={styles.btnText}>
                                         {user.role === 'admin' ? 'Make Student' : 'Make Admin'}
                                     </Text>
                                 </>
                             )}
                         </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={[styles.roleBtn, styles.deleteBtn]} onPress={handleDeleteUser}>
+                        <Trash2 size={16} color={Colors.white} />
+                        <Text style={styles.btnText}>Delete User</Text>
+                    </TouchableOpacity>
+                </View>
 
+                {/* Counselor Promotion */}
+                <View style={styles.counselorSection}>
+                    {user.role === 'counselor' ? (
+                        <View style={styles.counselorActiveBadge}>
+                            <Briefcase size={16} color='#059669' />
+                            <Text style={styles.counselorActiveText}>Active Counselor</Text>
+                            <TouchableOpacity onPress={handleRevokeCounselor} style={styles.revokeBtn} disabled={updatingRole}>
+                                <X size={14} color='#DC2626' />
+                                <Text style={styles.revokeBtnText}>Revoke</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
                         <TouchableOpacity
-                            style={[styles.roleBtn, styles.deleteBtn]}
-                            onPress={handleDeleteUser}
+                            style={styles.counselorBtn}
+                            onPress={() => setShowCounselorForm(v => !v)}
+                            disabled={updatingRole}
                         >
-                            <Trash2 size={16} color={Colors.white} />
-                            <Text style={styles.btnText}>Delete User</Text>
+                            <Briefcase size={16} color='#fff' />
+                            <Text style={styles.btnText}>Make Counselor</Text>
+                            {showCounselorForm
+                                ? <ChevronUp size={14} color='#fff' />
+                                : <ChevronDown size={14} color='#fff' />}
                         </TouchableOpacity>
-                    </View>
+                    )}
+
+                    {showCounselorForm && user.role !== 'counselor' && (
+                        <View style={styles.counselorForm}>
+                            <Text style={styles.formLabel}>Experience *</Text>
+                            <TextInput
+                                style={styles.formInput}
+                                placeholder="e.g. 5+ Years"
+                                value={counselorForm.experience}
+                                onChangeText={v => setCounselorForm(f => ({ ...f, experience: v }))}
+                                placeholderTextColor={Colors.text.tertiary}
+                            />
+                            <Text style={styles.formLabel}>Field / Specialization *</Text>
+                            <TextInput
+                                style={styles.formInput}
+                                placeholder="Engineering, Medical, Career..."
+                                value={counselorForm.field}
+                                onChangeText={v => setCounselorForm(f => ({ ...f, field: v }))}
+                                placeholderTextColor={Colors.text.tertiary}
+                            />
+                            <Text style={styles.formLabel}>City *</Text>
+                            <TextInput
+                                style={styles.formInput}
+                                placeholder="Mumbai, Pune, Nagpur..."
+                                value={counselorForm.cityName}
+                                onChangeText={v => setCounselorForm(f => ({ ...f, cityName: v }))}
+                                placeholderTextColor={Colors.text.tertiary}
+                            />
+                            <Text style={styles.formLabel}>Contact Number</Text>
+                            <TextInput
+                                style={styles.formInput}
+                                placeholder={user.phoneNumber || 'Phone number'}
+                                value={counselorForm.contactNumber}
+                                onChangeText={v => setCounselorForm(f => ({ ...f, contactNumber: v }))}
+                                keyboardType='phone-pad'
+                                placeholderTextColor={Colors.text.tertiary}
+                            />
+                            <Text style={styles.formLabel}>Bio / Description</Text>
+                            <TextInput
+                                style={[styles.formInput, { height: 80, textAlignVertical: 'top' }]}
+                                placeholder="Expert educational counselor..."
+                                value={counselorForm.description}
+                                onChangeText={v => setCounselorForm(f => ({ ...f, description: v }))}
+                                multiline
+                                numberOfLines={3}
+                                placeholderTextColor={Colors.text.tertiary}
+                            />
+                            <TouchableOpacity
+                                style={styles.confirmCounselorBtn}
+                                onPress={handleMakeCounselor}
+                                disabled={updatingRole}
+                            >
+                                {updatingRole
+                                    ? <ActivityIndicator size='small' color='#fff' />
+                                    : <Text style={styles.btnText}>{'✓  Confirm — Make Counselor'}</Text>
+                                }
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
                 </View>
 
                 <View style={styles.section}>
@@ -522,7 +645,37 @@ const styles = StyleSheet.create({
     },
     manageDocsText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
     emptyDocsBox: { paddingVertical: 12, alignItems: 'center', gap: 8 },
-    emptyDocsText: { fontSize: 13, color: Colors.text.tertiary, fontStyle: 'italic' }
+    emptyDocsText: { fontSize: 13, color: Colors.text.tertiary, fontStyle: 'italic' },
+
+    counselorSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+    counselorBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center',
+        backgroundColor: '#0891B2', paddingVertical: 12, paddingHorizontal: 20,
+        borderRadius: 14, ...Shadows.sm
+    },
+    counselorActiveBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#6EE7B7',
+        borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12
+    },
+    counselorActiveText: { flex: 1, fontSize: 14, fontWeight: '700', color: '#059669' },
+    revokeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEE2E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+    revokeBtnText: { fontSize: 12, fontWeight: '700', color: '#DC2626' },
+    counselorForm: {
+        marginTop: 12, backgroundColor: Colors.white, borderRadius: 16,
+        padding: 16, borderWidth: 1, borderColor: '#E0F2FE', ...Shadows.xs
+    },
+    formLabel: { fontSize: 11, fontWeight: '700', color: Colors.text.secondary, marginBottom: 4, marginTop: 10 },
+    formInput: {
+        backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0',
+        borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+        fontSize: 14, color: Colors.text.primary
+    },
+    confirmCounselorBtn: {
+        marginTop: 16, backgroundColor: '#059669', flexDirection: 'row',
+        alignItems: 'center', justifyContent: 'center', paddingVertical: 13,
+        borderRadius: 12, ...Shadows.sm
+    },
 });
 
 export default AdminUserDetailScreen;

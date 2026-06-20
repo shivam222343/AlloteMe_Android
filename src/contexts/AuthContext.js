@@ -22,7 +22,11 @@ export const AuthProvider = ({ children }) => {
             setUserState(prev => {
                 let newData = data(prev);
                 if (newData && !newData.subscription) {
-                    newData.subscription = { type: 'free', usage: { aiPrompts: 0, predictions: 0, exports: 0 } };
+                    // Counselors get their plan auto-assigned; others default to free
+                    newData.subscription = {
+                        type: newData.role === 'counselor' ? 'counselor' : 'free',
+                        usage: { aiPrompts: 0, predictions: 0, exports: 0 }
+                    };
                 } else if (newData && newData.subscription && !newData.subscription.usage) {
                     newData.subscription.usage = { aiPrompts: 0, predictions: 0, exports: 0 };
                 }
@@ -33,7 +37,7 @@ export const AuthProvider = ({ children }) => {
 
         if (data && !data.subscription) {
             data.subscription = {
-                type: 'free',
+                type: data.role === 'counselor' ? 'counselor' : 'free',
                 usage: { aiPrompts: 0, predictions: 0, exports: 0 }
             };
         } else if (data && data.subscription && !data.subscription.usage) {
@@ -315,7 +319,8 @@ export const AuthProvider = ({ children }) => {
 
     const checkLimit = (type) => {
         if (!user) return true;
-        if (user.role === 'admin') return true;
+        // Admins and Counselors have unlimited access
+        if (user.role === 'admin' || user.role === 'counselor') return true;
 
         const sub = user.subscription || { type: 'free', usage: { aiPrompts: 0, predictions: 0, exports: 0 } };
         const plan = SUBSCRIPTION_PLANS[sub.type.toUpperCase()] || SUBSCRIPTION_PLANS.FREE;
