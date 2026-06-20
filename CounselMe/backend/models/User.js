@@ -120,7 +120,7 @@ const userSchema = new mongoose.Schema({
         savedAt: { type: Date, default: Date.now }
     }],
     subscription: {
-        type: { type: String, enum: ['free', 'standard', 'advance'], default: 'free' },
+        type: { type: String, enum: ['free', 'standard', 'advance', 'counselor'], default: 'free' },
         paymentId: { type: String },
         usage: {
             aiPrompts: { type: Number, default: 0 },
