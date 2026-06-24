@@ -103,7 +103,7 @@ const classifyQueryIntent = (query) => {
 // Compress context arrays to compact format
 const compressContextForLLM = (contextData) => {
     const compressedCutoffs = (contextData.suggested_cutoffs || []).map(c => 
-        `${c.institute} | ${c.branch} | ${c.category} | ${c.cutoff_percentile}% | ${c.cutoff_rank || 'N/A'} | ${c.year} | ${c.round} | ${c.location || 'N/A'}`
+        `${c.institute} | ${c.branch} | ${c.category} | ${c.cutoff_percentile}% | ${c.exam_type || 'N/A'} | ${c.year} | ${c.round} | ${c.location || 'N/A'}`
     );
 
     const compressedColleges = (contextData.found_colleges || []).map(c => 
@@ -623,7 +623,9 @@ const getAICounsel = async (req, res) => {
                 relevantCutoffs = cachedCutoffs;
             } else {
                 const independentCutoffQueries = [];
-                const cutoffQueryBase = {};
+                const cutoffQueryBase = {
+                    examType: { $in: examTypesForQuery }
+                };
                 if (strictFilters.round !== undefined) cutoffQueryBase.round = strictFilters.round;
                 if (strictFilters.year !== undefined) cutoffQueryBase.year = strictFilters.year;
                 
@@ -748,6 +750,7 @@ const getAICounsel = async (req, res) => {
                 branch: c.branch,
                 category: c.category,
                 cutoff_percentile: c.percentile,
+                exam_type: c.examType,
                 cutoff_rank: c.rank,
                 year: c.year,
                 round: c.round,

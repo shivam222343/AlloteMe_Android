@@ -11,7 +11,7 @@ const { OAuth2Client } = require('google-auth-library');
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const getRandomAvatar = (name) => {
-    const categories = ['bottts', 'avataaars', 'pixel-art', 'adventurer', 'open-peeps', 'lorelei', 'fun-emoji'];
+    const categories = ['bottts', 'avataaars', 'micah', 'pixel-art', 'adventurer', 'open-peeps', 'lorelei', 'fun-emoji', 'notionists'];
     const category = categories[Math.floor(Math.random() * categories.length)];
     const seeds = ['Felix', 'Max', 'Luna', 'Jack', 'Daisy', 'Zoe', 'Milo', 'Coco', 'Oliver', 'Toby'];
     const randomSeed = seeds[Math.floor(Math.random() * seeds.length)] + Math.floor(Math.random() * 1000);

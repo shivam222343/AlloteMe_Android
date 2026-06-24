@@ -111,6 +111,8 @@ const markdownStyles = {
         color: Colors.text.primary,
         borderBottomWidth: 1,
         borderBottomColor: Colors.divider,
+        borderRightWidth: 1,
+        borderRightColor: Colors.divider,
         minWidth: 120,
     },
     td: {
@@ -118,6 +120,8 @@ const markdownStyles = {
         color: Colors.text.secondary,
         borderBottomWidth: 1,
         borderBottomColor: Colors.divider,
+        borderRightWidth: 1,
+        borderRightColor: Colors.divider,
         minWidth: 120,
     }
 };

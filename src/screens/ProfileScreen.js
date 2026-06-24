@@ -139,7 +139,7 @@ const ProfileScreen = ({ navigation, route }) => {
     };
 
     const refreshAvatarOptions = () => {
-        const categories = ['bottts', 'avataaars', 'identities', 'pixel-art', 'adventurer', 'open-peeps', 'lorelei', 'fun-emoji'];
+        const categories = ['bottts', 'avataaars', 'micah', 'pixel-art', 'adventurer', 'open-peeps', 'lorelei', 'fun-emoji', 'notionists'];
         const newAvatars = [];
         for (let i = 0; i < 9; i++) {
             const category = categories[i % categories.length];
