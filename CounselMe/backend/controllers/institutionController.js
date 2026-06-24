@@ -102,6 +102,26 @@ Only include facilities from the provided list. Extract as much as possible from
     }
 };
 
+// @desc    Get all institutions with only name and DTE code (lightweight)
+// @route   GET /api/institutions/dte-codes
+// @access  Public
+const getInstitutionDteCodes = async (req, res) => {
+    try {
+        const cacheKey = 'institutions_dte_codes';
+        const cachedData = await redis.get(cacheKey);
+        if (cachedData) {
+            console.log(`[Redis] Hit: ${cacheKey}`);
+            return res.json(JSON.parse(cachedData));
+        }
+
+        const institutions = await Institution.find({}, { name: 1, dteCode: 1, _id: 0 }).lean();
+        await redis.set(cacheKey, JSON.stringify(institutions), { EX: 86400 });
+        res.json(institutions);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // @desc    Get all institutions
 // @route   GET /api/institutions
 // @access  Public
@@ -466,6 +486,7 @@ module.exports = {
     createInstitution,
     parseInstitutionText,
     getInstitutions,
+    getInstitutionDteCodes,
     getInstitutionById,
     updateInstitution,
     deleteInstitution,

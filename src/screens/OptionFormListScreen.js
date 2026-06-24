@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert, Dimensions, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Trash2, ShieldCheck, GraduationCap } from 'lucide-react-native';
+import { ChevronLeft, Trash2, ShieldCheck, GraduationCap, Layers } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { optionFormAPI } from '../services/api';
 import { Colors, Shadows } from '../constants/theme';
@@ -199,6 +199,10 @@ const OptionFormListScreen = ({ route, navigation }) => {
                                                     <View style={styles.categoryContainer}>
                                                         <ShieldCheck size={10} color={colors.text} />
                                                         <Text style={[styles.categoryText, { color: colors.text }]}>{preset.category}</Text>
+                                                    </View>
+                                                    <View style={[styles.categoryContainer, { marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: Colors.primary + '10', borderRadius: 4 }]}>
+                                                        <Layers size={10} color={Colors.primary} />
+                                                        <Text style={[styles.categoryText, { color: Colors.primary, fontSize: 9 }]}>Round {preset.round || 1}</Text>
                                                     </View>
                                                 </TouchableOpacity>
                                                 

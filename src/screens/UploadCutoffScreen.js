@@ -5,10 +5,12 @@ import MainLayout from '../components/layouts/MainLayout';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import Toast from '../components/ui/Toast';
 import { institutionAPI, cutoffAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Typography, Shadows } from '../constants/theme';
 import { ChevronRight, Search, Bot, Code, CheckCircle2, Building2, MapPin, LayoutGrid } from 'lucide-react-native';
+import AdminPrivacyLock from '../components/AdminPrivacyLock';
 
 const UploadCutoffScreen = ({ navigation }) => {
     const { admissionPath } = useAuth();
@@ -18,7 +20,14 @@ const UploadCutoffScreen = ({ navigation }) => {
     const [selectedInst, setSelectedInst] = useState(null);
     const [selectedBranch, setSelectedBranch] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [aiLoading, setAiLoading] = useState(false);
+    const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+    const showToast = (message, type = 'success') => {
+        setToast({ visible: true, message, type });
+    };
+    const hideToast = () => setToast(prev => ({ ...prev, visible: false }));
     const [inputMode, setInputMode] = useState('AI'); // 'AI' or 'JSON'
     const [rawText, setRawText] = useState('');
     const [jsonText, setJsonText] = useState('');
@@ -116,6 +125,7 @@ const UploadCutoffScreen = ({ navigation }) => {
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch data');
+        } finally {
             setLoading(false);
         }
     };
@@ -213,13 +223,42 @@ const UploadCutoffScreen = ({ navigation }) => {
             return;
         }
 
-        setLoading(true);
+        setUploading(true);
         try {
             let parsedData = JSON.parse(jsonText);
 
-            // 1. Auto-Add Missing Branches if in Bulk Mode
+            // ─── Normalize cutoff entry fields (cat/val → category/percentile) ───
+            const normalizeEntry = (entry) => ({
+                category: entry.category ?? entry.cat ?? entry.Category ?? null,
+                percentile: entry.percentile ?? entry.val ?? entry.Percentile ?? null,
+                ...entry,
+            });
+
+            // ─── Normalize bulk data: accept object {"Branch": [data]} OR array [{branchName, cutoffData}] ───
+            const normalizeBulkData = (data) => {
+                if (Array.isArray(data)) {
+                    // Already array format — [{branchName, cutoffData: [...]}]
+                    return data.map(item => ({
+                        branchName: item.branchName || item.branch || item.Branch || '',
+                        cutoffData: Array.isArray(item.cutoffData)
+                            ? item.cutoffData.map(normalizeEntry)
+                            : [],
+                    }));
+                } else if (data && typeof data === 'object') {
+                    // Object format: {"Computer": [{cat, val}], "IT": [{...}]}
+                    return Object.entries(data).map(([branchName, entries]) => ({
+                        branchName,
+                        cutoffData: Array.isArray(entries) ? entries.map(normalizeEntry) : [],
+                    }));
+                }
+                return [];
+            };
+
             if (isBulkMode) {
-                const incomingBranchNames = [...new Set(parsedData.map(item => item.branchName).filter(Boolean))];
+                const normalizedBranches = normalizeBulkData(parsedData);
+
+                // 1. Auto-Add Missing Branches
+                const incomingBranchNames = normalizedBranches.map(b => b.branchName).filter(Boolean);
                 const existingBranchNames = (selectedInst.branches || []).map(b => b.name);
                 const missingBranches = incomingBranchNames.filter(name => !existingBranchNames.includes(name));
 
@@ -231,12 +270,10 @@ const UploadCutoffScreen = ({ navigation }) => {
                     const updatedBranches = [...(selectedInst.branches || []), ...newBranchObjects];
                     await institutionAPI.update(selectedInst._id, { branches: updatedBranches });
                 }
-            }
 
-            if (isBulkMode) {
-                // Filter out empty branches or invalid entries
-                const bulkItems = parsedData
-                    .filter(item => item.branchName && item.cutoffData && Array.isArray(item.cutoffData))
+                // 2. Build valid bulk items
+                const bulkItems = normalizedBranches
+                    .filter(item => item.branchName && item.cutoffData.length > 0)
                     .map(item => ({
                         branchName: item.branchName,
                         examType: metaData.examType,
@@ -246,7 +283,9 @@ const UploadCutoffScreen = ({ navigation }) => {
                     }))
                     .filter(item => item.cutoffData.length > 0);
 
-                // 2. Remove older cutoffs for each branch being uploaded (Replace mode)
+                if (bulkItems.length === 0) throw new Error('No valid branch data found after parsing.');
+
+                // 3. Delete existing + re-upload (Replace mode)
                 for (const item of bulkItems) {
                     await cutoffAPI.delete(selectedInst._id, item.branchName, {
                         examType: item.examType,
@@ -260,10 +299,14 @@ const UploadCutoffScreen = ({ navigation }) => {
                     items: bulkItems
                 });
             } else {
-                // Filter out invalid single entries
-                const cleanData = parsedData.filter(c => c.category && c.percentile != null);
+                // Single branch mode — ensure it's an array
+                const rawArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+                const cleanData = rawArray
+                    .map(normalizeEntry)
+                    .filter(c => c.category && c.percentile != null);
 
-                // 2. Remove older cutoffs for this branch (Replace mode)
+                if (cleanData.length === 0) throw new Error('No valid cutoff entries found. Check that entries have category and percentile/val fields.');
+
                 await cutoffAPI.delete(selectedInst._id, selectedBranch.name, {
                     examType: metaData.examType,
                     year: parseInt(metaData.year),
@@ -279,17 +322,17 @@ const UploadCutoffScreen = ({ navigation }) => {
                     cutoffData: cleanData
                 });
             }
-            Alert.alert(
-                'Success', 
-                'Cutoff data uploaded successfully! Moving to next college...',
-                [{ text: 'OK', onPress: () => goToNextInst() }]
-            );
+
+            showToast(isBulkMode ? 'Bulk cutoffs uploaded successfully!' : `Cutoffs uploaded for ${selectedBranch?.name}!`, 'success');
+            // Move to next college after a short delay so toast is visible
+            setTimeout(() => goToNextInst(), 1800);
         } catch (error) {
             console.error('Upload Error:', error.response?.data || error.message);
-            Alert.alert('Error', 'Upload failed: ' + (error.response?.data?.message || 'Check JSON format or connection.'));
+            showToast('Upload failed: ' + (error.response?.data?.message || error.message || 'Check JSON format or connection.'), 'error');
         } finally {
-            setLoading(false);
+            setUploading(false);
         }
+
     };
 
     const handlePickDocument = async () => {
@@ -563,7 +606,7 @@ const UploadCutoffScreen = ({ navigation }) => {
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={styles.reviewItemTitle} numberOfLines={1}>{c.college}</Text>
-                                                <Text style={styles.reviewItemSub}>DTE Code: {c["DTE code"]} | {c.branches?.length || 0} branches found</Text>
+                                                <Text style={[styles.reviewItemSub, (c.branches?.length || 0) === 0 && { color: '#EF4444', fontWeight: '600' }]}>DTE Code: {c["DTE code"]} | {c.branches?.length || 0} branches found</Text>
                                             </View>
                                         </TouchableOpacity>
                                     );
@@ -998,7 +1041,7 @@ const UploadCutoffScreen = ({ navigation }) => {
                             <Button
                                 title={isBulkMode ? "Confirm & Upload Bulk" : "Confirm & Upload"}
                                 onPress={handleUpload}
-                                loading={loading}
+                                loading={uploading}
                             />
                             <Button title="Back" type="secondary" onPress={() => setStep(3)} />
                         </View>
@@ -1014,6 +1057,12 @@ const UploadCutoffScreen = ({ navigation }) => {
                     {renderStepContent()}
                 </View>
             </View>
+            <Toast
+                visible={toast.visible}
+                message={toast.message}
+                type={toast.type}
+                onHide={hideToast}
+            />
         </MainLayout>
     );
 };
@@ -1226,4 +1275,10 @@ const styles = StyleSheet.create({
     }
 });
 
-export default UploadCutoffScreen;
+export default function LockedUploadCutoffScreen(props) {
+    return (
+        <AdminPrivacyLock>
+            <UploadCutoffScreen {...props} />
+        </AdminPrivacyLock>
+    );
+}

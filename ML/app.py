@@ -28,7 +28,9 @@ def extract_college_cutoff_data(pdf_path):
         while i < len(blocks):
             text = blocks[i][4].strip()
             
-            m_coll = re.match(r'^(\d{4,5})\s*-\s*(.+)$', text)
+            # College header: 4-5 digit DTE code. Only match the first line of the block.
+            first_line = text.split('\n')[0].strip()
+            m_coll = re.match(r'^(\d{4,5})\s*-\s*(.+)$', first_line)
             if m_coll:
                 dte_code = m_coll.group(1).strip()
                 if dte_code not in colleges_dict:
@@ -41,7 +43,9 @@ def extract_college_cutoff_data(pdf_path):
                 i += 1
                 continue
                 
-            m_branch = re.match(r'^(\d{9,10})\s*-\s*(.+)$', text)
+            # Branch codes: 9-12 alphanumeric chars (e.g. 0600719115, 06007195IT, 0627624550F)
+            # Only match first line in case block contains multi-line text
+            m_branch = re.match(r'^([A-Z0-9]{9,12})\s*-\s*(.+)$', first_line)
             if m_branch:
                 if current_college:
                     branch_code = m_branch.group(1).strip()
@@ -61,6 +65,7 @@ def extract_college_cutoff_data(pdf_path):
                         current_college["branches"].append(current_branch)
                 i += 1
                 continue
+
                 
             if text == 'Stage' and i > 0 and i + 1 < len(blocks):
                 data_block = blocks[i+1][4].strip()
@@ -70,7 +75,7 @@ def extract_college_cutoff_data(pdf_path):
                     raw_parts = []
                     for j in range(i-1, max(-1, i-6), -1):
                         b_text = blocks[j][4].strip()
-                        if "Level" in b_text or "Status" in b_text or "University" in b_text or re.match(r'^\d{9,10}\s*-', b_text):
+                        if "Level" in b_text or "Status" in b_text or "University" in b_text or re.match(r'^[A-Z0-9]{9,12}\s*-', b_text.split('\n')[0]):
                             break
                         raw_parts = b_text.split('\n') + raw_parts
                         

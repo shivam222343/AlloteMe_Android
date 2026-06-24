@@ -20,7 +20,14 @@ const SubscriptionPopup = ({ visible, onClose, onSubscribe }) => {
             period: 'One time', 
             color: Colors.primary, 
             icon: Target,
-            features: ['Unlimited AI Prompts', '15 College Predictions', '7 PDF & CSV Exports', '300+ College Info', '19000+ Listed Cutoffs', 'Personalized Presets']
+            features: [
+                'Unlimited AI counselor guidance', 
+                '15 college prediction chances', 
+                '5 PDF/CSV export options', 
+                'Explore college listed on map', 
+                'Explore 350+ colleges and 47,000+ cutoffs', 
+                'One live Zoom meeting'
+            ]
         },
         { 
             id: 'advance', 
@@ -29,7 +36,16 @@ const SubscriptionPopup = ({ visible, onClose, onSubscribe }) => {
             period: 'One time', 
             color: '#F59E0B', 
             icon: Crown,
-            features: ['Unlimited AI Prompts', '25 College Predictions', '15 PDF & CSV Exports', '300+ College Info', '19000+ Listed Cutoffs', 'Personalized Presets', 'Document Verifications'],
+            features: [
+                'Unlimited AI counselor guidance', 
+                '25 college prediction chances', 
+                '10 PDF/CSV exports', 
+                'Explore college listed on map', 
+                'Explore 350+ colleges and 47,000+ cutoffs', 
+                'All College Seat Matrix for available seats', 
+                'Weekly live Zoom meeting',
+                'WhatsApp Chat Support (Limited)'
+            ],
             popular: true
         }
     ]);
@@ -107,7 +123,7 @@ const SubscriptionPopup = ({ visible, onClose, onSubscribe }) => {
                                                 <Text style={styles.planName}>{plan.name}</Text>
                                                 <View style={styles.priceRow}>
                                                     <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                                                        <Text style={styles.originalPrice}>₹{parseInt(plan.price.replace('₹', '')) + (plan.id === 'counselor' ? 1000 : plan.id === 'advance' ? 700 : 500)}</Text>
+                                                        <Text style={styles.originalPrice}>₹{parseInt(plan.price.replace('₹', '')) + (plan.id === 'counselor' ? 2300 : plan.id === 'advance' ? 1400 : 300)}</Text>
                                                         <Text style={styles.planPrice}>{plan.price}</Text>
                                                     </View>
                                                     <Text style={styles.planPeriod}>/ {plan.period}</Text>

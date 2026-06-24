@@ -983,11 +983,23 @@ const importParsedCollege = async (req, res) => {
         });
 
         // 2. Loop through each branch and process
+        const seenBranchNamesInPayload = new Map(); // branchName (lowercase) -> occurrences count
+
         for (const branch of branches) {
             const { branchName, cutoffData } = branch;
             if (!branchName || !Array.isArray(cutoffData) || cutoffData.length === 0) continue;
 
-            const trimmedBranchName = branchName.trim();
+            let trimmedBranchName = branchName.trim();
+            const lowerName = trimmedBranchName.toLowerCase();
+
+            // Get how many times we've already seen this branch name in the current payload
+            const occurrences = seenBranchNamesInPayload.get(lowerName) || 0;
+            seenBranchNamesInPayload.set(lowerName, occurrences + 1);
+
+            // Suffix duplicates with a zero-width space (\u200B) repeated occurrences times
+            if (occurrences > 0) {
+                trimmedBranchName = trimmedBranchName + '\u200B'.repeat(occurrences);
+            }
 
             // Check if branch exists
             let branchExists = institution.branches.some(
@@ -995,8 +1007,9 @@ const importParsedCollege = async (req, res) => {
             );
 
             if (!branchExists) {
-                // Generate a short code from the branch name
+                // Generate a short code from the branch name (strip zero-width spaces first)
                 const generatedCode = trimmedBranchName
+                    .replace(/\u200B/g, '')
                     .split(/[\s\(\)\-]+/)
                     .filter(w => w.length > 0 && !['and', 'of', 'in', 'the', 'for', 'with', 'technology', 'engineering', 'science'].includes(w.toLowerCase()))
                     .map(w => w[0])

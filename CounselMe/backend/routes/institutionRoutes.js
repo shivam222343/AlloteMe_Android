@@ -4,6 +4,7 @@ const {
     createInstitution,
     parseInstitutionText,
     getInstitutions,
+    getInstitutionDteCodes,
     getInstitutionById,
     updateInstitution,
     deleteInstitution,
@@ -20,6 +21,7 @@ router.route('/')
     .post(protect, authorize('admin'), createInstitution);
 
 router.get('/featured', getFeaturedInstitutions);
+router.get('/dte-codes', getInstitutionDteCodes);
 router.route('/managed')
     .get(protect, authorize('college_admin'), getManagedInstitution)
     .put(protect, authorize('college_admin'), updateManagedInstitution);

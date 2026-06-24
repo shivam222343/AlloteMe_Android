@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity, TextInput, Alert, Switch } from 'react-native';
 import { LineChart, BarChart } from 'react-native-chart-kit';
 import MainLayout from '../components/layouts/MainLayout';
+import Toast from '../components/ui/Toast';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI, systemAPI } from '../services/api';
 import { TrendingUp, Users, Home, Activity, FileText, ChevronRight, Settings, Tag, Trash2, Save, Plus, Eye } from 'lucide-react-native';
+import AdminPrivacyLock from '../components/AdminPrivacyLock';
 
 const SystemAnalyticsScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
@@ -13,10 +15,19 @@ const SystemAnalyticsScreen = ({ navigation }) => {
     const [basicPrice, setBasicPrice] = useState('99');
     const [premiumPrice, setPremiumPrice] = useState('499');
     const [counselorPrice, setCounselorPrice] = useState('999');
+    const [latestAppVersion, setLatestAppVersion] = useState('');
     
     const [coupons, setCoupons] = useState([]);
     const [newCouponCode, setNewCouponCode] = useState('');
     const [newCouponDiscount, setNewCouponDiscount] = useState('');
+
+    const [savingPrices, setSavingPrices] = useState(false);
+    const [savingCoupon, setSavingCoupon] = useState(false);
+    const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+    const showToast = (message, type = 'success') => {
+        setToast({ visible: true, message, type });
+    };
 
     useEffect(() => {
         fetchData();
@@ -33,6 +44,7 @@ const SystemAnalyticsScreen = ({ navigation }) => {
             if (settingsRes.data.basicPrice) setBasicPrice(settingsRes.data.basicPrice.toString());
             if (settingsRes.data.premiumPrice) setPremiumPrice(settingsRes.data.premiumPrice.toString());
             if (settingsRes.data.counselorPrice) setCounselorPrice(settingsRes.data.counselorPrice.toString());
+            if (settingsRes.data.latestAppVersion) setLatestAppVersion(settingsRes.data.latestAppVersion);
             setCoupons(couponsRes.data || []);
         } catch (error) {
             console.error('Failed to fetch admin data', error);
@@ -42,18 +54,25 @@ const SystemAnalyticsScreen = ({ navigation }) => {
     };
 
     const handleSavePrices = async () => {
+        setSavingPrices(true);
         try {
             await systemAPI.updateSetting({ key: 'basicPrice', value: Number(basicPrice) });
             await systemAPI.updateSetting({ key: 'premiumPrice', value: Number(premiumPrice) });
             await systemAPI.updateSetting({ key: 'counselorPrice', value: Number(counselorPrice) });
-            Alert.alert('Success', 'Pricing updated successfully!');
+            if (latestAppVersion) {
+                await systemAPI.updateSetting({ key: 'latestAppVersion', value: latestAppVersion.trim() });
+            }
+            showToast('Settings updated successfully!', 'success');
         } catch (e) {
-            Alert.alert('Error', 'Failed to update pricing');
+            showToast('Failed to update settings', 'error');
+        } finally {
+            setSavingPrices(false);
         }
     };
 
     const handleCreateCoupon = async () => {
         if (!newCouponCode || !newCouponDiscount) return;
+        setSavingCoupon(true);
         try {
             const res = await systemAPI.createCoupon({
                 code: newCouponCode.toUpperCase(),
@@ -63,8 +82,11 @@ const SystemAnalyticsScreen = ({ navigation }) => {
             setCoupons([res.data, ...coupons]);
             setNewCouponCode('');
             setNewCouponDiscount('');
+            showToast('Coupon created successfully!', 'success');
         } catch (e) {
-            Alert.alert('Error', e.response?.data?.message || 'Failed to create coupon');
+            showToast(e.response?.data?.message || 'Failed to create coupon', 'error');
+        } finally {
+            setSavingCoupon(false);
         }
     };
 
@@ -161,7 +183,7 @@ const SystemAnalyticsScreen = ({ navigation }) => {
                 <View style={styles.sectionCard}>
                     <View style={styles.sectionHeader}>
                         <Settings size={20} color={Colors.primary} />
-                        <Text style={styles.sectionTitle}>Pricing Configuration</Text>
+                        <Text style={styles.sectionTitle}>System Settings</Text>
                     </View>
                     
                     <View style={styles.inputRow}>
@@ -192,9 +214,25 @@ const SystemAnalyticsScreen = ({ navigation }) => {
                         />
                     </View>
                     
-                    <TouchableOpacity style={styles.saveBtn} onPress={handleSavePrices}>
-                        <Save size={18} color="white" />
-                        <Text style={styles.saveBtnText}>Save Pricing</Text>
+                    <View style={styles.inputRow}>
+                        <Text style={styles.inputLabel}>Latest App Version (Force Update)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={latestAppVersion}
+                            onChangeText={setLatestAppVersion}
+                            placeholder="e.g. 2.2.0"
+                        />
+                    </View>
+                    
+                    <TouchableOpacity style={styles.saveBtn} onPress={handleSavePrices} disabled={savingPrices}>
+                        {savingPrices ? (
+                            <ActivityIndicator size="small" color="white" />
+                        ) : (
+                            <>
+                                <Save size={18} color="white" />
+                                <Text style={styles.saveBtnText}>Save Settings</Text>
+                            </>
+                        )}
                     </TouchableOpacity>
                 </View>
 
@@ -220,8 +258,12 @@ const SystemAnalyticsScreen = ({ navigation }) => {
                             onChangeText={setNewCouponDiscount}
                             keyboardType="numeric"
                         />
-                        <TouchableOpacity style={styles.addBtn} onPress={handleCreateCoupon}>
-                            <Plus size={20} color="white" />
+                        <TouchableOpacity style={styles.addBtn} onPress={handleCreateCoupon} disabled={savingCoupon}>
+                            {savingCoupon ? (
+                                <ActivityIndicator size="small" color="white" />
+                            ) : (
+                                <Plus size={20} color="white" />
+                            )}
                         </TouchableOpacity>
                     </View>
 
@@ -289,6 +331,14 @@ const SystemAnalyticsScreen = ({ navigation }) => {
 
                 <View style={{ height: 100 }} />
             </ScrollView>
+
+            {/* Toast Notification */}
+            <Toast
+                visible={toast.visible}
+                message={toast.message}
+                type={toast.type}
+                onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+            />
         </MainLayout>
     );
 };
@@ -351,4 +401,10 @@ const styles = StyleSheet.create({
     formBuilderDesc: { fontSize: 12, color: Colors.text.tertiary, marginTop: 2 }
 });
 
-export default SystemAnalyticsScreen;
+export default function LockedSystemAnalyticsScreen(props) {
+    return (
+        <AdminPrivacyLock>
+            <SystemAnalyticsScreen {...props} />
+        </AdminPrivacyLock>
+    );
+}

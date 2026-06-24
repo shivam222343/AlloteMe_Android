@@ -9,7 +9,7 @@ import { Colors, Shadows } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import {
     Search, LayoutGrid, Cpu, MapPin,
-    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings, Bot, Info, Pencil, Target, Crown, Sparkles, Zap
+    MessageSquare, Bookmark, GraduationCap, TrendingUp, Star, Settings, Bot, Info, Pencil, Target, Crown, Sparkles, Zap, Lock, ChevronRight, Layers
 } from 'lucide-react-native';
 import { SUBSCRIPTION_PLANS } from '../constants/subscriptions';
 import { institutionAPI } from '../services/api';
@@ -55,6 +55,8 @@ const StudentDashboard = ({ navigation }) => {
     const [selectedVideo, setSelectedVideo] = useState(null);
     const [optionPresets, setOptionPresets] = useState([]);
     const [loadingPresets, setLoadingPresets] = useState(true);
+    const [roundModalVisible, setRoundModalVisible] = useState(false);
+    const [selectedGroupedPreset, setSelectedGroupedPreset] = useState(null);
     const flatListRef = React.useRef(null);
     const pathScrollRef = React.useRef(null);
 
@@ -136,7 +138,7 @@ const StudentDashboard = ({ navigation }) => {
     };
 
     const displayPresets = useMemo(() => {
-        return optionPresets.filter(preset => {
+        const filtered = optionPresets.filter(preset => {
             // 1. Direct category match
             if (matchesExamType(preset.category, admissionPath)) return true;
             // 2. First college category match
@@ -144,7 +146,51 @@ const StudentDashboard = ({ navigation }) => {
             if (firstCollegeCat && matchesExamType(firstCollegeCat, admissionPath)) return true;
             return false;
         });
+
+        // Group by percentile and category
+        const grouped = {};
+        filtered.forEach(preset => {
+            const key = `${preset.percentile}_${preset.category}`;
+            if (!grouped[key]) {
+                grouped[key] = {
+                    ...preset,
+                    availableRounds: []
+                };
+            }
+            if (preset.round && !grouped[key].availableRounds.includes(preset.round)) {
+                grouped[key].availableRounds.push(preset.round);
+            } else if (!preset.round && !grouped[key].availableRounds.includes(1)) {
+                grouped[key].availableRounds.push(1); // Default to round 1 if no round
+            }
+        });
+
+        return Object.values(grouped).sort((a, b) => Number(b.percentile) - Number(a.percentile));
     }, [optionPresets, admissionPath]);
+
+    const handlePresetClick = (preset) => {
+        const isFree = !user?.subscription?.type || user.subscription.type.toUpperCase() === 'FREE';
+        if (isFree && user?.role === 'student') {
+            navigation.navigate('Pricing');
+            return;
+        }
+        
+        setSelectedGroupedPreset(preset);
+        setRoundModalVisible(true);
+    };
+
+    const handleRoundSelect = (round) => {
+        setRoundModalVisible(false);
+        const specificPreset = optionPresets.find(p => 
+            p.percentile === selectedGroupedPreset.percentile && 
+            p.category === selectedGroupedPreset.category && 
+            (p.round === round || (!p.round && round === 1))
+        );
+        if (specificPreset) {
+            navigation.navigate('OptionFormView', { preset: specificPreset });
+        } else {
+            alert(`No list available for Round ${round} yet.`);
+        }
+    };
 
     useFocusEffect(
         useCallback(() => {
@@ -511,21 +557,32 @@ const StudentDashboard = ({ navigation }) => {
                             >
                                 {displayPresets.map((preset, idx) => {
                                     const colors = PRESET_COLORS[idx % PRESET_COLORS.length];
+                                    const isFree = !user?.subscription?.type || user.subscription.type.toUpperCase() === 'FREE';
+                                    const isLocked = isFree && user?.role === 'student';
+
                                     return (
                                         <TouchableOpacity
                                             key={preset._id}
-                                            style={styles.presetChip}
+                                            style={[styles.presetChip, isLocked && { opacity: 0.8 }]}
                                             activeOpacity={0.8}
-                                            onPress={() => navigation.navigate('OptionFormView', { preset })}
+                                            onPress={() => handlePresetClick(preset)}
                                         >
-                                            <View style={[styles.presetCircle, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-                                                <Text style={[styles.presetPercentileText, { color: colors.text }]}>
-                                                    {Number(preset.percentile).toFixed(2)}
-                                                </Text>
-                                                <Text style={[styles.presetCirclePercentSign, { color: colors.text }]}>%ile</Text>
+                                            <View style={[styles.presetCircle, { backgroundColor: isLocked ? '#F1F5F9' : colors.bg, borderColor: isLocked ? '#CBD5E1' : colors.border }]}>
+                                                {isLocked ? (
+                                                    <Lock size={24} color="#94A3B8" />
+                                                ) : (
+                                                    <>
+                                                        <Text style={[styles.presetPercentileText, { color: colors.text }]}>
+                                                            {Number(preset.percentile).toFixed(2)}
+                                                        </Text>
+                                                        <Text style={[styles.presetCirclePercentSign, { color: colors.text }]}>%ile</Text>
+                                                    </>
+                                                )}
                                             </View>
                                             <View style={styles.presetCategoryContainer}>
-                                                <Text style={[styles.presetCategoryText, { color: colors.text }]}>{preset.category}</Text>
+                                                <Text style={[styles.presetCategoryText, { color: isLocked ? '#64748B' : colors.text }]}>
+                                                    {isLocked ? 'Premium Only' : preset.category}
+                                                </Text>
                                             </View>
                                         </TouchableOpacity>
                                     );
@@ -634,6 +691,53 @@ const StudentDashboard = ({ navigation }) => {
                                 />
                             )
                         )}
+                    </View>
+                </View>
+            </RNModal>
+
+            {/* Round Selection Modal */}
+            <RNModal
+                visible={roundModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setRoundModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Select Round</Text>
+                        <Text style={styles.modalSub}>Which round cutoffs do you want to use for this option form?</Text>
+                        
+                        <View style={styles.roundOptions}>
+                            {[1, 2, 3].map(round => {
+                                const isAvailable = selectedGroupedPreset?.availableRounds?.includes(round);
+                                return (
+                                    <TouchableOpacity
+                                        key={round}
+                                        style={[
+                                            styles.roundOptionBtn,
+                                            !isAvailable && styles.roundOptionBtnDisabled
+                                        ]}
+                                        onPress={() => handleRoundSelect(round)}
+                                        disabled={!isAvailable}
+                                    >
+                                        <Layers size={20} color={isAvailable ? Colors.primary : '#94A3B8'} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.roundOptionText, !isAvailable && { color: '#94A3B8' }]}>
+                                                Round {round}
+                                            </Text>
+                                            {!isAvailable && (
+                                                <Text style={styles.roundOptionSubText}>Not available</Text>
+                                            )}
+                                        </View>
+                                        <ChevronRight size={16} color={isAvailable ? Colors.primary : '#94A3B8'} />
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                        
+                        <TouchableOpacity style={styles.closeModalBtn} onPress={() => setRoundModalVisible(false)}>
+                            <Text style={styles.closeModalText}>Cancel</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </RNModal>
@@ -798,6 +902,71 @@ const styles = StyleSheet.create({
         borderColor: Colors.primary,
         borderStyle: 'dashed',
         backgroundColor: Colors.primary + '05'
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20
+    },
+    modalContent: {
+        backgroundColor: Colors.white,
+        borderRadius: 20,
+        padding: 24,
+        width: '100%',
+        maxWidth: 360,
+        ...Shadows.lg
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: Colors.text.primary,
+        marginBottom: 8,
+        textAlign: 'center'
+    },
+    modalSub: {
+        fontSize: 13,
+        color: Colors.text.tertiary,
+        textAlign: 'center',
+        marginBottom: 20
+    },
+    roundOptions: {
+        gap: 12
+    },
+    roundOptionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 16,
+        borderRadius: 12,
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0'
+    },
+    roundOptionBtnDisabled: {
+        backgroundColor: '#F1F5F9',
+        opacity: 0.7
+    },
+    roundOptionText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: Colors.text.primary
+    },
+    roundOptionSubText: {
+        fontSize: 12,
+        color: '#94A3B8',
+        marginTop: 2
+    },
+    closeModalBtn: {
+        marginTop: 20,
+        padding: 12,
+        alignItems: 'center'
+    },
+    closeModalText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.text.tertiary
     },
     editBadge: {
         position: 'absolute',

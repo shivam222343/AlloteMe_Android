@@ -7,7 +7,7 @@ import {
     User as UserIcon, Mail, Phone, Calendar,
     ShieldCheck, GraduationCap, MapPin, Search,
     Activity, CheckCircle2, AlertCircle, Star, Trash2, Clock,
-    FileText, ChevronRight, Briefcase, X, ChevronDown, ChevronUp
+    FileText, ChevronRight, Briefcase, X, ChevronDown, ChevronUp, Compass
 } from 'lucide-react-native';
 import GradientBorder from '../components/ui/GradientBorder';
 
@@ -329,9 +329,32 @@ const AdminUserDetailScreen = ({ route, navigation }) => {
                     <View style={styles.card}>
                         <InfoRow icon={Mail} label="Email Address" value={user.email} />
                         <InfoRow icon={Phone} label="Contact Number" value={user.phoneNumber} />
+                        <InfoRow icon={MapPin} label="Location" value={user.location} />
+                        <InfoRow icon={Compass} label="Expected Region" value={user.expectedRegion} />
+                        <InfoRow icon={GraduationCap} label="Admission Category" value={user.admissionCategory} />
                         <InfoRow icon={Calendar} label="Member Since" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'} />
                         <InfoRow icon={Clock} label="Last Active" value={user.lastActive ? new Date(user.lastActive).toLocaleString() : 'Never'} />
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Subscription & Usage</Text>
+                    <View style={styles.card}>
                         <InfoRow icon={Star} label="Subscription Status" value={user.subscription?.type ? user.subscription.type.toUpperCase() : 'FREE'} />
+                        <View style={[styles.academicGrid, { marginTop: 16, marginBottom: 0 }]}>
+                            <View style={styles.academicBox}>
+                                <Text style={styles.academicLabel}>Predictions Used</Text>
+                                <Text style={styles.academicVal}>{user.subscription?.usage?.predictions || 0}</Text>
+                            </View>
+                            <View style={styles.academicBox}>
+                                <Text style={styles.academicLabel}>AI Prompts Used</Text>
+                                <Text style={styles.academicVal}>{user.subscription?.usage?.aiPrompts || 0}</Text>
+                            </View>
+                            <View style={styles.academicBox}>
+                                <Text style={styles.academicLabel}>Exports Used</Text>
+                                <Text style={styles.academicVal}>{user.subscription?.usage?.exports || 0}</Text>
+                            </View>
+                        </View>
                     </View>
                 </View>
 

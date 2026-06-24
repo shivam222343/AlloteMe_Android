@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { X, Plus, Globe, MapPin, Bot, ShieldCheck, Award, ClipboardPaste } from 'lucide-react-native';
 import { useClipboardPaste } from '../hooks/useClipboardPaste';
+import AdminPrivacyLock from '../components/AdminPrivacyLock';
 
 
 const FACILITY_OPTIONS = ['WiFi', 'Canteen', 'Library', 'Labs', 'Sports', 'Hostel', 'Parking', 'Garden', 'Medical', 'ATM', 'Gym', 'Auditorium'];
@@ -700,4 +701,10 @@ const styles = StyleSheet.create({
     webPasteBannerText: { fontSize: 11, color: Colors.primary, fontWeight: '600', flex: 1 },
 });
 
-export default EditInstitutionScreen;
+export default function LockedEditInstitutionScreen(props) {
+    return (
+        <AdminPrivacyLock>
+            <EditInstitutionScreen {...props} />
+        </AdminPrivacyLock>
+    );
+}

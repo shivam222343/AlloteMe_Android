@@ -4,8 +4,9 @@ import MainLayout from '../components/layouts/MainLayout';
 import { Colors, Shadows } from '../constants/theme';
 import { authAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, ChevronRight, User as UserIcon, Users, ShieldCheck, Mail, Trash2, Clock, Phone } from 'lucide-react-native';
+import { Search, ChevronRight, User as UserIcon, Users, ShieldCheck, Mail, Trash2, Clock, Phone, MapPin } from 'lucide-react-native';
 import GradientBorder from '../components/ui/GradientBorder';
+import AdminPrivacyLock from '../components/AdminPrivacyLock';
 
 const AdminUsersScreen = ({ navigation }) => {
     const { socket } = useAuth();
@@ -148,6 +149,12 @@ const AdminUsersScreen = ({ navigation }) => {
                         <Text style={styles.userPhone} numberOfLines={1}>{item.phoneNumber}</Text>
                     </View>
                 ) : null}
+                {item.location ? (
+                    <View style={styles.locationRow}>
+                        <MapPin size={12} color={Colors.text.secondary} />
+                        <Text style={styles.userLocation} numberOfLines={1}>{item.location}</Text>
+                    </View>
+                ) : null}
             </View>
             <View style={styles.actionColumn}>
                 <TouchableOpacity
@@ -273,10 +280,18 @@ const styles = StyleSheet.create({
     userEmail: { fontSize: 13, color: Colors.text.tertiary, marginTop: 4 },
     contactRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
     userPhone: { fontSize: 13, color: Colors.text.secondary },
+    locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+    userLocation: { fontSize: 13, color: Colors.text.secondary },
     actionColumn: { flexDirection: 'row', alignItems: 'center' },
     deleteBtn: { padding: 8, marginRight: 4 },
     emptyBox: { padding: 60, alignItems: 'center' },
     emptyText: { marginTop: 12, color: Colors.text.tertiary }
 });
 
-export default AdminUsersScreen;
+export default function LockedAdminUsersScreen(props) {
+    return (
+        <AdminPrivacyLock>
+            <AdminUsersScreen {...props} />
+        </AdminPrivacyLock>
+    );
+}

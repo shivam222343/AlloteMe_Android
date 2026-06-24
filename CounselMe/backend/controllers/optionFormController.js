@@ -3,7 +3,7 @@ const Institution = require('../models/Institution');
 
 exports.addPreset = async (req, res) => {
     try {
-        const { percentile, category, colleges } = req.body;
+        const { percentile, category, round, colleges } = req.body;
 
         if (!percentile || !category || !colleges || !Array.isArray(colleges)) {
             return res.status(400).json({ success: false, message: 'Percentile, category and colleges list are required.' });
@@ -12,6 +12,7 @@ exports.addPreset = async (req, res) => {
         const preset = await OptionFormPreset.create({
             percentile: parseFloat(percentile),
             category,
+            round: parseInt(round) || 1,
             colleges: colleges.map(c => ({
                 collegeId: c.collegeId?._id || c.collegeId,
                 branch: c.branch,

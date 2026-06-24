@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { useClipboardPaste } from '../hooks/useClipboardPaste';
 import { Camera, X, Plus, Image as ImageIcon, Globe, MapPin, Hash, ShieldCheck, Award, Bot, ClipboardPaste } from 'lucide-react-native';
+import AdminPrivacyLock from '../components/AdminPrivacyLock';
 
 const CreateInstitutionScreen = ({ navigation }) => {
     const { admissionPath } = useAuth();
@@ -752,4 +753,10 @@ const styles = StyleSheet.create({
     webPasteBannerText: { fontSize: 11, color: Colors.primary, fontWeight: '600', flex: 1 },
 });
 
-export default CreateInstitutionScreen;
+export default function LockedCreateInstitutionScreen(props) {
+    return (
+        <AdminPrivacyLock>
+            <CreateInstitutionScreen {...props} />
+        </AdminPrivacyLock>
+    );
+}

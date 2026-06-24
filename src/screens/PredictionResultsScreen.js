@@ -234,6 +234,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
     const [showAddPresetModal, setShowAddPresetModal] = useState(false);
     const [presetPercentile, setPresetPercentile] = useState(percentile?.toString() || '');
     const [presetCategory, setPresetCategory] = useState(category || 'OPEN');
+    const [presetRound, setPresetRound] = useState(1);
     const [isSavingPreset, setIsSavingPreset] = useState(false);
 
     const handleTryAgain = useCallback(() => {
@@ -254,6 +255,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                 keys.add(key);
             }
         });
+        setLocalSavedPredictions(keys);
         setLocalSavedPredictions(keys);
     }, [user?.savedPredictions]);
 
@@ -819,6 +821,27 @@ const PredictionResultsScreen = ({ route, navigation }) => {
                                         presetCategory === cat && styles.categoryChipTextActive
                                     ]}>
                                         {cat}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <Text style={styles.inputLabel}>Select Round</Text>
+                        <View style={styles.categoryGrid}>
+                            {[1, 2, 3].map((rd) => (
+                                <TouchableOpacity
+                                    key={`round-${rd}`}
+                                    style={[
+                                        styles.categoryChip,
+                                        presetRound === rd && styles.categoryChipActive
+                                    ]}
+                                    onPress={() => setPresetRound(rd)}
+                                >
+                                    <Text style={[
+                                        styles.categoryChipText,
+                                        presetRound === rd && styles.categoryChipTextActive
+                                    ]}>
+                                        Round {rd}
                                     </Text>
                                 </TouchableOpacity>
                             ))}

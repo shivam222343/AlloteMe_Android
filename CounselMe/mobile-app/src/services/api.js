@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LOCAL_URL = 'http://[IP_ADDRESS]/api';
 const RENDER_URL = 'https://alloteme-android-cqdu.onrender.com/api';
-const API_BASE_URL = RENDER_URL; // Update with your local IP for dev when testing locally
+const API_BASE_URL = RENDER_URL;
 
 const api = axios.create({
     baseURL: API_BASE_URL,

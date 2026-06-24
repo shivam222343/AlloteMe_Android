@@ -16,90 +16,90 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const PLANS = [
     {
+        id: 'counselor',
+        name: '1 to 1 Counselling',
+        subtitle: 'For the ultimate experience',
+        price: '₹2699',
+        priceLabel: 'One time',
+        isPremium: true,
+        features: [
+            { text: 'Unlimited AI counselor guidance', included: true },
+            { text: 'Document Verification from counselors', included: true },
+            { text: '25 college prediction chances', included: true },
+            { text: '10 PDF/CSV exports', included: true },
+            { text: 'Explore college listed on map', included: true },
+            { text: 'Explore 350+ colleges and 47,000+ cutoffs', included: true },
+            { text: 'All College Seat Matrix for available seats', included: true },
+            { text: 'Weekly live Zoom meeting', included: true },
+            { text: 'Counselor WhatsApp chat support (24x7)', included: true },
+            { text: 'Unlimited Call Support', included: true },
+            { text: 'one-to-one personal counseling', included: true },
+            { text: 'Strategy round-by planning', included: true },
+            { text: 'Doubt Solving and guidance', included: true },
+            { text: 'Cap round alerts and updates', included: true },
+        ],
+        buttonText: 'Get Counselling',
+        color: '#F43F5E'
+    },
+    {
+        id: 'advance',
+        name: 'Advance',
+        subtitle: 'For the Serious Ones',
+        price: '₹1599',
+        priceLabel: 'One time',
+        isPremium: true,
+        features: [
+            { text: 'Unlimited AI counselor guidance', included: true },
+            { text: 'Document Verification from counselors', included: true },
+            { text: '25 college prediction chances', included: true },
+            { text: '10 PDF/CSV exports', included: true },
+            { text: 'Explore college listed on map', included: true },
+            { text: 'Explore 350+ colleges and 47,000+ cutoffs', included: true },
+            { text: 'All Colege Seat Matrix for available seats', included: true },
+            { text: 'Weekly live Zoom meeting', included: true },
+            { text: 'Counsellor WhatsApp Chat Support (Limited)', included: true }
+        ],
+        buttonText: 'Get Advance Plan',
+        color: '#F59E0B'
+    },
+    {
+        id: 'standard',
+        name: 'Standard',
+        subtitle: 'Most Popular Choice',
+        price: '₹199',
+        priceLabel: 'One time',
+        isMid: true,
+        features: [
+            { text: 'Unlimited AI counselor guidance', included: true },
+            { text: 'Document Verification from counselors', included: false },
+            { text: '15 college prediction chances', included: true },
+            { text: '5 PDF/CSV export options', included: true },
+            { text: 'Explore college listed on map', included: true },
+            { text: 'Explore 350+ colleges and 47,000+ cutoffs', included: true },
+            { text: 'one live Zoom meeting', included: true }
+        ],
+        buttonText: 'Get Standard plan',
+        color: Colors.primary
+    },
+    {
         id: 'free',
         name: 'Free',
         subtitle: 'Start exploring now',
         price: 'Free',
         priceLabel: 'Forever',
         features: [
-            { text: '3 AI Counseling Prompts', included: true },
-            { text: '5 College Predictions', included: true },
-            { text: '3 PDF or CSV Exports', included: true },
-            { text: 'Browse All Colleges', included: true },
-            { text: 'Admission Notifications', included: true },
-            { text: 'Standard Chat Support', included: true },
-            { text: 'Personal API Key', included: false },
-            { text: 'Document Verifications', included: false },
+            { text: 'Limited AI counselor guidance', included: true },
+            { text: '2 college prediction chances', included: true },
+            { text: '1 PDF/CSV export options', included: true },
+            { text: 'Explore college listed on map (Limited)', included: true },
+            { text: 'Explore 350+ colleges and 47,000+ cutoffs', included: true }
         ],
         buttonText: 'Current Plan',
         color: '#94A3B8'
-    },
-    {
-        id: 'standard',
-        name: 'Standard',
-        subtitle: 'Most Popular Choice',
-        price: '₹99',
-        priceLabel: 'One time',
-        isMid: true,
-        features: [
-            { text: 'Unlimited AI Prompts', included: true },
-            { text: 'Personal API Key Support', included: true },
-            { text: '15 College Predictions', included: true },
-            { text: '7 PDF & CSV Exports', included: true },
-            { text: '300+ College Info', included: true },
-            { text: '19000+ Listed Cutoffs', included: true },
-            { text: 'Personalized Preset Lists', included: true },
-            { text: 'Standard Chat Support', included: true },
-            { text: 'Document Verifications', included: false },
-            { text: 'End-to-End Support', included: false },
-        ],
-        buttonText: 'Get Standard',
-        color: Colors.primary
-    },
-    {
-        id: 'advance',
-        name: 'Advance',
-        subtitle: 'For the Serious Ones',
-        price: '₹149',
-        priceLabel: 'One time',
-        isPremium: true,
-        features: [
-            { text: 'Unlimited AI Prompts', included: true },
-            { text: 'Personal API Key Support', included: true },
-            { text: '25 College Predictions', included: true },
-            { text: '15 PDF & CSV Exports', included: true },
-            { text: '300+ College Info', included: true },
-            { text: '19000+ Listed Cutoffs', included: true },
-            { text: 'Personalized Preset Lists', included: true },
-            { text: 'Document Verifications', included: true },
-            { text: 'Personal Counselor Chat', included: true },
-            { text: '24/7 Call & WhatsApp', included: true },
-        ],
-        buttonText: 'Get Advance',
-        color: '#F59E0B'
-    },
-    {
-        id: 'counselor',
-        name: 'Counselor Special',
-        subtitle: 'For Counseling Professionals',
-        price: '₹999',
-        priceLabel: 'One time',
-        isPremium: true,
-        features: [
-            { text: 'Unlimited AI Prompts', included: true },
-            { text: 'Counselor Profile in Expert Directory', included: true },
-            { text: '250 College Predictions', included: true },
-            { text: 'Unlimited PDF & CSV Exports', included: true },
-            { text: 'Special Counselor Dashboard', included: true },
-            { text: 'Direct Student Chat Access', included: true },
-            { text: '24/7 VIP Phone Support', included: true },
-        ],
-        buttonText: 'Get Counselor Special',
-        color: '#F43F5E'
     }
 ];
 
-const PricingScreen = ({ navigation }) => {
+const PricingScreen = ({ navigation, route }) => {
     const { user, updateProfile } = useAuth();
     const scrollViewRef = useRef(null);
     const scrollX = useRef(new Animated.Value(0)).current;
@@ -158,6 +158,18 @@ const PricingScreen = ({ navigation }) => {
         }
         return baseAmount;
     };
+
+    useEffect(() => {
+        // Auto Checkout
+        if (route?.params?.autoCheckout && dynamicPlans.length > 0) {
+            const planToCheckout = dynamicPlans.find(p => p.id === route.params.autoCheckout);
+            if (planToCheckout) {
+                handleSelectPlan(planToCheckout);
+                // Clear param so it doesn't reopen if they close it
+                navigation.setParams({ autoCheckout: undefined });
+            }
+        }
+    }, [route?.params?.autoCheckout, dynamicPlans]);
 
     useEffect(() => {
         // Fetch dynamic pricing from backend
@@ -220,14 +232,14 @@ const PricingScreen = ({ navigation }) => {
 
     const handleConfirmPayment = async (plan) => {
         let amount = getTotalCheckoutAmount(plan);
-        
+
         // Convert to paisa for Razorpay
         amount = amount * 100;
-        
+
         const successHandler = async (paymentId) => {
             try {
                 if (appliedCoupon) {
-                    try { await systemAPI.applyCoupon({ code: appliedCoupon.code }); } catch (e) {}
+                    try { await systemAPI.applyCoupon({ code: appliedCoupon.code }); } catch (e) { }
                 }
                 const updatedSubscription = {
                     type: plan.id,
@@ -326,7 +338,7 @@ const PricingScreen = ({ navigation }) => {
                 },
                 theme: { color: Colors.primary },
                 modal: {
-                    ondismiss: function() {
+                    ondismiss: function () {
                         console.log('Payment modal closed by user');
                     }
                 }
@@ -369,15 +381,15 @@ const PricingScreen = ({ navigation }) => {
             // Safeguard against property access on null/undefined
             if (!RazorpayCheckout || typeof RazorpayCheckout?.open !== 'function') {
                 console.log('Native Razorpay not found');
-                
+
                 // Final safety check to avoid "property open of null"
                 Alert.alert(
-                    'In-App Payment Unavailable', 
+                    'In-App Payment Unavailable',
                     'Would you like to securely open our website to complete the payment?',
                     [
                         { text: 'Cancel', style: 'cancel' },
-                        { 
-                            text: 'Open Website', 
+                        {
+                            text: 'Open Website',
                             onPress: () => {
                                 Linking.openURL('https://alloteme.in/pricing').catch(() => {
                                     Alert.alert('Error', 'Could not open browser. Please visit https://alloteme.in');
@@ -429,7 +441,7 @@ const PricingScreen = ({ navigation }) => {
                     )}
                 </View>
                 <Text style={[
-                    styles.featureText, 
+                    styles.featureText,
                     !feature.included && styles.featureDisabled,
                     (!feature.included && isDocVerification) && { color: '#EF4444', textDecorationLine: 'none', fontWeight: 'bold' }
                 ]}>
@@ -457,170 +469,170 @@ const PricingScreen = ({ navigation }) => {
                     ref={scrollViewRef}
                     horizontal
                     pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { useNativeDriver: false }
-                )}
-                scrollEnabled={!showSuccess}
-            >
-                {dynamicPlans.map((plan) => {
-                    const isActive = user?.subscription?.type === plan.id;
-                    let isRenewable = false;
-                    if (isActive && plan.id !== 'free') {
-                        const activePlanDetails = SUBSCRIPTION_PLANS[plan.id.toUpperCase()];
-                        const currentUsage = user?.subscription?.usage || {};
-                        if (activePlanDetails) {
-                            Object.keys(activePlanDetails.limits).forEach(key => {
-                                const limit = activePlanDetails.limits[key];
-                                if (limit !== Infinity && (currentUsage[key] || 0) >= limit) {
-                                    isRenewable = true;
-                                }
-                            });
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={Animated.event(
+                        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                        { useNativeDriver: false }
+                    )}
+                    scrollEnabled={!showSuccess}
+                >
+                    {dynamicPlans.map((plan) => {
+                        const isActive = user?.subscription?.type === plan.id;
+                        let isRenewable = false;
+                        if (isActive && plan.id !== 'free') {
+                            const activePlanDetails = SUBSCRIPTION_PLANS[plan.id.toUpperCase()];
+                            const currentUsage = user?.subscription?.usage || {};
+                            if (activePlanDetails) {
+                                Object.keys(activePlanDetails.limits).forEach(key => {
+                                    const limit = activePlanDetails.limits[key];
+                                    if (limit !== Infinity && (currentUsage[key] || 0) >= limit) {
+                                        isRenewable = true;
+                                    }
+                                });
+                            }
                         }
-                    }
 
-                    let displayPrice = plan.price;
-                    let originalPrice = null;
-                    if (isRenewable && plan.price !== 'Free') {
-                        const rawAmount = parseInt(plan.price.replace('₹', '')) || 0;
-                        if (rawAmount > 0) {
-                            originalPrice = plan.price;
-                            displayPrice = `₹${Math.round(rawAmount * 0.7)}`;
+                        let displayPrice = plan.price;
+                        let originalPrice = null;
+                        if (isRenewable && plan.price !== 'Free') {
+                            const rawAmount = parseInt(plan.price.replace('₹', '')) || 0;
+                            if (rawAmount > 0) {
+                                originalPrice = plan.price;
+                                displayPrice = `₹${Math.round(rawAmount * 0.7)}`;
+                            }
                         }
-                    }
 
-                    return (
-                        <View key={plan.id} style={styles.slide}>
-                        <View style={[
-                            styles.planCard,
-                            plan.isPremium && styles.premiumCard,
-                            plan.isMid && styles.midCard,
-                            plan.id === 'counselor' && { borderColor: '#F43F5E60' }
-                        ]}>
-                            {plan.isPremium ? (
-                                <LinearGradient
-                                    colors={plan.id === 'counselor' ? ['#F43F5E', '#BE123C'] : ['#F59E0B', '#B45309']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.premiumBadge}
-                                >
-                                    <Crown size={12} color="white" fill="white" />
-                                    <Text style={styles.badgeText}>ELITE PLAN</Text>
-                                </LinearGradient>
-                            ) : plan.isMid ? (
-                                <View style={[styles.premiumBadge, { backgroundColor: Colors.primary }]}>
-                                    <Zap size={12} color="white" fill="white" />
-                                    <Text style={styles.badgeText}>BEST VALUE</Text>
-                                </View>
-                            ) : null}
-
-                            <View style={styles.cardHeader}>
-                                <Text style={styles.planName}>{plan.name}</Text>
-                                <Text style={styles.planSub}>{plan.subtitle}</Text>
-                                <View style={styles.priceContainer}>
-                                    {originalPrice ? (
-                                        <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>{originalPrice}</Text>
-                                    ) : plan.price !== 'Free' && (
-                                        <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>
-                                            ₹{parseInt(plan.price.replace('₹', '')) + (plan.id === 'counselor' ? 1000 : plan.id === 'advance' ? 700 : 500)}
-                                        </Text>
-                                    )}
-                                    <Text style={styles.priceValue}>{displayPrice}</Text>
-                                    <Text style={styles.priceLabel}>/ {plan.priceLabel}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.divider} />
-
-                            <View style={styles.featuresList}>
-                                {plan.features.length > 6 ? (
-                                    <View style={styles.twoColumnFeatures}>
-                                        <View style={{ flex: 1 }}>
-                                            {plan.features.slice(0, Math.ceil(plan.features.length / 2)).map((f, idx) => renderFeature(f, idx))}
+                        return (
+                            <View key={plan.id} style={styles.slide}>
+                                <View style={[
+                                    styles.planCard,
+                                    plan.isPremium && styles.premiumCard,
+                                    plan.isMid && styles.midCard,
+                                    plan.id === 'counselor' && { borderColor: '#F43F5E60' }
+                                ]}>
+                                    {plan.isPremium ? (
+                                        <LinearGradient
+                                            colors={plan.id === 'counselor' ? ['#F43F5E', '#BE123C'] : ['#F59E0B', '#B45309']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.premiumBadge}
+                                        >
+                                            <Crown size={12} color="white" fill="white" />
+                                            <Text style={styles.badgeText}>ELITE PLAN</Text>
+                                        </LinearGradient>
+                                    ) : plan.isMid ? (
+                                        <View style={[styles.premiumBadge, { backgroundColor: Colors.primary }]}>
+                                            <Zap size={12} color="white" fill="white" />
+                                            <Text style={styles.badgeText}>BEST VALUE</Text>
                                         </View>
-                                        <View style={{ flex: 1 }}>
-                                            {plan.features.slice(Math.ceil(plan.features.length / 2)).map((f, idx) => renderFeature(f, idx + 10))}
+                                    ) : null}
+
+                                    <View style={styles.cardHeader}>
+                                        <Text style={styles.planName}>{plan.name}</Text>
+                                        <Text style={styles.planSub}>{plan.subtitle}</Text>
+                                        <View style={styles.priceContainer}>
+                                            {originalPrice ? (
+                                                <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>{originalPrice}</Text>
+                                            ) : plan.price !== 'Free' && (
+                                                <Text style={[styles.priceValue, { textDecorationLine: 'line-through', fontSize: 24, color: '#94A3B8', marginRight: 8 }]}>
+                                                    ₹{parseInt(plan.price.replace('₹', '')) + (plan.id === 'counselor' ? 2300 : plan.id === 'advance' ? 1400 : 300)}
+                                                </Text>
+                                            )}
+                                            <Text style={styles.priceValue}>{displayPrice}</Text>
+                                            <Text style={styles.priceLabel}>/ {plan.priceLabel}</Text>
                                         </View>
                                     </View>
-                                ) : (
-                                    plan.features.map((f, idx) => renderFeature(f, idx))
-                                )}
-                            </View>
 
-                            {(() => {
-                                const planHierarchy = { free: 0, standard: 1, advance: 2, counselor: 3 };
-                                const userLevel = planHierarchy[user?.subscription?.type] || 0;
-                                const currentPlanLevel = planHierarchy[plan.id] || 0;
-                                
-                                const isIncluded = userLevel > currentPlanLevel;
-                                const btnText = isRenewable ? 'Renew Plan (30% Off)' : isActive ? 'Currently Active' : isIncluded ? 'Included in Plan' : plan.buttonText;
-                                const isDisabled = (isActive && !isRenewable) || isIncluded;
+                                    <View style={styles.divider} />
 
-                                return (
-                                    <TouchableOpacity
-                                        activeOpacity={0.8}
-                                        onPress={() => {
-                                            if (isDisabled) return;
-                                            handleSelectPlan(plan);
-                                        }}
-                                        style={[
-                                            styles.actionBtn,
-                                            { backgroundColor: plan.color },
-                                            (plan.isPremium || plan.isMid) && Shadows.md,
-                                            isDisabled && { opacity: 0.7 }
-                                        ]}>
-                                        {plan.isPremium ? (
-                                            <LinearGradient
-                                                colors={plan.id === 'counselor' ? ['#F43F5E', '#E11D48'] : ['#F59E0B', '#D97706']}
-                                                style={styles.gradientBtn}
-                                            >
-                                                <Text style={styles.btnText}>{btnText}</Text>
-                                                {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
-                                            </LinearGradient>
-                                        ) : plan.isMid ? (
-                                            <LinearGradient
-                                                colors={[Colors.primary, '#4338CA']}
-                                                style={styles.gradientBtn}
-                                            >
-                                                <Text style={styles.btnText}>{btnText}</Text>
-                                                {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
-                                            </LinearGradient>
-                                        ) : (
-                                            <View style={styles.normalBtn}>
-                                                <Text style={styles.btnText}>{isActive && !isRenewable ? 'Activated' : btnText}</Text>
-                                                {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
+                                    <View style={styles.featuresList}>
+                                        {plan.features.length > 6 ? (
+                                            <View style={styles.twoColumnFeatures}>
+                                                <View style={{ flex: 1 }}>
+                                                    {plan.features.slice(0, Math.ceil(plan.features.length / 2)).map((f, idx) => renderFeature(f, idx))}
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    {plan.features.slice(Math.ceil(plan.features.length / 2)).map((f, idx) => renderFeature(f, idx + 10))}
+                                                </View>
                                             </View>
+                                        ) : (
+                                            plan.features.map((f, idx) => renderFeature(f, idx))
                                         )}
-                                    </TouchableOpacity>
-                                );
-                            })()}
-                        </View>
-                    </View>
-                    );
-                })}
-            </ScrollView>
+                                    </View>
 
-            <View style={styles.indicatorContainer}>
-                {dynamicPlans.map((_, i) => {
-                    const opacity = scrollX.interpolate({
-                        inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
-                        outputRange: [0.3, 1, 0.3],
-                        extrapolate: 'clamp'
-                    });
-                    const scale = scrollX.interpolate({
-                        inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
-                        outputRange: [1, 1.25, 1],
-                        extrapolate: 'clamp'
-                    });
-                    return <Animated.View key={i} style={[styles.dot, { opacity, transform: [{ scale }] }]} />;
-                })}
-            </View>
+                                    {(() => {
+                                        const planHierarchy = { free: 0, standard: 1, advance: 2, counselor: 3 };
+                                        const userLevel = planHierarchy[user?.subscription?.type] || 0;
+                                        const currentPlanLevel = planHierarchy[plan.id] || 0;
 
-            <View style={styles.trustBox}>
-                <ShieldCheck size={16} color="#64748B" />
-                <Text style={styles.trustText}>Secured Payment Infrastructure</Text>
-            </View>
+                                        const isIncluded = userLevel > currentPlanLevel;
+                                        const btnText = isRenewable ? 'Renew Plan (30% Off)' : isActive ? 'Currently Active' : isIncluded ? 'Included in Plan' : plan.buttonText;
+                                        const isDisabled = (isActive && !isRenewable) || isIncluded;
+
+                                        return (
+                                            <TouchableOpacity
+                                                activeOpacity={0.8}
+                                                onPress={() => {
+                                                    if (isDisabled) return;
+                                                    handleSelectPlan(plan);
+                                                }}
+                                                style={[
+                                                    styles.actionBtn,
+                                                    { backgroundColor: plan.color },
+                                                    (plan.isPremium || plan.isMid) && Shadows.md,
+                                                    isDisabled && { opacity: 0.7 }
+                                                ]}>
+                                                {plan.isPremium ? (
+                                                    <LinearGradient
+                                                        colors={plan.id === 'counselor' ? ['#F43F5E', '#E11D48'] : ['#F59E0B', '#D97706']}
+                                                        style={styles.gradientBtn}
+                                                    >
+                                                        <Text style={styles.btnText}>{btnText}</Text>
+                                                        {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
+                                                    </LinearGradient>
+                                                ) : plan.isMid ? (
+                                                    <LinearGradient
+                                                        colors={[Colors.primary, '#4338CA']}
+                                                        style={styles.gradientBtn}
+                                                    >
+                                                        <Text style={styles.btnText}>{btnText}</Text>
+                                                        {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
+                                                    </LinearGradient>
+                                                ) : (
+                                                    <View style={styles.normalBtn}>
+                                                        <Text style={styles.btnText}>{isActive && !isRenewable ? 'Activated' : btnText}</Text>
+                                                        {isDisabled ? <Check size={16} color="white" /> : <Zap size={16} color="white" fill="white" />}
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    })()}
+                                </View>
+                            </View>
+                        );
+                    })}
+                </ScrollView>
+
+                <View style={styles.indicatorContainer}>
+                    {dynamicPlans.map((_, i) => {
+                        const opacity = scrollX.interpolate({
+                            inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
+                            outputRange: [0.3, 1, 0.3],
+                            extrapolate: 'clamp'
+                        });
+                        const scale = scrollX.interpolate({
+                            inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
+                            outputRange: [1, 1.25, 1],
+                            extrapolate: 'clamp'
+                        });
+                        return <Animated.View key={i} style={[styles.dot, { opacity, transform: [{ scale }] }]} />;
+                    })}
+                </View>
+
+                <View style={styles.trustBox}>
+                    <ShieldCheck size={16} color="#64748B" />
+                    <Text style={styles.trustText}>Secured Payment Infrastructure</Text>
+                </View>
             </ScrollView>
 
             {/* Checkout Modal */}
@@ -637,8 +649,8 @@ const PricingScreen = ({ navigation }) => {
                                 <Text style={styles.checkoutTitle}>Checkout</Text>
                                 <Text style={styles.checkoutSub}>Review your plan & apply coupons</Text>
                             </View>
-                            <TouchableOpacity 
-                                style={styles.closeModalBtn} 
+                            <TouchableOpacity
+                                style={styles.closeModalBtn}
                                 onPress={() => setShowCheckout(false)}
                             >
                                 <X size={20} color={Colors.text.secondary} />
@@ -676,11 +688,11 @@ const PricingScreen = ({ navigation }) => {
                                     <Ticket size={18} color={Colors.primary} />
                                     <Text style={styles.sectionTitle}>Available Coupons</Text>
                                 </View>
-                                
+
                                 {availableCoupons.length > 0 ? (
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.couponsList}>
                                         {availableCoupons.map((coupon) => (
-                                            <TouchableOpacity 
+                                            <TouchableOpacity
                                                 key={coupon._id}
                                                 style={[
                                                     styles.couponCard,
@@ -751,7 +763,7 @@ const PricingScreen = ({ navigation }) => {
                                         <Text style={styles.invoiceLabel}>Base Price</Text>
                                         <Text style={styles.invoiceValue}>{selectedPlanForCheckout?.price}</Text>
                                     </View>
-                                    
+
                                     {isPlanRenewable(selectedPlanForCheckout?.id) && (
                                         <View style={styles.invoiceRow}>
                                             <View style={styles.discountRow}>
@@ -765,7 +777,7 @@ const PricingScreen = ({ navigation }) => {
                                             </Text>
                                         </View>
                                     )}
-                                    
+
                                     {appliedCoupon && (
                                         <View style={styles.invoiceRow}>
                                             <View style={styles.discountRow}>
@@ -781,7 +793,7 @@ const PricingScreen = ({ navigation }) => {
                                     )}
 
                                     <View style={styles.invoiceDivider} />
-                                    
+
                                     <View style={styles.totalRow}>
                                         <Text style={styles.totalLabel}>Total Amount</Text>
                                         <Text style={styles.totalValue}>
@@ -798,7 +810,7 @@ const PricingScreen = ({ navigation }) => {
                         </ScrollView>
 
                         <View style={styles.checkoutFooter}>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.confirmBtn, { backgroundColor: selectedPlanForCheckout?.color || Colors.primary }]}
                                 onPress={() => {
                                     setShowCheckout(false);
@@ -902,7 +914,7 @@ const styles = StyleSheet.create({
 
     trustBox: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingBottom: 20 },
     trustText: { fontSize: 12, color: '#64748B', fontWeight: '500' },
-    
+
     // Checkout Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     checkoutContainer: { backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: Platform.OS === 'ios' ? 40 : 20, maxHeight: '90%' },
