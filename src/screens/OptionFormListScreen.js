@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Alert, Dimensions, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Trash2, ShieldCheck, GraduationCap, Layers } from 'lucide-react-native';
+import { ChevronLeft, Trash2, ShieldCheck, GraduationCap, Layers, Lock } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { optionFormAPI } from '../services/api';
 import { Colors, Shadows } from '../constants/theme';
@@ -18,7 +18,7 @@ const PRESET_COLORS = [
 const OptionFormListScreen = ({ route, navigation }) => {
     const insets = useSafeAreaInsets();
     const { width: windowWidth } = useWindowDimensions();
-    const { user, admissionPath } = useAuth();
+    const { user, admissionPath, setSubscriptionModal } = useAuth();
     const isAdmin = user?.role === 'admin';
     const [presets, setPresets] = useState([]);
     const [categoryOrder, setCategoryOrder] = useState([]);
@@ -28,6 +28,7 @@ const OptionFormListScreen = ({ route, navigation }) => {
     const itemWidth = isDesktop ? 130 : (windowWidth - 44) / 3;
 
     const activePath = route?.params?.activePath || admissionPath || user?.examType;
+    const isFree = !user?.subscription?.type || user.subscription.type.toUpperCase() === 'FREE';
 
     const matchesExamType = (category, examType) => {
         if (!category || !examType) return false;
@@ -182,27 +183,40 @@ const OptionFormListScreen = ({ route, navigation }) => {
                                 <Text style={styles.sectionHeading}>{categoryName}</Text>
                                 <View style={styles.grid}>
                                     {catPresets.map((preset, idx) => {
+                                        const isLocked = isFree && !isAdmin;
                                         const colors = PRESET_COLORS[idx % PRESET_COLORS.length];
                                         return (
                                             <View key={preset._id} style={[styles.gridItemContainer, { width: itemWidth }]}>
                                                 <TouchableOpacity
                                                     style={styles.gridItem}
                                                     activeOpacity={0.8}
-                                                    onPress={() => navigation.navigate('OptionFormView', { preset })}
+                                                    onPress={() => {
+                                                        if (isLocked) {
+                                                            setSubscriptionModal({ visible: true, feature: 'predictions' });
+                                                        } else {
+                                                            navigation.navigate('OptionFormView', { preset });
+                                                        }
+                                                    }}
                                                 >
-                                                    <View style={[styles.circle, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-                                                        <Text style={[styles.percentileText, { color: colors.text }]}>
-                                                            {Number(preset.percentile).toFixed(2)}
-                                                        </Text>
-                                                        <Text style={[styles.circlePercentSign, { color: colors.text }]}>%ile</Text>
+                                                    <View style={[styles.circle, { backgroundColor: isLocked ? '#F1F5F9' : colors.bg, borderColor: isLocked ? '#CBD5E1' : colors.border }]}>
+                                                        {isLocked ? (
+                                                            <Lock size={24} color="#94A3B8" />
+                                                        ) : (
+                                                            <>
+                                                                <Text style={[styles.percentileText, { color: colors.text }]}>
+                                                                    {Number(preset.percentile).toFixed(2)}
+                                                                </Text>
+                                                                <Text style={[styles.circlePercentSign, { color: colors.text }]}>%ile</Text>
+                                                            </>
+                                                        )}
                                                     </View>
                                                     <View style={styles.categoryContainer}>
-                                                        <ShieldCheck size={10} color={colors.text} />
-                                                        <Text style={[styles.categoryText, { color: colors.text }]}>{preset.category}</Text>
+                                                        <ShieldCheck size={10} color={isLocked ? '#94A3B8' : colors.text} />
+                                                        <Text style={[styles.categoryText, { color: isLocked ? '#94A3B8' : colors.text }]}>{preset.category}</Text>
                                                     </View>
-                                                    <View style={[styles.categoryContainer, { marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: Colors.primary + '10', borderRadius: 4 }]}>
-                                                        <Layers size={10} color={Colors.primary} />
-                                                        <Text style={[styles.categoryText, { color: Colors.primary, fontSize: 9 }]}>Round {preset.round || 1}</Text>
+                                                    <View style={[styles.categoryContainer, { marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: isLocked ? '#F1F5F9' : Colors.primary + '10', borderRadius: 4 }]}>
+                                                        <Layers size={10} color={isLocked ? '#94A3B8' : Colors.primary} />
+                                                        <Text style={[styles.categoryText, { color: isLocked ? '#94A3B8' : Colors.primary, fontSize: 9 }]}>Round {preset.round || 1}</Text>
                                                     </View>
                                                 </TouchableOpacity>
                                                 

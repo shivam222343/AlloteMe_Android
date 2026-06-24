@@ -13,36 +13,36 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const SubscriptionPopup = ({ visible, onClose, onSubscribe }) => {
     const [dynamicPlans, setDynamicPlans] = React.useState([
-        { 
-            id: 'standard', 
-            name: 'Standard Admission', 
-            price: '₹99', 
-            period: 'One time', 
-            color: Colors.primary, 
+        {
+            id: 'standard',
+            name: 'Standard Admission',
+            price: '₹199',
+            period: 'One time',
+            color: Colors.primary,
             icon: Target,
             features: [
-                'Unlimited AI counselor guidance', 
-                '15 college prediction chances', 
-                '5 PDF/CSV export options', 
-                'Explore college listed on map', 
-                'Explore 350+ colleges and 47,000+ cutoffs', 
+                'Unlimited AI counselor guidance',
+                '15 college prediction chances',
+                '5 PDF/CSV export options',
+                'Explore college listed on map',
+                'Explore 350+ colleges and 47,000+ cutoffs',
                 'One live Zoom meeting'
             ]
         },
-        { 
-            id: 'advance', 
-            name: 'Elite Advance', 
-            price: '₹149', 
-            period: 'One time', 
-            color: '#F59E0B', 
+        {
+            id: 'advance',
+            name: 'Elite Advance',
+            price: '₹1599',
+            period: 'One time',
+            color: '#F59E0B',
             icon: Crown,
             features: [
-                'Unlimited AI counselor guidance', 
-                '25 college prediction chances', 
-                '10 PDF/CSV exports', 
-                'Explore college listed on map', 
-                'Explore 350+ colleges and 47,000+ cutoffs', 
-                'All College Seat Matrix for available seats', 
+                'Unlimited AI counselor guidance',
+                '25 college prediction chances',
+                '10 PDF/CSV exports',
+                'Explore college listed on map',
+                'Explore 350+ colleges and 47,000+ cutoffs',
+                'All College Seat Matrix for available seats',
                 'Weekly live Zoom meeting',
                 'WhatsApp Chat Support (Limited)'
             ],

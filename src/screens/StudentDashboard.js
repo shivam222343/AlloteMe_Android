@@ -45,7 +45,7 @@ const StudentDashboard = ({ navigation }) => {
         }, [])
     );
 
-    const { user, hasSkippedProfile, socket, refreshUser, admissionPath, setAdmissionPath } = useAuth();
+    const { user, hasSkippedProfile, socket, refreshUser, admissionPath, setAdmissionPath, setSubscriptionModal } = useAuth();
     const [featuredColleges, setFeaturedColleges] = useState([]);
     const [loadingFeatured, setLoadingFeatured] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -170,7 +170,7 @@ const StudentDashboard = ({ navigation }) => {
     const handlePresetClick = (preset) => {
         const isFree = !user?.subscription?.type || user.subscription.type.toUpperCase() === 'FREE';
         if (isFree && user?.role === 'student') {
-            navigation.navigate('Pricing');
+            setSubscriptionModal({ visible: true, feature: 'predictions' });
             return;
         }
         

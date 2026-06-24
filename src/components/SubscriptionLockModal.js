@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { Colors, Shadows } from '../constants/theme';
 import { Lock, Sparkles, Zap, ChevronRight, X, BadgePercent, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
