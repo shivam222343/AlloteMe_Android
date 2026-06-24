@@ -113,6 +113,7 @@ const loginUser = async (req, res) => {
             savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university category')).savedColleges || [],
             savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode category')).savedPredictions || [],
             subscription: user.subscription,
+            phoneNumber: user.phoneNumber,
             token: generateToken(user._id),
             groqApiKey: user.groqApiKey,
             admissionCategory: user.admissionCategory || 'OPEN',
@@ -965,6 +966,7 @@ const verifyOTPAndRegister = async (req, res) => {
                 _id: user._id,
                 displayName: user.displayName,
                 email: user.email,
+                phoneNumber: user.phoneNumber,
                 role: user.role,
                 preferences: user.preferences,
                 showAvatarPopup: true
@@ -1052,6 +1054,7 @@ const googleLogin = async (req, res) => {
             savedColleges: (await user.populate('savedColleges', 'name location type feesPerYear rating dteCode galleryImages university category')).savedColleges || [],
             savedPredictions: (await user.populate('savedPredictions.collegeId', 'name location dteCode category')).savedPredictions || [],
             subscription: user.subscription,
+            phoneNumber: user.phoneNumber,
             token: generateToken(user._id),
             showAvatarPopup: !user.preferences?.hasConfirmedAvatar,
             isNewUser: isNewUser

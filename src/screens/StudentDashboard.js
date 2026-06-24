@@ -93,7 +93,10 @@ const StudentDashboard = ({ navigation }) => {
 
     useEffect(() => {
         if (user && user.role === 'student') {
-            const cleanPhone = (user.phoneNumber || '').trim();
+            let cleanPhone = (user.phoneNumber || '').replace(/\D/g, '');
+            if (cleanPhone.length > 10 && cleanPhone.startsWith('91')) {
+                cleanPhone = cleanPhone.slice(-10);
+            }
             const phoneRegex = /^[6-9]\d{9}$/;
             const hasEmptyField = !user.percentile || !user.percentile.toString().trim() ||
                                   !user.rank || !user.rank.toString().trim() ||

@@ -28,7 +28,8 @@ const CompleteProfileScreen = ({ navigation, route }) => {
     const [showWarningModal, setShowWarningModal] = useState(false);
 
     const handleBackgroundPress = () => {
-        const cleanPhone = (formData.phoneNumber || '').trim();
+        let cleanPhone = (formData.phoneNumber || '').replace(/\D/g, '');
+        if (cleanPhone.length > 10 && cleanPhone.startsWith('91')) cleanPhone = cleanPhone.slice(-10);
         const phoneRegex = /^[6-9]\d{9}$/;
         const hasEmpty = !formData.percentile.trim() ||
             !formData.rank.trim() ||
@@ -60,7 +61,12 @@ const CompleteProfileScreen = ({ navigation, route }) => {
         location: user?.location || '',
         expectedRegion: user?.expectedRegion || '',
         examType: initialExam,
-        phoneNumber: user?.phoneNumber || ''
+        phoneNumber: (() => {
+            let p = user?.phoneNumber || '';
+            let cleaned = p.replace(/\D/g, '');
+            if (cleaned.length > 10 && cleaned.startsWith('91')) return cleaned.slice(-10);
+            return p;
+        })()
     });
 
     const [errors, setErrors] = useState({
@@ -102,7 +108,8 @@ const CompleteProfileScreen = ({ navigation, route }) => {
 
     React.useEffect(() => {
         setValidateProfileForm(() => (showPopup = false) => {
-            const cleanPhone = (formData.phoneNumber || '').trim();
+            let cleanPhone = (formData.phoneNumber || '').replace(/\D/g, '');
+            if (cleanPhone.length > 10 && cleanPhone.startsWith('91')) cleanPhone = cleanPhone.slice(-10);
             const phoneRegex = /^[6-9]\d{9}$/;
             let phoneError = '';
             if (!cleanPhone) {
@@ -142,7 +149,8 @@ const CompleteProfileScreen = ({ navigation, route }) => {
             e.preventDefault();
 
             // Run validation to show errors in red
-            const cleanPhone = (formData.phoneNumber || '').trim();
+            let cleanPhone = (formData.phoneNumber || '').replace(/\D/g, '');
+            if (cleanPhone.length > 10 && cleanPhone.startsWith('91')) cleanPhone = cleanPhone.slice(-10);
             const phoneRegex = /^[6-9]\d{9}$/;
             let phoneError = '';
             if (!cleanPhone) {
@@ -214,7 +222,8 @@ const CompleteProfileScreen = ({ navigation, route }) => {
     }, [formData.percentile]);
 
     const handleSubmit = async () => {
-        const cleanPhone = (formData.phoneNumber || '').trim();
+        let cleanPhone = (formData.phoneNumber || '').replace(/\D/g, '');
+        if (cleanPhone.length > 10 && cleanPhone.startsWith('91')) cleanPhone = cleanPhone.slice(-10);
         const phoneRegex = /^[6-9]\d{9}$/;
         let phoneError = '';
         if (!cleanPhone) {
