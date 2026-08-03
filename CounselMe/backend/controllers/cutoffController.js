@@ -99,14 +99,15 @@ const saveCutoffDocuments = async (documents) => {
 
 // Category Mapping for Maharashtra DTE Data
 const CATEGORY_ALIASES = {
-    'NT1': ['NT1', 'NT-B', 'NTB', 'NT-1'],
-    'NT2': ['NT2', 'NT-C', 'NTC', 'NT-2'],
-    'NT3': ['NT3', 'NT-D', 'NTD', 'NT-3'],
-    'VJ': ['VJ', 'NT-A', 'NTA', 'VJNT', 'VJ/DT', 'VJA'],
+    'NT1': ['NT1', 'NT-B', 'NTB', 'NT-1', 'GNT1', 'LNT1'],
+    'NT2': ['NT2', 'NT-C', 'NTC', 'NT-2', 'GNT2', 'LNT2'],
+    'NT3': ['NT3', 'NT-D', 'NTD', 'NT-3', 'GNT3', 'LNT3'],
+    'VJ': ['VJ', 'NT-A', 'NTA', 'VJNT', 'VJ/DT', 'VJA', 'GVJ', 'LVJ'],
     'OPEN': ['OPEN', 'GOPEN', 'LOPEN'],
     'OBC': ['OBC', 'GOBC', 'LOBC'],
     'SC': ['SC', 'GSC', 'LSC'],
     'ST': ['ST', 'GST', 'LST'],
+    'SEBC': ['SEBC', 'GSEBC', 'LSEBC'],
     'EWS': ['EWS', 'GEWS', 'LEWS'],
     'TFWS': ['TFWS', 'GFWS', 'LFWS'],
     'DEF': ['DEF', 'DF', 'D1', 'D2', 'D3'],
@@ -282,6 +283,7 @@ const predictColleges = async (req, res) => {
         const filterClauses = [];
 
         // Specialized Flags
+        const activeFemale = (isFemale === true || isFemale === 'true' || data.isFemale === true || data.isFemale === 'true');
         const activeTFWS = (useTFWS === true || useTFWS === 'true');
         const activeDEF = (data.isDEF === true || data.isDEF === 'true' || category === 'DEF');
         const activePWD = (data.isPWD === true || data.isPWD === 'true' || category === 'PWD');
@@ -290,15 +292,39 @@ const predictColleges = async (req, res) => {
         const isSpecializedQuota = activeTFWS || activeDEF || activePWD || activeOrphan;
 
         if (category) {
-            const aliases = CATEGORY_ALIASES[category.toUpperCase()] || [category];
-            const matchingCategories = aliases.map(a => new RegExp(`^${a}$`, 'i'));
+            const userCatUpper = category.toUpperCase();
+            const aliases = CATEGORY_ALIASES[userCatUpper] || [category];
+            
+            // Build matching category patterns
+            const catList = [...aliases, 'OPEN', 'GOPEN', 'LOPEN'];
+            if (activeFemale) {
+                catList.push(`${userCatUpper} FEMALE`, 'OPEN FEMALE');
+            }
+            const catRegexes = catList.map(a => new RegExp(`^${a}`, 'i'));
 
-            if (activeTFWS) matchingCategories.push(/TFWS/i);
-            if (activeDEF) matchingCategories.push(/DEF|DF|D1|D2|D3/i);
-            if (activePWD) matchingCategories.push(/PWD|PH|P1|P2|P3/i);
-            if (activeOrphan) matchingCategories.push(/ORPHAN/i);
+            const categoryOrSeatConditions = [
+                { category: { $in: catRegexes } }
+            ];
 
-            query.category = { $in: matchingCategories };
+            // Build seatType patterns (matches G... or L... seats for user category or OPEN)
+            // E.g., LSEBCH, LSEBCO, LSCO, LNT1O, LOPENH, LOPENO, etc.
+            const seatTypeRegex = new RegExp(`^(G|L)?(${aliases.join('|')}|OPEN)`, 'i');
+            categoryOrSeatConditions.push({ seatType: seatTypeRegex });
+
+            if (activeTFWS) {
+                categoryOrSeatConditions.push({ category: /TFWS/i }, { seatType: /TFWS|FWS/i });
+            }
+            if (activeDEF) {
+                categoryOrSeatConditions.push({ category: /DEF|DF|D1|D2|D3/i }, { seatType: /DEF|DF|D1|D2|D3/i });
+            }
+            if (activePWD) {
+                categoryOrSeatConditions.push({ category: /PWD|PH|P1|P2|P3/i }, { seatType: /PWD|PH|P1|P2|P3/i });
+            }
+            if (activeOrphan) {
+                categoryOrSeatConditions.push({ category: /ORPHAN/i }, { seatType: /ORPHAN/i });
+            }
+
+            filterClauses.push({ $or: categoryOrSeatConditions });
         }
 
         // AUTO-EXCLUSION: Exclude specialized segments if they are not active
@@ -310,6 +336,12 @@ const predictColleges = async (req, res) => {
 
         if (exclusionSegments.length > 0) {
             filterClauses.push({ category: { $not: new RegExp(exclusionSegments.join('|'), 'i') } });
+        }
+
+        // Male Exclusion: If female quota is NOT active, exclude female seats starting with L (e.g. LSEBCH, LSCO, LNT1O, LOPENH) and category containing FEMALE
+        if (!activeFemale) {
+            filterClauses.push({ category: { $not: /FEMALE/i } });
+            filterClauses.push({ seatType: { $not: /^L[A-Z0-9]/i } });
         }
 
         if (round && round !== 'All') query.round = parseInt(round);
@@ -1084,6 +1116,63 @@ const clearAllCutoffsAndBranches = async (req, res) => {
     }
 };
 
+const getCutoffMeta = async (req, res) => {
+    try {
+        const { examType } = req.query;
+        let query = {};
+        if (examType) {
+            const eUpper = examType.toUpperCase();
+            if (eUpper.includes('PCM') || eUpper.includes('ENGINEERING') || eUpper === 'MHTCET') {
+                query = {
+                    $or: [
+                        { examType: /MHTCET/i },
+                        { examType: /Engineering/i },
+                        { examType: /PCM/i },
+                        { examType: { $exists: false } },
+                        { examType: null }
+                    ]
+                };
+            } else if (eUpper.includes('PCB') || eUpper.includes('PHARMACY')) {
+                query = {
+                    $or: [
+                        { examType: /Pharmacy/i },
+                        { examType: /PCB/i }
+                    ]
+                };
+            } else {
+                query = { examType: new RegExp(examType, 'i') };
+            }
+        }
+
+        let years = await Cutoff.distinct('year', query);
+        let rounds = await Cutoff.distinct('round', query);
+
+        // Fallback to all years/rounds if specific examType query yielded no entries
+        if (!years || years.length === 0) {
+            years = await Cutoff.distinct('year');
+        }
+        if (!rounds || rounds.length === 0) {
+            rounds = await Cutoff.distinct('round');
+        }
+
+        const sortedYears = (years || []).filter(y => y != null && !isNaN(y)).map(Number).sort((a, b) => b - a);
+        const sortedRounds = (rounds || []).filter(r => r != null && !isNaN(r)).map(Number).sort((a, b) => a - b);
+
+        const defaultYears = [2025, 2024, 2023, 2022];
+        const defaultRounds = [1, 2, 3];
+
+        const combinedYears = [...new Set([...sortedYears, ...defaultYears])].sort((a, b) => b - a);
+        const combinedRounds = [...new Set([...sortedRounds, ...defaultRounds])].sort((a, b) => a - b);
+
+        res.json({
+            years: combinedYears,
+            rounds: combinedRounds
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     addCutoffData,
     bulkAddCutoffData,
@@ -1094,6 +1183,7 @@ module.exports = {
     deleteCutoffs,
     estimateRank,
     getCutoffSummary,
+    getCutoffMeta,
     parsePdfCutoffs,
     importParsedCollege,
     clearAllCutoffsAndBranches

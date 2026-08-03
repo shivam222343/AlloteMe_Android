@@ -11,6 +11,7 @@ const {
     deleteCutoffs,
     estimateRank,
     getCutoffSummary,
+    getCutoffMeta,
     parsePdfCutoffs,
     importParsedCollege,
     clearAllCutoffsAndBranches
@@ -23,6 +24,7 @@ const upload = multer({
     limits: { fileSize: 15 * 1024 * 1024 } // 15MB limit for PDFs
 });
 
+router.get('/meta', getCutoffMeta);
 router.get('/summary/all', protect, authorize('admin'), getCutoffSummary);
 
 router.get('/estimate-rank', estimateRank);

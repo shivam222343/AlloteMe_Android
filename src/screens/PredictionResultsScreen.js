@@ -115,31 +115,64 @@ const PredictionResultRow = React.memo(({
                             <Text style={styles.branchName}>{item.branch}</Text>
                             <View style={styles.badgeRow}>
                                 <View style={[styles.badge, styles.roundBadge]}><Layers size={10} color={Colors.primary} /><Text style={styles.badgeText}>R-{item.round}</Text></View>
-                                <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View>
-                                {item.category && (
+                                <View style={[styles.badge, styles.yearBadge]}><Calendar size={10} color={Colors.secondary} /><Text style={styles.badgeText}>{item.year}</Text></View                                 {item.category && (
                                     <View style={[
                                         styles.badge,
-                                        { backgroundColor: item.category.toUpperCase().includes('TFWS') ? '#fff7ed' : '#f0fdf4' }
+                                        {
+                                            backgroundColor: item.category.toUpperCase().includes('TFWS')
+                                                ? '#fff7ed'
+                                                : (item.category.toUpperCase().includes('FEMALE') ? '#fdf2f8' : '#f0fdf4'),
+                                            borderColor: item.category.toUpperCase().includes('TFWS')
+                                                ? '#ffedd5'
+                                                : (item.category.toUpperCase().includes('FEMALE') ? '#fbcfe8' : 'transparent'),
+                                            borderWidth: (item.category.toUpperCase().includes('TFWS') || item.category.toUpperCase().includes('FEMALE')) ? 1 : 0
+                                        }
                                     ]}>
-                                        <ShieldCheck size={10} color={item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a'} />
+                                        <ShieldCheck
+                                            size={10}
+                                            color={
+                                                item.category.toUpperCase().includes('TFWS')
+                                                    ? '#f97316'
+                                                    : (item.category.toUpperCase().includes('FEMALE') ? '#db2777' : '#16a34a')
+                                            }
+                                        />
                                         <Text style={[
                                             styles.badgeText,
-                                            { color: item.category.toUpperCase().includes('TFWS') ? '#f97316' : '#16a34a' }
+                                            {
+                                                color: item.category.toUpperCase().includes('TFWS')
+                                                    ? '#f97316'
+                                                    : (item.category.toUpperCase().includes('FEMALE') ? '#db2777' : '#16a34a'),
+                                                fontWeight: (item.category.toUpperCase().includes('TFWS') || item.category.toUpperCase().includes('FEMALE')) ? '700' : '600'
+                                            }
                                         ]}>{item.category}</Text>
                                     </View>
                                 )}
                                 {item.seatType && (
                                     <View style={[
                                         styles.badge,
-                                        { backgroundColor: item.seatType.toUpperCase().startsWith('L') ? '#ecfdf5' : '#f0f9ff' }
+                                        {
+                                            backgroundColor: (item.seatType.toUpperCase().startsWith('L') || item.seatType.toUpperCase().includes('FEMALE'))
+                                                ? '#fdf2f8'
+                                                : '#f0f9ff',
+                                            borderColor: (item.seatType.toUpperCase().startsWith('L') || item.seatType.toUpperCase().includes('FEMALE'))
+                                                ? '#fbcfe8'
+                                                : '#e0f2fe',
+                                            borderWidth: 1
+                                        }
                                     ]}>
-                                        <ShieldCheck size={10} color={item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1'} />
+                                        <ShieldCheck
+                                            size={10}
+                                            color={(item.seatType.toUpperCase().startsWith('L') || item.seatType.toUpperCase().includes('FEMALE')) ? '#db2777' : '#0369a1'}
+                                        />
                                         <Text style={[
                                             styles.badgeText,
-                                            { color: item.seatType.toUpperCase().startsWith('L') ? '#059669' : '#0369a1' }
+                                            {
+                                                color: (item.seatType.toUpperCase().startsWith('L') || item.seatType.toUpperCase().includes('FEMALE')) ? '#db2777' : '#0369a1',
+                                                fontWeight: (item.seatType.toUpperCase().startsWith('L') || item.seatType.toUpperCase().includes('FEMALE')) ? '700' : '600'
+                                            }
                                         ]}>{item.seatType}</Text>
                                     </View>
-                                )}
+                                )})}
                             </View>
                         </View>
 
@@ -828,7 +861,7 @@ const PredictionResultsScreen = ({ route, navigation }) => {
 
                         <Text style={styles.inputLabel}>Select Round</Text>
                         <View style={styles.categoryGrid}>
-                            {[1, 2, 3].map((rd) => (
+                            {[...new Set([...(results || []).map(r => r.round).filter(Boolean), 1, 2, 3])].sort((a, b) => a - b).map((rd) => (
                                 <TouchableOpacity
                                     key={`round-${rd}`}
                                     style={[

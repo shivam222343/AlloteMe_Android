@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, ScrollView, Platform, LayoutAnimation, Modal } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import MainLayout from '../components/layouts/MainLayout';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -79,8 +80,8 @@ const SEAT_TYPES = [
     'State Level',
     'All India Level'
 ];
-const YEARS = [2025, 2024, 2023, 2022];
-const ROUNDS = [1, 2, 3];
+const DEFAULT_YEARS = [2025, 2024, 2023, 2022];
+const DEFAULT_ROUNDS = [1, 2, 3];
 
 const PredictorScreen = ({ navigation }) => {
     const { user, socket, admissionPath, checkLimit, incrementUsage } = useAuth();
@@ -102,10 +103,49 @@ const PredictorScreen = ({ navigation }) => {
     const [selectedRegions, setSelectedRegions] = useState([]);
     const [selectedTypes, setSelectedTypes] = useState([]);
     const [selectedSeatTypes, setSelectedSeatTypes] = useState([]);
+    const [yearsList, setYearsList] = useState(DEFAULT_YEARS);
+    const [roundsList, setRoundsList] = useState(DEFAULT_ROUNDS);
     const [selectedYear, setSelectedYear] = useState(2025);
     const [selectedRound, setSelectedRound] = useState(1);
     const [loading, setLoading] = useState(false);
     const [rankLoading, setRankLoading] = useState(false);
+
+    // Dynamic metadata fetch for uploaded Cutoff Years & Rounds
+    const fetchMeta = async () => {
+        try {
+            const targetExamType = admissionPath || user?.examType || 'MHTCET';
+            const res = await cutoffAPI.getMeta({ examType: targetExamType });
+            if (res.data?.years && res.data.years.length > 0) {
+                setYearsList(res.data.years);
+                setSelectedYear(prev => (res.data.years.includes(prev) ? prev : res.data.years[0]));
+            }
+            if (res.data?.rounds && res.data.rounds.length > 0) {
+                setRoundsList(res.data.rounds);
+                setSelectedRound(prev => (res.data.rounds.includes(prev) ? prev : res.data.rounds[0]));
+            }
+        } catch (err) {
+            console.log('Failed to fetch cutoff metadata', err);
+        }
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchMeta();
+        }, [admissionPath, user?.examType])
+    );
+
+    React.useEffect(() => {
+        if (!socket) return;
+        const handleCutoffUpdate = () => {
+            fetchMeta();
+        };
+        socket.on('cutoff:updated', handleCutoffUpdate);
+        socket.on('cutoff:added', handleCutoffUpdate);
+        return () => {
+            socket.off('cutoff:updated', handleCutoffUpdate);
+            socket.off('cutoff:added', handleCutoffUpdate);
+        };
+    }, [socket]);
 
     // Auto-calculate Rank based on Percentile
     React.useEffect(() => {
@@ -454,7 +494,7 @@ const PredictorScreen = ({ navigation }) => {
                                     <View style={{ flex: 1 }}>
                                         <Text style={[styles.advanceLabel, { marginBottom: 8, fontSize: 10 }]}>YEAR</Text>
                                         <View style={styles.chipGrid}>
-                                            {YEARS.map(y => (
+                                            {yearsList.map(y => (
                                                 <TouchableOpacity
                                                     key={y}
                                                     style={[styles.advanceChip, selectedYear === y && styles.advanceChipActive]}
@@ -468,7 +508,7 @@ const PredictorScreen = ({ navigation }) => {
                                     <View style={{ flex: 1 }}>
                                         <Text style={[styles.advanceLabel, { marginBottom: 8, fontSize: 10 }]}>ROUND</Text>
                                         <View style={styles.chipGrid}>
-                                            {ROUNDS.map(r => (
+                                            {roundsList.map(r => (
                                                 <TouchableOpacity
                                                     key={r}
                                                     style={[styles.advanceChip, selectedRound === r && styles.advanceChipActive]}

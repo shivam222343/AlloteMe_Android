@@ -288,7 +288,7 @@ a {
   .name-badge-container {
     left: 50% !important;
     transform: translateX(-50%) !important;
-    bottom: -4% !important;
+    bottom: 15px !important;
     white-space: nowrap;
     z-index: 20;
   }
@@ -1411,4 +1411,22 @@ a {
 
 .product-chips-track:hover {
   animation-play-state: paused;
+}
+
+main {
+  transition: padding-top 0.3s ease;
+}
+
+/* Dynamic Spacing for AppBanner */
+@media (min-width: 769px) {
+  main.main-with-banner {
+    padding-top: 100px;
+    transition: padding-top 0.3s ease;
+  }
+}
+
+@media (max-width: 768px) {
+  .mobile-tags-banner-visible {
+    margin-top: 200px !important;
+  }
 }

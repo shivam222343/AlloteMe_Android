@@ -127,7 +127,13 @@ const BranchCutoffDetailScreen = ({ route, navigation }) => {
                 <Text style={[styles.td, { fontWeight: '700', color: Colors.primary }]}>{item.category}</Text>
             </View>
             <View style={{ flex: 2 }}>
-                <Text style={[styles.td, { fontSize: 11, color: Colors.text.tertiary }]}>{item.seatType || 'General'}</Text>
+                {item.seatType && (item.seatType.toUpperCase().startsWith('L') || item.seatType.toUpperCase().includes('FEMALE')) ? (
+                    <View style={{ backgroundColor: '#fdf2f8', borderColor: '#fbcfe8', borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#db2777' }}>{item.seatType}</Text>
+                    </View>
+                ) : (
+                    <Text style={[styles.td, { fontSize: 11, color: Colors.text.tertiary }]}>{item.seatType || 'General'}</Text>
+                )}
             </View>
             <View style={{ flex: 1.5 }}>
                 <Text style={[styles.td, { textAlign: 'right', fontWeight: 'bold', color: Colors.text.primary }]}>

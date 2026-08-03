@@ -14,6 +14,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import RegisterCollegeAdmin from './pages/admin/RegisterCollegeAdmin';
 import PremiumPlans from './pages/PremiumPlans';
 import PortalModal from './components/PortalModal';
+import AppBanner from './components/AppBanner';
 import './index.css';
 import { useLocation } from 'react-router-dom';
 import { useState } from 'react';
@@ -28,6 +29,7 @@ const ScrollToTop = () => {
 
 function App() {
   const [isPortalModalOpen, setIsPortalModalOpen] = useState(false);
+  const [isBannerVisible, setIsBannerVisible] = useState(true);
 
   useEffect(() => {
     document.title = "AlloteMe";
@@ -42,9 +44,10 @@ function App() {
         <ScrollToTop />
         <PortalModal isOpen={isPortalModalOpen} onClose={closePortalModal} />
         <div className="app-container">
+          {window.location.pathname !== '/college/dashboard' && isBannerVisible && <AppBanner onClose={() => setIsBannerVisible(false)} />}
           {window.location.pathname !== '/college/dashboard' && <Navbar onPortalClick={openPortalModal} />}
-          {window.location.pathname !== '/college/dashboard' && <MobileNavTags onPortalClick={openPortalModal} />}
-          <main>
+          {window.location.pathname !== '/college/dashboard' && <MobileNavTags onPortalClick={openPortalModal} isBannerVisible={isBannerVisible} />}
+          <main className={isBannerVisible ? "main-with-banner" : ""}>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />

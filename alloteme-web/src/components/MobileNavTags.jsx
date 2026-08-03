@@ -2,11 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const MobileNavTags = ({ onPortalClick }) => {
+const MobileNavTags = ({ onPortalClick, isBannerVisible }) => {
     const { user, logout } = useAuth();
 
     return (
-        <div className="mobile-tags-container mobile-only">
+        <div 
+            className={`mobile-tags-container mobile-only ${isBannerVisible ? 'mobile-tags-banner-visible' : ''}`}
+            style={{ transition: 'margin-top 0.3s ease' }}
+        >
             <Link to="/" className="nav-tag nav-tag-home">Home</Link>
             <Link to="/about" className="nav-tag nav-tag-about">About</Link>
 
